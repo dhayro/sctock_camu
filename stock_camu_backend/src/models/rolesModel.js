@@ -1,18 +1,18 @@
-const mysql = require('mysql2');
-require('dotenv').config();
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database'); // Adjust the path as necessary
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+const Role = sequelize.define('Role', {
+  nombre: {
+    type: DataTypes.STRING(30),
+    unique: true,
+    allowNull: false,
+  },
+  descripcion: {
+    type: DataTypes.TEXT,
+  },
+}, {
+  tableName: 'roles',
+  timestamps: false,
 });
 
-const getRoles = (callback) => {
-  pool.query('SELECT * FROM roles', (error, results) => {
-    if (error) return callback(error);
-    callback(null, results);
-  });
-};
-
-module.exports = { getRoles };
+module.exports = Role;
