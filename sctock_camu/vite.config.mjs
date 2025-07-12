@@ -40,9 +40,18 @@ export default defineConfig(() => {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
     server: {
-      port: 3000,
+      port: 3001, // Cambiado de 3000 a 5173
       proxy: {
-        // https://vitejs.dev/config/server-options.html
+        '/api': {
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          secure: false,
+          // Opcional: si necesita reescribir las rutas
+          // rewrite: (path) => path.replace(/^\/api/, '')
+        }
+      },
+      hmr: {
+        overlay: false, // Disable the error overlay
       },
     },
   }

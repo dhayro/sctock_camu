@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Puerto Serial</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .monitor {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        .data-row {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 0.8em;
+        }
+        .raw-data {
+            color: #0066cc;
+            font-weight: bold;
+        }
+        .hex-data {
+            color: #cc6600;
+        }
+        .parsed-weight {
+            color: #009900;
+            font-weight: bold;
+        }
+        .stable {
+            color: #009900;
+        }
+        .unstable {
+            color: #cc0000;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+        .connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Monitor de Puerto Serial</h1>
+        
+        <div class="controls">
+            <button id="connect-btn">Conectar</button>
+            <button id="disconnect-btn">Desconectar</button>
+            <button id="clear-btn">Limpiar</button>
+            <span id="connection-status" class="status disconnected">Desconectado</span>
+        </div>
+        
+        <div class="monitor" id="data-monitor"></div>
+    </div>
+
+    <script>
+        // Variables globales
+        let eventSource = null;
+        const dataMonitor = document.getElementById('data-monitor');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const connectionStatus = document.getElementById('connection-status');
+        
+        // Función para conectar al SSE
+        function connectToSSE() {
+            console.log('Conectando al SSE...');
+            
+            // Cerrar conexión existente si hay
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // Crear nueva conexión SSE
+            eventSource = new EventSource('/api/balanza/monitor-data');
+            
+            // Configurar eventos
+            eventSource.onopen = function() {
+                console.log('Conexión SSE establecida');
+                connectionStatus.textContent = 'Conectado';
+                connectionStatus.className = 'status connected';
+            };
+            
+            eventSource.onmessage = function(event) {
+                console.log('Mensaje SSE recibido:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    addDataToMonitor(data);
+                } catch (error) {
+                    console.error('Error al procesar datos:', error);
+                    addRawDataToMonitor(event.data);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('Error en la conexión SSE:', error);
+                connectionStatus.textContent = 'Error de conexión';
+                connectionStatus.className = 'status disconnected';
+            };
+        }
+        
+        // Función para desconectar del SSE
+        function disconnectFromSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                console.log('Desconectado del SSE');
+                connectionStatus.textContent = 'Desconectado';
+                connectionStatus.className = 'status disconnected';
+            }
+        }
+        
+        // Función para añadir datos al monitor
+        function addDataToMonitor(data) {
+            const row = document.createElement('div');
+            row.className = 'data-row';
+            
+            // Formatear la fecha/hora
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            
+            row.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <div><strong>Datos crudos:</strong> <span class="raw-data">${data.rawData}</span></div>
+                <div><strong>Datos HEX:</strong> <span class="hex-data">${data.hexData}</span></div>
+                <div><strong>Tipo:</strong> ${data.dataType}</div>
+                <div><strong>Longitud:</strong> ${data.dataLength}</div>
+                <div><strong>Peso interpretado:</strong> <span class="parsed-weight">${data.parsedWeight ? data.parsedWeight.toFixed(3) : '0.000'} kg</span></div>
+                <div><strong>Estado:</strong> <span class="${data.stable ? 'stable' : 'unstable'}">${data.stable ? 'Estable' : 'Inestable'}</span></div>
+                ${data.asciiCodes ? `<div><strong>Códigos ASCII:</strong> [${data.asciiCodes.join(', ')}]</div>` : ''}
+                ${data.numericValues ? `<div><strong>Valores numéricos:</strong> [${data.numericValues.join(', ')}]</div>` : ''}
+                ${data.timeSinceLastData ? `<div><strong>Tiempo desde último dato:</strong> ${data.timeSinceLastData}ms</div>` : ''}
+            `;
+            
+            // Añadir al monitor
+            dataMonitor.appendChild(row);
+            
+            // Hacer scroll al final
+            dataMonitor.scrollTop = dataMonitor.scrollHeight;
+        }
+        
+        // Función para añadir datos crudos al monitor
+        function addRawDataToMonitor(rawData) {
+            const row = document.createElement('div');
+            row.className = 'data-row';
+            
+            row.innerHTML = `
+                <div class="timestamp">${new Date().toLocaleTimeString()}</div>
+                <div><strong>Datos crudos:</strong> <span class="raw-data">${rawData}</span></div>
+            `;
+            
+            // Añadir al monitor
+            dataMonitor.appendChild(row);
+            
+            // Hacer scroll al final
+            dataMonitor.scrollTop = dataMonitor.scrollHeight;
+        }
+        
+        // Función para limpiar el monitor
+        function clearMonitor() {
+            dataMonitor.innerHTML = '';
+        }
+        
+        // Configurar eventos de botones
+        connectBtn.addEventListener('click', connectToSSE);
+        disconnectBtn.addEventListener('click', disconnectFromSSE);
+        clearBtn.addEventListener('click', clearMonitor);
+        
+        // Verificar estado de conexión al cargar la página
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/balanza/status');
+                if (response.ok) {
+                    const status = await response.json();
+                    if (status.connected) {
+                        connectToSSE();
+                    }
+                }
+            } catch (error) {
+                console.error('Error al verificar el estado de conexión:', error);
+            }
+        });
+    </script>
+</body>
+</html>

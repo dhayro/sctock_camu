@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Balanza en Tiempo Real</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .weight-display {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        .status.connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .status.disconnected {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .button-group {
+            margin: 15px 0;
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        button.disconnect {
+            background-color: #f44336;
+        }
+
+        button.secondary {
+            background-color: #2196F3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .data-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .flex-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .flex-item {
+            flex: 1;
+        }
+
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .error {
+            color: #f44336;
+            margin-top: 5px;
+        }
+
+        .success {
+            color: #4CAF50;
+            margin-top: 5px;
+        }
+
+        .message {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+
+        .message.error {
+            background-color: #ffebee;
+            border: 1px solid #f44336;
+        }
+
+        .message.success {
+            background-color: #e8f5e9;
+            border: 1px solid #4CAF50;
+        }
+
+        #monitor-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        #monitor-table th,
+        #monitor-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        #monitor-table th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+
+        #monitor-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .data-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .raw-data-monitor {
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .monitor-header {
+            display: grid;
+            grid-template-columns: 150px 1fr 1fr 80px 80px 120px 80px;
+            background-color: #f5f5f5;
+            padding: 10px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .monitor-body {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .monitor-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 1fr 80px 80px 120px 80px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .monitor-row:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .monitor-row span {
+            word-break: break-all;
+        }
+        
+        .monitor-row .stable {
+            color: #4CAF50;
+        }
+        
+        .monitor-row .unstable {
+            color: #FF9800;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Monitor de Balanza en Tiempo Real</h1>
+            <div>
+                <span id="connection-status" class="status disconnected">Desconectado</span>
+            </div>
+        </div>
+
+        <div class="flex-container">
+            <div class="flex-item">
+                <div class="card">
+                    <h2>Configuración de la Balanza</h2>
+                    <div class="form-group">
+                        <label for="port-select">Puerto COM:</label>
+                        <select id="port-select">
+                            <option value="">Seleccionar puerto...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="baud-rate">Velocidad (baudios):</label>
+                        <select id="baud-rate">
+                            <option value="9600">9600</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="57600">57600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                    </div>
+                    <div class="button-group">
+                        <button id="refresh-ports" class="secondary">Actualizar Puertos</button>
+                        <button id="save-config" class="secondary">Guardar Configuración</button>
+                    </div>
+                    <div class="button-group">
+                        <button id="connect-button">Conectar</button>
+                        <button id="disconnect-button" class="disconnect" disabled>Desconectar</button>
+                    </div>
+                    <div id="config-message"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Peso Actual</h2>
+                    <div class="weight-display" id="current-weight">0.00 kg</div>
+                    <div>
+                        <p><strong>Estado:</strong> <span id="weight-status">-</span></p>
+                        <p><strong>Último peso estable:</strong> <span id="stable-weight">0.00 kg</span></p>
+                        <p><strong>Hora:</strong> <span id="last-stable-time">-</span></p>
+                        <p><strong>Datos crudos:</strong> <span id="raw-data">-</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-item">
+                <div class="card">
+                    <h2>Datos Recibidos</h2>
+                    <div class="button-group">
+                        <button id="clear-data" class="secondary">Limpiar Datos</button>
+                        <button id="export-data" class="secondary">Exportar CSV</button>
+                    </div>
+                    <div class="data-container">
+                        <table id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Datos Crudos</th>
+                                    <th>Peso Interpretado</th>
+                                    <th>Estable</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-body">
+                                <!-- Los datos se cargarán aquí dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Gráfico de Peso en Tiempo Real</h2>
+            <div class="chart-container">
+                <canvas id="weight-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Añadir estas bibliotecas antes de Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+
+    <script>
+        // Variables globales
+        let eventSource = null;
+        let weightData = [];
+        let chart = null;
+        let isConnected = false;
+        let lastStableWeight = 0;
+        let lastStableTime = null;
+        let monitorEventSource = null;
+        const monitorBody = document.getElementById('monitor-body');
+        const clearMonitorButton = document.getElementById('clear-monitor');
+
+        // Elementos DOM
+        const connectionStatus = document.getElementById('connection-status');
+        const currentWeight = document.getElementById('current-weight');
+        const stableWeight = document.getElementById('stable-weight');
+        const weightStatus = document.getElementById('weight-status');
+        const lastStableTimeEl = document.getElementById('last-stable-time');
+        const portSelect = document.getElementById('port-select');
+        const baudRateSelect = document.getElementById('baud-rate');
+        const connectButton = document.getElementById('connect-button');
+        const disconnectButton = document.getElementById('disconnect-button');
+        const refreshPortsButton = document.getElementById('refresh-ports');
+        const saveConfigButton = document.getElementById('save-config');
+        const clearDataButton = document.getElementById('clear-data');
+        const exportDataButton = document.getElementById('export-data');
+        const dataBody = document.getElementById('data-body');
+        const configMessage = document.getElementById('config-message');
+        const monitorDataDisplay = document.getElementById('monitor-data-display');
+        const startMonitorButton = document.getElementById('start-monitor');
+        const stopMonitorButton = document.getElementById('stop-monitor');
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', async () => {
+            initChart();
+            await loadPorts();
+            await checkConnectionStatus();
+
+            // Event listeners
+            refreshPortsButton.addEventListener('click', loadPorts);
+            saveConfigButton.addEventListener('click', saveConfig);
+            connectButton.addEventListener('click', connectBalanza);
+            disconnectButton.addEventListener('click', disconnectBalanza);
+            clearDataButton.addEventListener('click', clearData);
+            exportDataButton.addEventListener('click', exportData);
+            startMonitorButton.addEventListener('click', startMonitorData);
+            stopMonitorButton.addEventListener('click', stopMonitorData);
+            clearMonitorButton.addEventListener('click', clearMonitorData);
+
+            // Verificar estado cada 5 segundos
+            setInterval(checkConnectionStatus, 5000);
+
+            // Iniciar el monitor de datos si ya está conectado
+            if (isConnected) {
+                startMonitorDataListener();
+            }
+        });
+
+        // Inicializar el gráfico
+        function initChart() {
+            const ctx = document.getElementById('weight-chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Peso (kg)',
+                        data: [],
+                        borderColor: '#4CAF50',
+                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        pointRadius: 1,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'second',
+                                displayFormats: {
+                                    second: 'HH:mm:ss'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Hora'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Peso (kg)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return `Peso: ${context.parsed.y.toFixed(3)} kg`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Actualizar el gráfico
+        function updateChart(data) {
+            const now = new Date();
+
+            // Añadir el nuevo punto de datos
+            weightData.push({ x: now, y: data.weight });
+
+            // Limitar la cantidad de puntos para evitar problemas de rendimiento
+            if (weightData.length > 100) {
+                weightData.shift();
+            }
+
+            // Actualizar los datos del gráfico
+            chart.data.datasets[0].data = weightData;
+
+            // Actualizar el gráfico
+            chart.update();
+        }
+
+        // Cargar los puertos disponibles
+        async function loadPorts() {
+            try {
+                // Mostrar mensaje de carga
+                portSelect.innerHTML = '<option value="">Cargando puertos...</option>';
+
+                // Hacer la solicitud a la API
+                const response = await fetch('/api/balanza/puertos');
+
+                if (!response.ok) {
+                    throw new Error(`Error al obtener los puertos: ${response.status} ${response.statusText}`);
+                }
+
+                // Procesar la respuesta
+                const data = await response.json();
+
+                // Limpiar y llenar el selector de puertos
+                portSelect.innerHTML = '<option value="">Seleccionar puerto...</option>';
+
+                // Verificar si data es un array directamente (como en tu respuesta)
+                const puertos = Array.isArray(data) ? data : (data && data.puertos && Array.isArray(data.puertos) ? data.puertos : []);
+
+                if (puertos.length > 0) {
+                    puertos.forEach(puerto => {
+                        const option = document.createElement('option');
+                        option.value = puerto.path;
+                        option.textContent = `${puerto.path} - ${puerto.manufacturer || 'Desconocido'}${puerto.friendlyName ? ` (${puerto.friendlyName})` : ''}`;
+                        portSelect.appendChild(option);
+                    });
+
+                    showMessage(configMessage, `Se encontraron ${puertos.length} puertos disponibles`, 'success');
+                } else {
+                    showMessage(configMessage, 'No se encontraron puertos disponibles', 'error');
+                }
+            } catch (error) {
+                console.error('Error al cargar los puertos:', error);
+                portSelect.innerHTML = '<option value="">Error al cargar puertos</option>';
+                showMessage(configMessage, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Obtener el estado actual de la balanza
+        async function checkConnectionStatus() {
+            try {
+                const response = await fetch('/api/balanza/status');
+                if (!response.ok) {
+                    throw new Error('Error al obtener el estado');
+                }
+
+                const status = await response.json();
+                const wasConnected = isConnected;
+                isConnected = status.connected;
+
+                connectionStatus.className = `status ${isConnected ? 'connected' : 'disconnected'}`;
+                connectionStatus.textContent = isConnected ? 'Conectado' : 'Desconectado';
+
+                if (isConnected) {
+                    connectButton.disabled = true;
+                    disconnectButton.disabled = false;
+
+                    // Solo iniciar la escucha si no estaba conectado antes
+                    if (!wasConnected) {
+                        startListeningToEvents();
+                    }
+                } else {
+                    connectButton.disabled = false;
+                    disconnectButton.disabled = true;
+                    stopListeningToEvents();
+                }
+            } catch (error) {
+                console.error('Error al obtener el estado:', error);
+                connectionStatus.className = 'status disconnected';
+                connectionStatus.textContent = 'Error';
+                isConnected = false;
+                connectButton.disabled = false;
+                disconnectButton.disabled = true;
+                stopListeningToEvents();
+            }
+        }
+
+        // Conectar a la balanza
+        async function connectBalanza() {
+            const port = portSelect.value;
+            const baudRate = parseInt(baudRateSelect.value);
+
+            if (!port || !baudRate) {
+                showMessage(configMessage, 'Por favor, seleccione un puerto y una velocidad', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/balanza/connect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ port, baudRate })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error al conectar a la balanza');
+                }
+
+                const result = await response.json();
+                showMessage(configMessage, result.message || 'Conectado correctamente', 'success');
+                await checkConnectionStatus();
+            } catch (error) {
+                console.error('Error al conectar a la balanza:', error);
+                showMessage(configMessage, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Desconectar de la balanza
+        async function disconnectBalanza() {
+            try {
+                const response = await fetch('/api/balanza/disconnect', {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error al desconectar de la balanza');
+                }
+
+                const result = await response.json();
+                showMessage(configMessage, result.message || 'Desconectado correctamente', 'success');
+                await checkConnectionStatus();
+            } catch (error) {
+                console.error('Error al desconectar de la balanza:', error);
+                showMessage(configMessage, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Guardar la configuración
+        async function saveConfig() {
+            const port = portSelect.value;
+            const baudRate = parseInt(baudRateSelect.value);
+
+            if (!port || !baudRate) {
+                showMessage(configMessage, 'Por favor, seleccione un puerto y una velocidad', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/balanza/configurar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ port, baudRate })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error al guardar la configuración');
+                }
+
+                const result = await response.json();
+                showMessage(configMessage, result.message || 'Configuración guardada correctamente', 'success');
+            } catch (error) {
+                console.error('Error al guardar la configuración:', error);
+                showMessage(configMessage, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Limpiar los datos
+        function clearData() {
+            weightData = [];
+            chart.data.datasets[0].data = [];
+            chart.update();
+            dataBody.innerHTML = '';
+            lastStableWeight = 0;
+            lastStableTime = null;
+            currentWeight.textContent = '0.00 kg';
+            stableWeight.textContent = '0.00 kg';
+            lastStableTimeEl.textContent = '-';
+            weightStatus.textContent = '-';
+        }
+
+        // Exportar los datos a CSV
+        function exportData() {
+            const csvContent = "data:text/csv;charset=utf-8,Hora,Datos Crudos,Peso Interpretado,Estable\n";
+            const rows = Array.from(dataBody.rows).map(row => {
+                return Array.from(row.cells).map(cell => cell.textContent).join(',');
+            }).join('\n');
+
+            const encodedUri = encodeURI(csvContent + rows);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "balanza_data.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Mostrar mensajes
+        function showMessage(element, message, type) {
+            element.className = `message ${type}`;
+            element.textContent = message;
+            setTimeout(() => {
+                element.textContent = '';
+            }, 5000);
+        }
+
+        // Escuchar eventos de la balanza
+        function startListeningToEvents() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            eventSource = new EventSource('/api/balanza/pesaje-realtime');
+
+            eventSource.onmessage = function (event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('Datos recibidos:', data); // Añadir log para depuración
+                    updateWeightDisplay(data);
+                    addDataTableRow(data);
+                    updateChart(data);
+                } catch (error) {
+                    console.error('Error al procesar datos del evento:', error);
+                }
+            };
+
+            eventSource.onerror = function (error) {
+                console.error('Error en el EventSource:', error);
+                connectionStatus.className = 'status disconnected';
+                connectionStatus.textContent = 'Error de conexión';
+                eventSource.close();
+            };
+
+            // Cargar el historial de datos al conectar
+            loadDataHistory();
+        }
+
+        // Dejar de escuchar eventos de la balanza
+        function stopListeningToEvents() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        // Actualizar la visualización del peso
+        function updateWeightDisplay(data) {
+            // Mostrar el peso interpretado
+            currentWeight.textContent = `${data.weight.toFixed(2)} kg`;
+
+            // Mostrar el estado
+            weightStatus.textContent = data.stable ? 'Estable' : 'Inestable';
+
+            // Mostrar los datos crudos
+            if (document.getElementById('raw-data')) {
+                document.getElementById('raw-data').textContent = data.rawData || 'No hay datos';
+            }
+
+            // Actualizar el último peso estable
+            if (data.stable && data.weight !== lastStableWeight) {
+                lastStableWeight = data.weight;
+                lastStableTime = new Date().toLocaleTimeString();
+                lastStableTimeEl.textContent = lastStableTime;
+                stableWeight.textContent = `${lastStableWeight.toFixed(2)} kg`;
+            }
+        }
+
+        // Agregar una fila a la tabla de datos
+        function addDataTableRow(data, isHistorical = false) {
+            const row = document.createElement('tr');
+
+            // Formatear la fecha/hora
+            let timestamp;
+            if (data.timestamp) {
+                timestamp = new Date(data.timestamp).toLocaleTimeString();
+            } else {
+                timestamp = new Date().toLocaleTimeString();
+            }
+
+            // Crear las celdas
+            const timeCell = document.createElement('td');
+            timeCell.textContent = timestamp;
+
+            const rawDataCell = document.createElement('td');
+            rawDataCell.textContent = data.rawData || 'No disponible';
+
+            const weightCell = document.createElement('td');
+            weightCell.textContent = data.weight !== undefined ? `${data.weight.toFixed(3)} kg` : 'N/A';
+
+            const stableCell = document.createElement('td');
+            stableCell.textContent = data.stable ? 'Sí' : 'No';
+
+            // Añadir las celdas a la fila
+            row.appendChild(timeCell);
+            row.appendChild(rawDataCell);
+            row.appendChild(weightCell);
+            row.appendChild(stableCell);
+
+            // Añadir la fila a la tabla (al principio para los datos más recientes)
+            if (dataBody.firstChild) {
+                dataBody.insertBefore(row, dataBody.firstChild);
+            } else {
+                dataBody.appendChild(row);
+            }
+
+            // Limitar el número de filas para evitar problemas de rendimiento
+            while (dataBody.children.length > 100) {
+                dataBody.removeChild(dataBody.lastChild);
+            }
+        }
+
+        // Añade esta función para cargar el historial de datos
+        async function loadDataHistory() {
+            try {
+                // Limpiar datos existentes
+                dataBody.innerHTML = '';
+                weightData = [];
+
+                // Intentar obtener datos crudos recientes
+                const rawDataResponse = await fetchRawData();
+
+                if (rawDataResponse && rawDataResponse.rawDataHistory && Array.isArray(rawDataResponse.rawDataHistory)) {
+                    // Procesar el historial de datos
+                    rawDataResponse.rawDataHistory.forEach(item => {
+                        // Añadir al gráfico
+                        if (item.parsedWeight !== null && !isNaN(item.parsedWeight)) {
+                            const timestamp = new Date(item.timestamp);
+                            weightData.push({ x: timestamp, y: item.parsedWeight });
+                        }
+
+                        // Añadir a la tabla
+                        addDataTableRow({
+                            timestamp: item.timestamp,
+                            rawData: item.rawData,
+                            weight: item.parsedWeight || 0,
+                            stable: true // Asumimos que los datos históricos son estables
+                        }, true); // true indica que es un dato histórico
+                    });
+
+                    // Actualizar el gráfico
+                    chart.data.datasets[0].data = weightData;
+                    chart.update();
+
+                    // Mostrar el último dato si existe
+                    if (rawDataResponse.lastRawData) {
+                        updateWeightDisplay({
+                            weight: rawDataResponse.lastRawData.parsedWeight || 0,
+                            stable: true,
+                            rawData: rawDataResponse.lastRawData.rawData
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar el historial de datos:', error);
+            }
+        }
+
+        // Añade esta función después de updateWeightDisplay
+        async function fetchRawData() {
+            try {
+                const response = await fetch('/api/balanza/raw-data');
+                if (!response.ok) {
+                    console.warn('No se pudieron obtener datos crudos:', response.status);
+                    return null;
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('Error al obtener datos crudos:', error);
+                return null;
+            }
+        }
+
+        // Añade un intervalo para actualizar los datos crudos periódicamente incluso cuando no hay eventos
+        setInterval(async () => {
+            if (isConnected) {
+                const rawData = await fetchRawData();
+                if (rawData && rawData.lastRawData) {
+                    document.getElementById('raw-data').textContent = rawData.lastRawData.rawData || 'No hay datos';
+                }
+            }
+        }, 2000); // Actualizar cada 2 segundos
+
+        function startMonitorData() {
+            if (monitorEventSource) {
+                monitorEventSource.close();
+            }
+
+            // Cambiar estado de los botones
+            startMonitorButton.disabled = true;
+            stopMonitorButton.disabled = false;
+
+            // Crear una nueva conexión SSE
+            monitorEventSource = new EventSource('/api/balanza/monitor-data');
+
+            // Configurar el manejador de eventos para los mensajes
+            monitorEventSource.onmessage = function (event) {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    // Crear una nueva fila para la tabla
+                    const row = document.createElement('tr');
+
+                    // Formatear la fecha/hora
+                    const timestamp = new Date(data.timestamp).toLocaleTimeString();
+
+                    // Crear las celdas
+                    const timeCell = document.createElement('td');
+                    timeCell.textContent = timestamp;
+
+                    const rawDataCell = document.createElement('td');
+                    rawDataCell.textContent = data.rawData || 'No disponible';
+
+                    const hexDataCell = document.createElement('td');
+                    hexDataCell.textContent = data.hexData || 'No disponible';
+
+                    const typeCell = document.createElement('td');
+                    typeCell.textContent = data.dataType || 'desconocido';
+
+                    const lengthCell = document.createElement('td');
+                    lengthCell.textContent = data.dataLength || '0';
+
+                    const weightCell = document.createElement('td');
+                    weightCell.textContent = data.parsedWeight !== undefined ? `${data.parsedWeight.toFixed(3)} kg` : 'N/A';
+
+                    const stableCell = document.createElement('td');
+                    stableCell.textContent = data.stable ? 'Sí' : 'No';
+
+                    // Añadir las celdas a la fila
+                    row.appendChild(timeCell);
+                    row.appendChild(rawDataCell);
+                    row.appendChild(hexDataCell);
+                    row.appendChild(typeCell);
+                    row.appendChild(lengthCell);
+                    row.appendChild(weightCell);
+                    row.appendChild(stableCell);
+
+                    // Añadir la fila a la tabla (al principio para los datos más recientes)
+                    if (monitorBody.firstChild) {
+                        monitorBody.insertBefore(row, monitorBody.firstChild);
+                    } else {
+                        monitorBody.appendChild(row);
+                    }
+
+                    // Limitar el número de filas para evitar problemas de rendimiento
+                    while (monitorBody.children.length > 100) {
+                        monitorBody.removeChild(monitorBody.lastChild);
+                    }
+                } catch (error) {
+                    console.error('Error al procesar datos del monitor:', error);
+                }
+            };
+
+            monitorEventSource.onerror = function (error) {
+                console.error('Error en el EventSource del monitor:', error);
+                stopMonitorData();
+            };
+        }
+
+        function stopMonitorData() {
+            if (monitorEventSource) {
+                monitorEventSource.close();
+                monitorEventSource = null;
+            }
+
+            // Cambiar estado de los botones
+            startMonitorButton.disabled = false;
+            stopMonitorButton.disabled = true;
+        }
+
+        function clearMonitorData() {
+            monitorBody.innerHTML = '';
+        }
+
+        // Variables para el monitor de datos crudos
+        const monitorDataContainer = document.getElementById('monitor-data-container');
+        
+        // Función para iniciar la escucha de eventos del monitor de datos
+        function startMonitorDataListener() {
+            if (monitorEventSource) {
+                monitorEventSource.close();
+            }
+            
+            monitorEventSource = new EventSource('/api/balanza/monitor-data');
+            
+            monitorEventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    addMonitorDataRow(data);
+                } catch (error) {
+                    console.error('Error al procesar datos del monitor:', error);
+                }
+            };
+            
+            monitorEventSource.onerror = (error) => {
+                console.error('Error en el EventSource del monitor:', error);
+                setTimeout(() => {
+                    startMonitorDataListener();
+                }, 5000); // Reintentar conexión después de 5 segundos
+            };
+        }
+        
+        // Función para añadir una fila al monitor de datos
+        function addMonitorDataRow(data) {
+            const row = document.createElement('div');
+            row.className = 'monitor-row';
+            
+            // Formatear la fecha
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            
+            // Crear el contenido de la fila
+            row.innerHTML = `
+                <span>${timestamp}</span>
+                <span>${data.rawData}</span>
+                <span>${data.hexData}</span>
+                <span>${data.dataType}</span>
+                <span>${data.dataLength}</span>
+                <span>${data.parsedWeight.toFixed(3)} kg</span>
+                <span class="${data.stable ? 'stable' : 'unstable'}">${data.stable ? 'Estable' : 'Inestable'}</span>
+            `;
+            
+            // Añadir la fila al contenedor
+            monitorDataContainer.prepend(row);
+            
+            // Limitar el número de filas para evitar problemas de rendimiento
+            while (monitorDataContainer.children.length > 50) {
+                monitorDataContainer.removeChild(monitorDataContainer.lastChild);
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -4,6 +4,18 @@ const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
 const Colors = React.lazy(() => import('./views/theme/colors/Colors'))
 const Typography = React.lazy(() => import('./views/theme/typography/Typography'))
 
+// Usuarios y Roles
+const Roles = React.lazy(() => import('./views/maestros/Roles'))
+
+// Cargos
+const Cargos = React.lazy(() => import('./views/maestros/Cargos')) // Import the Cargos component
+
+// Areas
+const Areas = React.lazy(() => import('./views/maestros/Areas')) // Import the Areas component
+
+// Personal
+const Personal = React.lazy(() => import('./views/maestros/Personal')) // Import the Personal component
+
 // Base
 const Accordion = React.lazy(() => import('./views/base/accordion/Accordion'))
 const Breadcrumbs = React.lazy(() => import('./views/base/breadcrumbs/Breadcrumbs'))
@@ -57,6 +69,13 @@ const routes = [
   { path: '/theme', name: 'Theme', element: Colors, exact: true },
   { path: '/theme/colors', name: 'Colors', element: Colors },
   { path: '/theme/typography', name: 'Typography', element: Typography },
+  
+  // Rutas para Usuarios, Roles, Áreas, y Personal
+  { path: '/maestros/roles', name: 'Roles', element: Roles },
+  { path: '/maestros/cargos', name: 'Cargos', element: Cargos },
+  { path: '/maestros/areas', name: 'Áreas', element: Areas },
+  { path: '/maestros/personal', name: 'Personal', element: Personal }, // Add the route for Personal
+  
   { path: '/base', name: 'Base', element: Cards, exact: true },
   { path: '/base/accordion', name: 'Accordion', element: Accordion },
   { path: '/base/breadcrumbs', name: 'Breadcrumbs', element: Breadcrumbs },

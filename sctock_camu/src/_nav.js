@@ -13,6 +13,13 @@ import {
   cilPuzzle,
   cilSpeedometer,
   cilStar,
+  cilPeople,
+  cilUser,
+  cilStorage,
+  cilBasket,
+  cilTruck,
+  cilClipboard,
+  cilLockLocked,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -26,6 +33,225 @@ const _nav = [
       color: 'info',
       text: 'NEW',
     },
+  },
+  
+  // Nuevo grupo de menú para el sistema de Stock Camu
+  {
+    component: CNavTitle,
+    name: 'Sistema Stock Camu',
+  },
+  {
+    component: CNavGroup,
+    name: 'Maestros del Sistema',
+    to: '/maestros',
+    icon: <CIcon icon={cilLockLocked} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Roles',
+        to: '/maestros/roles',
+      },
+      {
+        component: CNavItem,
+        name: 'Áreas',
+        to: '/maestros/areas',
+      },
+      {
+        component: CNavItem,
+        name: 'Cargos',
+        to: '/maestros/cargos',
+      },
+      {
+        component: CNavItem,
+        name: 'Personal',
+        to: '/maestros/personal',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Gestión de Socios',
+    to: '/socios',
+    icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Lista de Socios',
+        to: '/socios/lista',
+      },
+      {
+        component: CNavItem,
+        name: 'Registrar Socio',
+        to: '/socios/nuevo',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Inventario',
+    to: '/inventario',
+    icon: <CIcon icon={cilStorage} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Productos',
+        to: '/inventario/productos',
+      },
+      {
+        component: CNavItem,
+        name: 'Tipos de Fruta',
+        to: '/inventario/tipos-fruta',
+      },
+      {
+        component: CNavItem,
+        name: 'Unidades de Medida',
+        to: '/inventario/unidades-medida',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Operaciones',
+    to: '/operaciones',
+    icon: <CIcon icon={cilBasket} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Ingresos',
+        to: '/operaciones/ingresos',
+      },
+      {
+        component: CNavItem,
+        name: 'Salidas',
+        to: '/operaciones/salidas',
+      },
+      {
+        component: CNavItem,
+        name: 'Pesajes',
+        to: '/operaciones/pesajes',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Pedidos y Lotes',
+    to: '/pedidos',
+    icon: <CIcon icon={cilTruck} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Lista de Pedidos',
+        to: '/pedidos/lista',
+      },
+      {
+        component: CNavItem,
+        name: 'Nuevo Pedido',
+        to: '/pedidos/nuevo',
+      },
+      {
+        component: CNavItem,
+        name: 'Seguimiento',
+        to: '/pedidos/seguimiento',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Clientes',
+    to: '/clientes',
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Lista de Clientes',
+        to: '/clientes/lista',
+      },
+      {
+        component: CNavItem,
+        name: 'Nuevo Cliente',
+        to: '/clientes/nuevo',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Reportes',
+    to: '/reportes',
+    icon: <CIcon icon={cilClipboard} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Reporte de Ingresos',
+        to: '/reportes/ingresos',
+      },
+      {
+        component: CNavItem,
+        name: 'Reporte de Salidas',
+        to: '/reportes/salidas',
+      },
+      {
+        component: CNavItem,
+        name: 'Contribución por Socio',
+        to: '/reportes/contribucion-socios',
+      },
+      {
+        component: CNavItem,
+        name: 'Avance de Pedidos',
+        to: '/reportes/avance-pedidos',
+      },
+    ],
+  },
+  
+  // Mantener el resto del menú original
+  {
+    component: CNavTitle,
+    name: 'Administración',
+  },
+  {
+    component: CNavGroup,
+    name: 'Maestros del Sistema',
+    to: '/maestros',
+    icon: <CIcon icon={cilLockLocked} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Roles',
+        to: '/maestros/roles',
+      },
+      {
+        component: CNavItem,
+        name: 'Áreas',
+        to: '/maestros/areas',
+      },
+      {
+        component: CNavItem,
+        name: 'Cargos',
+        to: '/maestros/cargos',
+      },
+      {
+        component: CNavItem,
+        name: 'Personal',
+        to: '/maestros/personal',
+      },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Usuarios',
+    to: '/usuarios',
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Lista de Usuarios',
+        to: '/usuarios/lista',
+      },
+      {
+        component: CNavItem,
+        name: 'Roles',
+        to: '/usuarios/roles',
+      },
+    ],
   },
   {
     component: CNavTitle,
