@@ -60,7 +60,7 @@ class BalanzaService extends EventEmitter {
             });
             
             // Crear parser
-            this.parser = this.port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+            this.parser = this.port.pipe(new ReadlineParser({ delimiter: '=' })); //\r\n
             
             // Configurar eventos
             this.port.on('open', () => {
@@ -105,8 +105,8 @@ class BalanzaService extends EventEmitter {
                 this.dataBuffer += dataStr;
                 
                 // Verificar si el buffer contiene un mensaje completo (por ejemplo, termina con un delimitador)
-                if (this.dataBuffer.includes('\n')) {
-                    const mensajes = this.dataBuffer.split('\n');
+                if (this.dataBuffer.includes('=')) { //\n
+                    const mensajes = this.dataBuffer.split('=');   //\n
                     // Procesar todos los mensajes completos
                     for (let i = 0; i < mensajes.length - 1; i++) {
                         const mensajeCompleto = mensajes[i].trim();
