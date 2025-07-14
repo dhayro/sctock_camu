@@ -139,10 +139,13 @@ exports.updateUsuario = async (req, res) => {
       }
     }
 
+    // Encriptar la contraseña si se proporciona una nueva
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : usuarioExistente.password;
+
     await usuarioExistente.update({
       personal_id: personal_id !== undefined ? personal_id : usuarioExistente.personal_id,
       usuario: usuario || usuarioExistente.usuario,
-      password: password ? password : usuarioExistente.password, // Asegúrate de encriptar la contraseña si se actualiza
+      password: hashedPassword,
       email: email || usuarioExistente.email,
       rol_id: rol_id || usuarioExistente.rol_id,
       estado: estado !== undefined ? estado : usuarioExistente.estado

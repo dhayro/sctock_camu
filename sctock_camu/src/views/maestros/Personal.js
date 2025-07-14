@@ -38,7 +38,7 @@ const formatText = (text) => {
 };
 
 const PersonalRow = ({ personal, index, currentPage, itemsPerPage, onEdit, onDelete, onUserAction }) => {
-  const hasAccess = personal.usuario !== 'sin acceso';
+  const hasAccess = personal.usuario && personal.usuario.usuario !== 'sin acceso';
 
   return (
     <CTableRow>
@@ -56,7 +56,7 @@ const PersonalRow = ({ personal, index, currentPage, itemsPerPage, onEdit, onDel
           onClick={() => onUserAction(personal)}
         >
           <CIcon icon={hasAccess ? cilUserPlus : cilUserX} />
-          {hasAccess ? personal.usuario : 'sin acceso'}
+          {hasAccess ? personal.usuario.usuario : 'sin acceso'}
         </CButton>
       </CTableDataCell>
       <CTableDataCell>
@@ -270,6 +270,10 @@ const Personal = () => {
   const [nombreFilter, setNombreFilter] = useState('');
   const [apellidoFilter, setApellidoFilter] = useState('');
   const [emailFilter, setEmailFilter] = useState('');
+  const [dniFilter, setDniFilter] = useState('');
+  const [cargoFilter, setCargoFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
+  const [usuarioFilter, setUsuarioFilter] = useState('');
 
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [activeFilter, setActiveFilter] = useState(null);
@@ -306,16 +310,20 @@ const Personal = () => {
     const filtered = personalList.filter(personal => 
       personal.nombre.toLowerCase().includes(nombreFilter.toLowerCase()) &&
       personal.apellido.toLowerCase().includes(apellidoFilter.toLowerCase()) &&
-      personal.email.toLowerCase().includes(emailFilter.toLowerCase())
+      personal.email.toLowerCase().includes(emailFilter.toLowerCase()) &&
+      personal.dni.toLowerCase().includes(dniFilter.toLowerCase()) &&
+      personal.cargo?.nombre.toLowerCase().includes(cargoFilter.toLowerCase()) &&
+      personal.area?.nombre.toLowerCase().includes(areaFilter.toLowerCase()) &&
+      personal.usuario?.usuario.toLowerCase().includes(usuarioFilter.toLowerCase())
     );
     setFilteredPersonal(filtered);
-  }, [personalList, nombreFilter, apellidoFilter, emailFilter]);
+  }, [personalList, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter]);
 
-  const fetchPersonal = async (page = 1, itemsPerPage = 10, searchTerm = '', nombre = '', apellido = '', email = '') => {
+  const fetchPersonal = async (page = 1, itemsPerPage = 10, searchTerm = '', nombre = '', apellido = '', email = '', dni = '', cargo = '', area = '', usuario = '') => {
     setLoading(true);
     setError(null);
     try {
-      const response = await personalService.getAll({ page, itemsPerPage, search: searchTerm, nombre, apellido, email });
+      const response = await personalService.getAll({ page, itemsPerPage, search: searchTerm, nombre, apellido, email, dni, cargo, area, usuario });
       if (response.data && Array.isArray(response.data.personal)) {
         setPersonalList(response.data.personal);
         setPaginatedPersonal(response.data.personal);
@@ -361,11 +369,11 @@ const Personal = () => {
 
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
-    fetchPersonal(page, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter);
+    fetchPersonal(page, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
   };
 
-  const debouncedFetchPersonal = useRef(debounce((search, nombre, apellido, email) => {
-    fetchPersonal(1, itemsPerPage, search, nombre, apellido, email);
+  const debouncedFetchPersonal = useRef(debounce((search, nombre, apellido, email, dni, cargo, area, usuario) => {
+    fetchPersonal(1, itemsPerPage, search, nombre, apellido, email, dni, cargo, area, usuario);
   }, 300)).current;
 
   const handleSearchChange = (e) => {
@@ -380,24 +388,28 @@ const Personal = () => {
   };
 
   useEffect(() => {
-    debouncedFetchPersonal(searchTerm, nombreFilter, apellidoFilter, emailFilter);
-  }, [searchTerm, nombreFilter, apellidoFilter, emailFilter]);
+    debouncedFetchPersonal(searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
+  }, [searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter]);
 
   const handleSearch = () => {
-    fetchPersonal(1, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter);
+    fetchPersonal(1, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
   };
 
   const clearFilters = () => {
     setNombreFilter('');
     setApellidoFilter('');
     setEmailFilter('');
+    setDniFilter('');
+    setCargoFilter('');
+    setAreaFilter('');
+    setUsuarioFilter('');
     setSearchTerm('');
-    fetchPersonal(1, itemsPerPage, '', '', '', '');
+    fetchPersonal(1, itemsPerPage, '', '', '', '', '', '', '', '');
   };
 
   const clearSearch = () => {
     setSearchTerm('');
-    fetchPersonal(1, itemsPerPage, '', nombreFilter, apellidoFilter, emailFilter);
+    fetchPersonal(1, itemsPerPage, '', nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
   };
 
   const handleOpenCreateModal = () => {
@@ -496,7 +508,7 @@ const Personal = () => {
         });
       }
 
-      await fetchPersonal(currentPage, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter);
+      await fetchPersonal(currentPage, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
       setShowModal(false);
     } catch (err) {
       console.error('Error al guardar personal:', err);
@@ -552,7 +564,7 @@ const Personal = () => {
       const remainingItems = filteredPersonal.length - 1;
       const newPage = remainingItems === 0 && currentPage > 1 ? currentPage - 1 : currentPage;
 
-      await fetchPersonal(newPage, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter);
+      await fetchPersonal(newPage, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
 
       Swal.fire({
         icon: 'success',
@@ -575,30 +587,28 @@ const Personal = () => {
   };
 
   const applyFilters = () => {
-    fetchPersonal(1, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter);
+    fetchPersonal(1, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
   };
 
   useEffect(() => {
     setIsFilterActive(
-      searchTerm.trim() !== '' || nombreFilter.trim() !== '' || apellidoFilter.trim() !== '' || emailFilter.trim() !== ''
+      searchTerm.trim() !== '' || nombreFilter.trim() !== '' || apellidoFilter.trim() !== '' || emailFilter.trim() !== '' ||
+      dniFilter.trim() !== '' || cargoFilter.trim() !== '' || areaFilter.trim() !== '' || usuarioFilter.trim() !== ''
     );
-  }, [searchTerm, nombreFilter, apellidoFilter, emailFilter]);
+  }, [searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter]);
 
   const handleUserAction = (personal) => {
-    if (personal.usuario === 'sin acceso') {
-      setCurrentPersonal(personal);
-      setModalTitle('Crear Usuario');
-      setShowUserModal(true);
-    } else {
-      setCurrentPersonal(personal);
-      setModalTitle('Modificar Usuario');
-      setShowUserModal(true);
-    }
+    setCurrentPersonal({
+      ...personal,
+      usuarioId: personal.usuario?.id || null, // Set usuarioId if it exists
+    });
+    setModalTitle(personal.usuario ? 'Modificar Usuario' : 'Crear Usuario');
+    setShowUserModal(true);
   };
 
   const handleSaveUser = async (userData) => {
     try {
-      if (currentPersonal.usuario === 'sin acceso') {
+      if (!currentPersonal.usuario) {
         const newUser = {
           personal_id: currentPersonal.id,
           usuario: userData.usuario,
@@ -612,7 +622,8 @@ const Personal = () => {
           rol_id: userData.rol_id,
           estado: userData.estado,
         };
-        await usuarioService.updateUser(currentPersonal.id, updatedUser);
+        // Use usuarioId for updating the user
+        await usuarioService.updateUser(currentPersonal.usuarioId, updatedUser);
       }
 
       Swal.fire({
@@ -625,6 +636,9 @@ const Personal = () => {
       });
 
       setShowUserModal(false);
+
+      // Refresh the personal list to reflect the changes
+      await fetchPersonal(currentPage, itemsPerPage, searchTerm, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter);
     } catch (err) {
       console.error('Error al guardar usuario:', err);
 
@@ -678,9 +692,23 @@ const Personal = () => {
                   <CFormInput
                     ref={filterInputRef}
                     placeholder={`Filtrar por ${activeFilter}...`}
-                    value={activeFilter === 'nombre' ? nombreFilter : activeFilter === 'apellido' ? apellidoFilter : emailFilter}
+                    value={
+                      activeFilter === 'nombre' ? nombreFilter :
+                      activeFilter === 'apellido' ? apellidoFilter :
+                      activeFilter === 'email' ? emailFilter :
+                      activeFilter === 'dni' ? dniFilter :
+                      activeFilter === 'cargo' ? cargoFilter :
+                      activeFilter === 'area' ? areaFilter :
+                      usuarioFilter
+                    }
                     onChange={handleFilterInputChange(
-                      activeFilter === 'nombre' ? setNombreFilter : activeFilter === 'apellido' ? setApellidoFilter : setEmailFilter
+                      activeFilter === 'nombre' ? setNombreFilter :
+                      activeFilter === 'apellido' ? setApellidoFilter :
+                      activeFilter === 'email' ? setEmailFilter :
+                      activeFilter === 'dni' ? setDniFilter :
+                      activeFilter === 'cargo' ? setCargoFilter :
+                      activeFilter === 'area' ? setAreaFilter :
+                      setUsuarioFilter
                     )}
                   />
                 )}
@@ -700,7 +728,15 @@ const Personal = () => {
                 <CTableHead>
                   <CTableRow>
                     <CTableHeaderCell scope="col">#</CTableHeaderCell>
-                    <CTableHeaderCell scope="col">DNI</CTableHeaderCell>
+                    <CTableHeaderCell scope="col">
+                      DNI
+                      <CButton
+                        color="link"
+                        onClick={() => setActiveFilter(activeFilter === 'dni' ? null : 'dni')}
+                      >
+                        <CIcon icon={cilFilter} />
+                      </CButton>
+                    </CTableHeaderCell>
                     <CTableHeaderCell scope="col">
                       Nombre 
                       <CButton
@@ -728,9 +764,33 @@ const Personal = () => {
                         <CIcon icon={cilFilter} />
                       </CButton>
                     </CTableHeaderCell>
-                    <CTableHeaderCell scope="col">Cargo</CTableHeaderCell>
-                    <CTableHeaderCell scope="col">Área</CTableHeaderCell>
-                    <CTableHeaderCell scope="col">Usuario</CTableHeaderCell>
+                    <CTableHeaderCell scope="col">
+                      Cargo
+                      <CButton
+                        color="link"
+                        onClick={() => setActiveFilter(activeFilter === 'cargo' ? null : 'cargo')}
+                      >
+                        <CIcon icon={cilFilter} />
+                      </CButton>
+                    </CTableHeaderCell>
+                    <CTableHeaderCell scope="col">
+                      Área
+                      <CButton
+                        color="link"
+                        onClick={() => setActiveFilter(activeFilter === 'area' ? null : 'area')}
+                      >
+                        <CIcon icon={cilFilter} />
+                      </CButton>
+                    </CTableHeaderCell>
+                    <CTableHeaderCell scope="col">
+                      Usuario
+                      <CButton
+                        color="link"
+                        onClick={() => setActiveFilter(activeFilter === 'usuario' ? null : 'usuario')}
+                      >
+                        <CIcon icon={cilFilter} />
+                      </CButton>
+                    </CTableHeaderCell>
                     <CTableHeaderCell scope="col">Acciones</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
@@ -824,11 +884,11 @@ const Personal = () => {
 
 const UserModal = ({ visible, onClose, title, personal, onSave }) => {
   const [userData, setUserData] = useState({
-    usuario: personal.usuario === 'sin acceso' ? '' : personal.usuario,
+    usuario: personal.usuario?.usuario || '',
     password: 'Coopay123',
     email: personal.email || '',
-    rol_id: personal.rol_id || '',
-    estado: true,
+    rol_id: personal.usuario?.rol?.id || '',
+    estado: personal.usuario ? personal.usuario.estado : true,
   });
 
   const [roles, setRoles] = useState([]);
@@ -849,7 +909,7 @@ const UserModal = ({ visible, onClose, title, personal, onSave }) => {
   }, []);
 
   useEffect(() => {
-    if (visible && usuarioInputRef.current && personal.usuario === 'sin acceso') {
+    if (visible && usuarioInputRef.current && !personal.usuario) {
       usuarioInputRef.current.focus();
     }
   }, [visible, personal.usuario]);
@@ -911,7 +971,7 @@ const UserModal = ({ visible, onClose, title, personal, onSave }) => {
                   value={userData.usuario}
                   onChange={handleInputChange}
                   ref={usuarioInputRef}
-                  disabled={personal.usuario !== 'sin acceso'}
+                  disabled={!!personal.usuario}
                 />
                 {formErrors.usuario && <div className="invalid-feedback">{formErrors.usuario}</div>}
               </div>

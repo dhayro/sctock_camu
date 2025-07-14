@@ -1,4 +1,4 @@
-const { Personal, Cargo, Area, Usuario } = require('../models'); // Asegúrate de importar el modelo Usuario
+const { Personal, Cargo, Area, Usuario, Role } = require('../models'); // Ensure Role is imported
 const { Op } = require('sequelize');
 
 // Obtener todo el personal con paginación y filtros
@@ -9,13 +9,23 @@ exports.getAllPersonal = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const filters = {};
+
+    // General search across multiple fields
     if (req.query.search) {
       filters[Op.or] = [
+        { dni: { [Op.like]: `%${req.query.search}%` } },
         { nombre: { [Op.like]: `%${req.query.search}%` } },
         { apellido: { [Op.like]: `%${req.query.search}%` } },
+        { email: { [Op.like]: `%${req.query.search}%` } },
         { '$cargo.nombre$': { [Op.like]: `%${req.query.search}%` } },
-        { '$area.nombre$': { [Op.like]: `%${req.query.search}%` } }
+        { '$area.nombre$': { [Op.like]: `%${req.query.search}%` } },
+        { '$usuario.usuario$': { [Op.like]: `%${req.query.search}%` } }
       ];
+    }
+
+    // Specific filters
+    if (req.query.dni) {
+      filters.dni = { [Op.like]: `%${req.query.dni}%` };
     }
     if (req.query.nombre) {
       filters.nombre = { [Op.like]: `%${req.query.nombre}%` };
@@ -23,30 +33,45 @@ exports.getAllPersonal = async (req, res) => {
     if (req.query.apellido) {
       filters.apellido = { [Op.like]: `%${req.query.apellido}%` };
     }
+    if (req.query.email) {
+      filters.email = { [Op.like]: `%${req.query.email}%` };
+    }
+    if (req.query.cargo) {
+      filters['$cargo.nombre$'] = { [Op.like]: `%${req.query.cargo}%` };
+    }
+    if (req.query.area) {
+      filters['$area.nombre$'] = { [Op.like]: `%${req.query.area}%` };
+    }
+    if (req.query.usuario) {
+      filters['$usuario.usuario$'] = { [Op.like]: `%${req.query.usuario}%` };
+    }
 
     const { count, rows } = await Personal.findAndCountAll({
       where: filters,
       include: [
-        { model: Cargo, as: 'cargo' },
-        { model: Area, as: 'area' },
-        { model: Usuario, as: 'usuario', attributes: ['usuario'] } // Incluir el modelo Usuario
+        { model: Cargo, as: 'cargo', attributes: ['id', 'nombre'] },
+        { model: Area, as: 'area', attributes: ['id', 'nombre'] },
+        { 
+          model: Usuario, 
+          as: 'usuario', 
+          attributes: ['id', 'usuario', 'estado'],
+          include: [
+            { model: Role, as: 'rol', attributes: ['id', 'nombre'] }
+          ]
+        }
       ],
       limit,
       offset,
       order: [['nombre', 'ASC']]
     });
 
-    // Procesar los resultados para incluir el nombre de usuario o "sin acceso"
-    const personalWithUserStatus = rows.map(personal => ({
-      ...personal.toJSON(),
-      usuario: personal.usuario ? personal.usuario.usuario : 'sin acceso'
-    }));
-
     res.json({
       total: count,
       totalPages: Math.ceil(count / limit),
       currentPage: page,
-      personal: personalWithUserStatus
+      personal: rows.map(personal => ({
+        ...personal.toJSON()
+      }))
     });
   } catch (error) {
     console.error('Error al obtener personal:', error);
