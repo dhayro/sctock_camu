@@ -1,7 +1,6 @@
 const app = require('./app');
-const { sequelize } = require('./models');
+const { initializeDatabase, testConnection, createDefaultAdmin } = require('./config/database');
 require('dotenv').config();
-const initialize = require('./config/init');
 const balanzaService = require('./services/balanzaService');
 
 const PORT = process.env.PORT || 3000;
@@ -9,12 +8,26 @@ const PORT = process.env.PORT || 3000;
 // Función para iniciar el servidor
 async function startServer() {
   try {
-    // Sincronizar modelos con la base de datos
-    await sequelize.authenticate();
-    console.log('Conexión a la base de datos establecida correctamente.');
+    // Initialize the database
+    const dbInitialized = await initializeDatabase();
+    if (!dbInitialized) {
+      console.error('Failed to initialize the database.');
+      process.exit(1);
+    }
 
-    // Inicializar la base de datos y crear usuario admin por defecto
-    await initialize();
+    // Test the database connection
+    const dbConnected = await testConnection();
+    if (!dbConnected) {
+      console.error('Failed to connect to the database.');
+      process.exit(1);
+    }
+
+    // Create default admin user
+    const adminCreated = await createDefaultAdmin();
+    if (!adminCreated) {
+      console.error('Failed to create default admin user.');
+      process.exit(1);
+    }
 
     // Iniciar el servidor
     const server = app.listen(PORT, () => {

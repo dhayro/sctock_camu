@@ -12,7 +12,16 @@ module.exports = (sequelize, DataTypes) => {
     ruc: {
       type: DataTypes.STRING(11),
       allowNull: false,
-      unique: true
+      unique: true,
+      validate: {
+        isNumeric: {
+          msg: 'El RUC debe contener solo números'
+        },
+        len: {
+          args: [11, 11],
+          msg: 'El RUC debe tener exactamente 11 dígitos'
+        }
+      }
     },
     direccion: {
       type: DataTypes.STRING(200)
@@ -22,8 +31,16 @@ module.exports = (sequelize, DataTypes) => {
     },
     email: {
       type: DataTypes.STRING(100),
+      allowNull: true, // Allow null values
       validate: {
-        isEmail: true
+        isEmail: {
+          msg: 'Debe ser un correo electrónico válido',
+          args: true,
+        },
+      },
+      set(value) {
+        // Convert empty string or dash to null
+        this.setDataValue('email', (value === '' || value === '-') ? null : value);
       }
     },
     estado: {

@@ -1,12 +1,56 @@
 const { UnidadMedida } = require('../models');
+const { Op } = require('sequelize');
 
-// Obtener todas las unidades de medida
-exports.getAllUnidadesMedida = async (req, res) => {
+// Obtener todas las unidades de medida con paginación, búsqueda general y filtros específicos
+exports.getAllUnidadMedida = async (req, res) => {
   try {
-    const unidadesMedida = await UnidadMedida.findAll();
-    res.json(unidadesMedida);
+    // Implementar paginación en el servidor
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Implementar filtros desde el servidor
+    const filters = {};
+    
+    // Búsqueda general
+    if (req.query.search) {
+      console.log('Buscando unidades de medida:', req.query.search);
+      filters[Op.or] = [
+        { nombre: { [Op.like]: `%${req.query.search}%` } },
+        { abreviatura: { [Op.like]: `%${req.query.search}%` } }
+      ];
+    }
+    
+    // Filtros específicos por columna
+    if (req.query.nombre) {
+      console.log('Filtrando por nombre:', req.query.nombre);
+      filters.nombre = { [Op.like]: `%${req.query.nombre}%` };
+    }
+    
+    if (req.query.abreviatura) {
+      filters.abreviatura = { [Op.like]: `%${req.query.abreviatura}%` };
+    }
+    
+    // Debugging: Log the filters, page, limit, and offset
+    console.log('Filters:', filters);
+    console.log('Page:', page, 'Limit:', limit, 'Offset:', offset);
+    
+    // Consulta con paginación y filtros
+    const { count, rows } = await UnidadMedida.findAndCountAll({
+      where: filters,
+      limit,
+      offset,
+      order: [['nombre', 'ASC']]
+    });
+    
+    res.json({
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      unidadesMedida: rows
+    });
   } catch (error) {
-    console.error('Error al obtener unidades de medida:', error);
+    console.error('Error al obtener unidades de medida paginadas:', error);
     res.status(500).json({ error: 'Error al obtener unidades de medida', details: error.message });
   }
 };
@@ -38,15 +82,10 @@ exports.createUnidadMedida = async (req, res) => {
       return res.status(400).json({ error: 'El nombre y la abreviatura son obligatorios' });
     }
     
-    // Verificar si ya existe una unidad de medida con el mismo nombre o abreviatura
-    const existingUnidadNombre = await UnidadMedida.findOne({ where: { nombre } });
-    if (existingUnidadNombre) {
+    // Verificar si ya existe una unidad de medida con el mismo nombre
+    const existingUnidadMedida = await UnidadMedida.findOne({ where: { nombre } });
+    if (existingUnidadMedida) {
       return res.status(400).json({ error: 'Ya existe una unidad de medida con ese nombre' });
-    }
-    
-    const existingUnidadAbreviatura = await UnidadMedida.findOne({ where: { abreviatura } });
-    if (existingUnidadAbreviatura) {
-      return res.status(400).json({ error: 'Ya existe una unidad de medida con esa abreviatura' });
     }
     
     const newUnidadMedida = await UnidadMedida.create({
@@ -73,21 +112,17 @@ exports.updateUnidadMedida = async (req, res) => {
       return res.status(404).json({ error: 'Unidad de medida no encontrada' });
     }
     
-    // Si se cambia el nombre, verificar que no exista otra unidad con ese nombre
+    // Si se cambia el nombre, verificar que no exista otra unidad de medida con ese nombre
     if (nombre && nombre !== unidadMedida.nombre) {
-      const existingUnidadNombre = await UnidadMedida.findOne({ where: { nombre } });
-      if (existingUnidadNombre) {
+      const existingUnidadMedida = await UnidadMedida.findOne({ where: { nombre } });
+      if (existingUnidadMedida) {
         return res.status(400).json({ error: 'Ya existe una unidad de medida con ese nombre' });
       }
       unidadMedida.nombre = nombre;
     }
     
-    // Si se cambia la abreviatura, verificar que no exista otra unidad con esa abreviatura
-    if (abreviatura && abreviatura !== unidadMedida.abreviatura) {
-      const existingUnidadAbreviatura = await UnidadMedida.findOne({ where: { abreviatura } });
-      if (existingUnidadAbreviatura) {
-        return res.status(400).json({ error: 'Ya existe una unidad de medida con esa abreviatura' });
-      }
+    // Actualizar abreviatura si se proporciona
+    if (abreviatura !== undefined) {
       unidadMedida.abreviatura = abreviatura;
     }
     

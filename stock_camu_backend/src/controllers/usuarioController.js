@@ -7,17 +7,66 @@ require('dotenv').config();
 // Obtener todos los usuarios
 exports.getAllUsuarios = async (req, res) => {
   try {
-    const usuarios = await Usuario.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const filters = {};
+
+    // General search across multiple fields
+    if (req.query.search) {
+      filters[Op.or] = [
+        { usuario: { [Op.like]: `%${req.query.search}%` } },
+        { email: { [Op.like]: `%${req.query.search}%` } },
+        { '$rol.nombre$': { [Op.like]: `%${req.query.search}%` } },
+        { '$personal.nombre$': { [Op.like]: `%${req.query.search}%` } },
+        { '$personal.apellido$': { [Op.like]: `%${req.query.search}%` } }
+      ];
+    }
+
+    // Specific filters
+    if (req.query.usuario) {
+      filters.usuario = { [Op.like]: `%${req.query.usuario}%` };
+    }
+    if (req.query.email) {
+      filters.email = { [Op.like]: `%${req.query.email}%` };
+    }
+    if (req.query.rol) {
+      filters['$rol.nombre$'] = { [Op.like]: `%${req.query.rol}%` };
+    }
+    if (req.query.personal) {
+      filters[Op.or] = [
+        { '$personal.nombre$': { [Op.like]: `%${req.query.personal}%` } },
+        { '$personal.apellido$': { [Op.like]: `%${req.query.personal}%` } }
+      ];
+    }
+    if (req.query.estado) {
+      filters.estado = req.query.estado === 'true';
+    }
+
+    const { count, rows } = await Usuario.findAndCountAll({
+      where: filters,
       include: [
-        { model: Role, as: 'rol' },
-        { model: Personal, as: 'personal' }
+        { model: Role, as: 'rol', attributes: ['id', 'nombre'] },
+        { model: Personal, as: 'personal', attributes: ['id', 'nombre', 'apellido'] }
       ],
-      attributes: { exclude: ['password'] }
+      limit,
+      offset,
+      order: [['usuario', 'ASC']]
     });
-    res.json(usuarios);
+
+    res.json({
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      usuarios: rows.map(usuario => ({
+        ...usuario.toJSON(),
+        password: undefined // Ensure password is not included in the response
+      }))
+    });
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
-    res.status(500).json({ message: 'Error al obtener usuarios' });
+    res.status(500).json({ message: 'Error al obtener usuarios', details: error.message });
   }
 };
 
@@ -260,5 +309,30 @@ exports.getCurrentUser = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener usuario actual:', error);
     res.status(500).json({ message: 'Error al obtener usuario actual' });
+  }
+};
+
+// Resetear la contraseña de un usuario
+exports.resetPassword = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // Buscar el usuario por ID
+    const usuario = await Usuario.findByPk(userId);
+    if (!usuario) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    // Encriptar la nueva contraseña
+    const newPassword = 'Coopay123';
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar la contraseña del usuario
+    await usuario.update({ password: hashedPassword });
+
+    res.json({ message: 'Contraseña reseteada exitosamente a "Coopay123"' });
+  } catch (error) {
+    console.error('Error al resetear contraseña:', error);
+    res.status(500).json({ message: 'Error al resetear contraseña', details: error.message });
   }
 };

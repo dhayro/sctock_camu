@@ -416,4 +416,51 @@ router.post('/auth/login', usuarioController.login);
  */
 router.get('/auth/me', verifyToken, usuarioController.getCurrentUser);
 
+/**
+ * @swagger
+ * /api/usuarios/{id}/reset-password:
+ *   put:
+ *     summary: Resetea la contraseña de un usuario a "Coopay123"
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID del usuario
+ *     responses:
+ *       200:
+ *         description: Contraseña reseteada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Contraseña reseteada exitosamente a "Coopay123"
+ *       401:
+ *         description: No autorizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Error del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.put('/:id/reset-password', verifyToken, checkRole(['admin']), usuarioController.resetPassword);
+
 module.exports = router;

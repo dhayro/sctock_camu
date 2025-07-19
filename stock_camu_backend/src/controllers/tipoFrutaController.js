@@ -1,15 +1,70 @@
 const { TipoFruta } = require('../models');
+const { Op } = require('sequelize');
 
-// Obtener todos los tipos de fruta
+// Obtener todos los tipos de fruta con paginación, búsqueda general y filtros específicos
 exports.getAllTiposFruta = async (req, res) => {
   try {
-    const tiposFruta = await TipoFruta.findAll();
-    res.json(tiposFruta);
+    // Implementar paginación en el servidor
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    
+    // Implementar filtros desde el servidor
+    const filters = {};
+    
+    // Búsqueda general
+    if (req.query.search) {
+      console.log('Buscando tipos de fruta:', req.query.search);
+      filters[Op.or] = [
+        { nombre: { [Op.like]: `%${req.query.search}%` } },
+        { descripcion: { [Op.like]: `%${req.query.search}%` } }
+      ];
+    }
+    
+    // Filtros específicos por columna
+    if (req.query.nombre) {
+      console.log('Filtrando por nombre:', req.query.nombre);
+      filters.nombre = { [Op.like]: `%${req.query.nombre}%` };
+    }
+    
+    if (req.query.descripcion) {
+      filters.descripcion = { [Op.like]: `%${req.query.descripcion}%` };
+    }
+    
+    // Debugging: Log the filters, page, limit, and offset
+    console.log('Filters:', filters);
+    console.log('Page:', page, 'Limit:', limit, 'Offset:', offset);
+    
+    // Consulta con paginación y filtros
+    const { count, rows } = await TipoFruta.findAndCountAll({
+      where: filters,
+      limit,
+      offset,
+      order: [['nombre', 'ASC']]
+    });
+    
+    res.json({
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      tiposFruta: rows
+    });
   } catch (error) {
-    console.error('Error al obtener tipos de fruta:', error);
+    console.error('Error al obtener tipos de fruta paginados:', error);
     res.status(500).json({ error: 'Error al obtener tipos de fruta', details: error.message });
   }
 };
+
+// // Obtener todos los tipos de fruta
+// exports.getAllTiposFruta = async (req, res) => {
+//   try {
+//     const tiposFruta = await TipoFruta.findAll();
+//     res.json(tiposFruta);
+//   } catch (error) {
+//     console.error('Error al obtener tipos de fruta:', error);
+//     res.status(500).json({ error: 'Error al obtener tipos de fruta', details: error.message });
+//   }
+// };
 
 // Obtener un tipo de fruta por ID
 exports.getTipoFrutaById = async (req, res) => {

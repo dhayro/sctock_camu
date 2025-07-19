@@ -66,6 +66,11 @@ const _nav = [
         name: 'Personal',
         to: '/maestros/personal',
       },
+      {
+        component: CNavItem,
+        name: 'Usuarios',
+        to: '/maestros/usuarios',
+      },
     ],
   },
   {
@@ -76,36 +81,44 @@ const _nav = [
     items: [
       {
         component: CNavItem,
-        name: 'Lista de Socios',
-        to: '/socios/lista',
+        name: 'Socios',
+        to: '/socios',
+      }
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Gestión de Productos',
+    to: '/productos',
+    icon: <CIcon icon={cilStorage} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Tipos de Fruta',
+        to: '/productos/tipos-fruta',
       },
       {
         component: CNavItem,
-        name: 'Registrar Socio',
-        to: '/socios/nuevo',
+        name: 'Unidades de Medida',
+        to: '/productos/unidades-medida',
+      },
+      {
+        component: CNavItem,
+        name: 'Productos',
+        to: '/productos/productos',
       },
     ],
   },
   {
     component: CNavGroup,
-    name: 'Inventario',
-    to: '/inventario',
-    icon: <CIcon icon={cilStorage} customClassName="nav-icon" />,
+    name: 'Gestión de Clientes',
+    to: '/clientes',
+    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
     items: [
       {
         component: CNavItem,
-        name: 'Productos',
-        to: '/inventario/productos',
-      },
-      {
-        component: CNavItem,
-        name: 'Tipos de Fruta',
-        to: '/inventario/tipos-fruta',
-      },
-      {
-        component: CNavItem,
-        name: 'Unidades de Medida',
-        to: '/inventario/unidades-medida',
+        name: 'Clientes',
+        to: '/clientes', // Ensure this matches your route for managing clients
       },
     ],
   },
@@ -152,24 +165,6 @@ const _nav = [
         component: CNavItem,
         name: 'Seguimiento',
         to: '/pedidos/seguimiento',
-      },
-    ],
-  },
-  {
-    component: CNavGroup,
-    name: 'Clientes',
-    to: '/clientes',
-    icon: <CIcon icon={cilUser} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Lista de Clientes',
-        to: '/clientes/lista',
-      },
-      {
-        component: CNavItem,
-        name: 'Nuevo Cliente',
-        to: '/clientes/nuevo',
       },
     ],
   },

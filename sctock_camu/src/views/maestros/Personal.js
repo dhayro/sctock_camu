@@ -307,6 +307,7 @@ const Personal = () => {
   }, []);
 
   useEffect(() => {
+    console.log('Personal List:', personalList);
     const filtered = personalList.filter(personal => 
       personal.nombre.toLowerCase().includes(nombreFilter.toLowerCase()) &&
       personal.apellido.toLowerCase().includes(apellidoFilter.toLowerCase()) &&
@@ -314,8 +315,9 @@ const Personal = () => {
       personal.dni.toLowerCase().includes(dniFilter.toLowerCase()) &&
       personal.cargo?.nombre.toLowerCase().includes(cargoFilter.toLowerCase()) &&
       personal.area?.nombre.toLowerCase().includes(areaFilter.toLowerCase()) &&
-      personal.usuario?.usuario.toLowerCase().includes(usuarioFilter.toLowerCase())
+      (personal.usuario?.usuario.toLowerCase().includes(usuarioFilter.toLowerCase()) || usuarioFilter === '')
     );
+    console.log('Filtered Personal:', filtered);
     setFilteredPersonal(filtered);
   }, [personalList, nombreFilter, apellidoFilter, emailFilter, dniFilter, cargoFilter, areaFilter, usuarioFilter]);
 
@@ -324,6 +326,8 @@ const Personal = () => {
     setError(null);
     try {
       const response = await personalService.getAll({ page, itemsPerPage, search: searchTerm, nombre, apellido, email, dni, cargo, area, usuario });
+      console.log('Fetched Personal Data:', response.data);
+
       if (response.data && Array.isArray(response.data.personal)) {
         setPersonalList(response.data.personal);
         setPaginatedPersonal(response.data.personal);
@@ -616,14 +620,14 @@ const Personal = () => {
           email: userData.email,
           rol_id: userData.rol_id,
         };
-        await usuarioService.createUser(newUser);
+        await usuarioService.createUsuario(newUser);
       } else {
         const updatedUser = {
           rol_id: userData.rol_id,
           estado: userData.estado,
         };
         // Use usuarioId for updating the user
-        await usuarioService.updateUser(currentPersonal.usuarioId, updatedUser);
+        await usuarioService.updateUsuario(currentPersonal.usuarioId, updatedUser);
       }
 
       Swal.fire({
@@ -721,6 +725,7 @@ const Personal = () => {
           {loading ? (
             <div className="text-center my-3">
               <CSpinner />
+              <p>Cargando datos...</p>
             </div>
           ) : filteredPersonal.length > 0 ? (
             <>

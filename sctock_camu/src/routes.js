@@ -4,17 +4,24 @@ const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
 const Colors = React.lazy(() => import('./views/theme/colors/Colors'))
 const Typography = React.lazy(() => import('./views/theme/typography/Typography'))
 
-// Usuarios y Roles
 const Roles = React.lazy(() => import('./views/maestros/Roles'))
+const Cargos = React.lazy(() => import('./views/maestros/Cargos')) 
+const Areas = React.lazy(() => import('./views/maestros/Areas')) 
+const Personal = React.lazy(() => import('./views/maestros/Personal'))
+const Usuarios = React.lazy(() => import('./views/maestros/Usuarios')) 
+const Socios = React.lazy(() => import('./views/socios/index')) 
 
-// Cargos
-const Cargos = React.lazy(() => import('./views/maestros/Cargos')) // Import the Cargos component
+// Import the TiposFruta component
+const TiposFruta = React.lazy(() => import('./views/Productos/TiposFruta'));
 
-// Areas
-const Areas = React.lazy(() => import('./views/maestros/Areas')) // Import the Areas component
+// Import the UnidadesMedida component
+const UnidadesMedida = React.lazy(() => import('./views/Productos/UnidadesMedida'));
 
-// Personal
-const Personal = React.lazy(() => import('./views/maestros/Personal')) // Import the Personal component
+// Import the Productos component
+const Productos = React.lazy(() => import('./views/Productos/Productos'));
+
+// Import the Clientes component
+const Clientes = React.lazy(() => import('./views/clientes/index'))
 
 // Base
 const Accordion = React.lazy(() => import('./views/base/accordion/Accordion'))
@@ -74,8 +81,23 @@ const routes = [
   { path: '/maestros/roles', name: 'Roles', element: Roles },
   { path: '/maestros/cargos', name: 'Cargos', element: Cargos },
   { path: '/maestros/areas', name: 'Áreas', element: Areas },
-  { path: '/maestros/personal', name: 'Personal', element: Personal }, // Add the route for Personal
+  { path: '/maestros/personal', name: 'Personal', element: Personal }, 
+  { path: '/maestros/usuarios', name: 'Usuarios', element: Usuarios }, 
+
+  { path: '/socios', name: 'Socios', element: Socios },
+
+  // Add the route for Tipos de Fruta
+  { path: '/productos/tipos-fruta', name: 'Tipos de Fruta', element: TiposFruta },
   
+  // Add the route for Unidades de Medida
+  { path: '/productos/unidades-medida', name: 'Unidades de Medida', element: UnidadesMedida },
+
+  // Add the route for Productos
+  { path: '/productos/productos', name: 'Productos', element: Productos },
+
+  // Add the route for Gestión de Clientes
+  { path: '/clientes', name: 'Clientes', element: Clientes },
+
   { path: '/base', name: 'Base', element: Cards, exact: true },
   { path: '/base/accordion', name: 'Accordion', element: Accordion },
   { path: '/base/breadcrumbs', name: 'Breadcrumbs', element: Breadcrumbs },

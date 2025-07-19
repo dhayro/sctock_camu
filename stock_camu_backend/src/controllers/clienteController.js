@@ -1,12 +1,36 @@
 const { Cliente, PedidoLote, Salida, Op } = require('../models');
 
-// Obtener todos los clientes
+// Obtener todos los clientes con paginación y filtros
 exports.getAllClientes = async (req, res) => {
   try {
-    const clientes = await Cliente.findAll({
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const filters = {};
+    if (req.query.search) {
+      filters[Op.or] = [
+        { razon_social: { [Op.like]: `%${req.query.search}%` } },
+        { ruc: { [Op.like]: `%${req.query.search}%` } },
+        { direccion: { [Op.like]: `%${req.query.search}%` } },
+        { telefono: { [Op.like]: `%${req.query.search}%` } },
+        { email: { [Op.like]: `%${req.query.search}%` } }
+      ];
+    }
+
+    const { count, rows } = await Cliente.findAndCountAll({
+      where: filters,
+      limit,
+      offset,
       order: [['razon_social', 'ASC']]
     });
-    res.json(clientes);
+
+    res.json({
+      total: count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      clientes: rows
+    });
   } catch (error) {
     console.error('Error al obtener clientes:', error);
     res.status(500).json({ error: 'Error al obtener clientes', details: error.message });
@@ -39,24 +63,10 @@ exports.createCliente = async (req, res) => {
     if (!razon_social || !ruc) {
       return res.status(400).json({ error: 'Razón social y RUC son obligatorios' });
     }
-    
-    // Validar formato de RUC (11 dígitos numéricos)
     if (!/^\d{11}$/.test(ruc)) {
-      return res.status(400).json({ error: 'El RUC debe contener exactamente 11 dígitos numéricos' });
+      return res.status(400).json({ error: 'El RUC debe tener exactamente 11 dígitos numéricos' });
     }
-    
-    // Verificar si ya existe un cliente con el mismo RUC
-    const existingCliente = await Cliente.findOne({ where: { ruc } });
-    if (existingCliente) {
-      return res.status(400).json({ error: 'Ya existe un cliente con ese RUC' });
-    }
-    
-    // Validar email si se proporciona
-    if (email && !isValidEmail(email)) {
-      return res.status(400).json({ error: 'El formato del email no es válido' });
-    }
-    
-    // Crear el cliente
+
     const newCliente = await Cliente.create({
       razon_social,
       ruc,
@@ -85,29 +95,13 @@ exports.updateCliente = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
     
-    // Si se cambia el RUC, validar formato y unicidad
-    if (ruc && ruc !== cliente.ruc) {
-      // Validar formato de RUC (11 dígitos numéricos)
+    if (razon_social !== undefined) cliente.razon_social = razon_social;
+    if (ruc !== undefined) {
       if (!/^\d{11}$/.test(ruc)) {
-        return res.status(400).json({ error: 'El RUC debe contener exactamente 11 dígitos numéricos' });
+        return res.status(400).json({ error: 'El RUC debe tener exactamente 11 dígitos numéricos' });
       }
-      
-      // Verificar si ya existe otro cliente con ese RUC
-      const existingCliente = await Cliente.findOne({ where: { ruc } });
-      if (existingCliente && existingCliente.id !== parseInt(id)) {
-        return res.status(400).json({ error: 'Ya existe otro cliente con ese RUC' });
-      }
-      
       cliente.ruc = ruc;
     }
-    
-    // Validar email si se proporciona
-    if (email && email !== cliente.email && !isValidEmail(email)) {
-      return res.status(400).json({ error: 'El formato del email no es válido' });
-    }
-    
-    // Actualizar campos si se proporcionan
-    if (razon_social) cliente.razon_social = razon_social;
     if (direccion !== undefined) cliente.direccion = direccion;
     if (telefono !== undefined) cliente.telefono = telefono;
     if (email !== undefined) cliente.email = email;

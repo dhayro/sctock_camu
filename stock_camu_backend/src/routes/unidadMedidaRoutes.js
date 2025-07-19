@@ -61,7 +61,7 @@ router.use(verifyToken);
  *                 details:
  *                   type: string
  */
-router.get('/', unidadMedidaController.getAllUnidadesMedida);
+router.get('/', unidadMedidaController.getAllUnidadMedida);
 
 /**
  * @swagger
