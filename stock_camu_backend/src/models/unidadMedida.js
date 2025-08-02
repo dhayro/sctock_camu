@@ -24,15 +24,15 @@ module.exports = (sequelize, DataTypes) => {
       as: 'productos'
     });
     
-    UnidadMedida.hasMany(models.PedidoLote, {
-      foreignKey: 'unidad_medida_id',
-      as: 'pedidos'
-    });
+    // UnidadMedida.hasMany(models.PedidoLote, {
+    //   foreignKey: 'unidad_medida_id',
+    //   as: 'pedidos'
+    // });
     
-    UnidadMedida.hasMany(models.Ingreso, {
-      foreignKey: 'unidad_medida_id',
-      as: 'ingresos'
-    });
+    // UnidadMedida.hasMany(models.Ingreso, {
+    //   foreignKey: 'unidad_medida_id',
+    //   as: 'ingresos'
+    // });
     
     UnidadMedida.hasMany(models.Salida, {
       foreignKey: 'unidad_medida_id',

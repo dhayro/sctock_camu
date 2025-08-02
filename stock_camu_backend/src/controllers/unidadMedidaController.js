@@ -75,12 +75,16 @@ exports.getUnidadMedidaById = async (req, res) => {
 // Crear una nueva unidad de medida
 exports.createUnidadMedida = async (req, res) => {
   try {
-    const { nombre, abreviatura } = req.body;
+    let { nombre, abreviatura } = req.body;
     
     // Validaciones básicas
     if (!nombre || !abreviatura) {
       return res.status(400).json({ error: 'El nombre y la abreviatura son obligatorios' });
     }
+    
+    // Trim and convert nombre to uppercase
+    nombre = nombre.trim().toUpperCase();
+    console.log('Nombre after conversion:', nombre);
     
     // Verificar si ya existe una unidad de medida con el mismo nombre
     const existingUnidadMedida = await UnidadMedida.findOne({ where: { nombre } });
@@ -93,6 +97,7 @@ exports.createUnidadMedida = async (req, res) => {
       abreviatura
     });
     
+    console.log('Created UnidadMedida:', newUnidadMedida);
     res.status(201).json(newUnidadMedida);
   } catch (error) {
     console.error('Error al crear unidad de medida:', error);
@@ -104,7 +109,7 @@ exports.createUnidadMedida = async (req, res) => {
 exports.updateUnidadMedida = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, abreviatura } = req.body;
+    let { nombre, abreviatura } = req.body;
     
     const unidadMedida = await UnidadMedida.findByPk(id);
     
@@ -114,6 +119,10 @@ exports.updateUnidadMedida = async (req, res) => {
     
     // Si se cambia el nombre, verificar que no exista otra unidad de medida con ese nombre
     if (nombre && nombre !== unidadMedida.nombre) {
+      // Trim and convert nombre to uppercase
+      nombre = nombre.trim().toUpperCase();
+      console.log('Nombre after conversion:', nombre);
+      
       const existingUnidadMedida = await UnidadMedida.findOne({ where: { nombre } });
       if (existingUnidadMedida) {
         return res.status(400).json({ error: 'Ya existe una unidad de medida con ese nombre' });
@@ -128,6 +137,7 @@ exports.updateUnidadMedida = async (req, res) => {
     
     await unidadMedida.save();
     
+    console.log('Updated UnidadMedida:', unidadMedida);
     res.json(unidadMedida);
   } catch (error) {
     console.error('Error al actualizar unidad de medida:', error);

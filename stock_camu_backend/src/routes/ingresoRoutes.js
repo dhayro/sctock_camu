@@ -16,10 +16,7 @@ router.use(verifyToken);
  *         - numero_ingreso
  *         - fecha
  *         - socio_id
- *         - producto_id
- *         - pedido_lote_id
- *         - unidad_medida_id
- *         - tipo_fruta_id
+ *         - detalle_orden_id
  *         - num_jabas
  *         - usuario_creacion_id
  *       properties:
@@ -36,18 +33,9 @@ router.use(verifyToken);
  *         socio_id:
  *           type: integer
  *           description: ID del socio
- *         producto_id:
+ *         detalle_orden_id:
  *           type: integer
- *           description: ID del producto
- *         pedido_lote_id:
- *           type: integer
- *           description: ID del pedido o lote
- *         unidad_medida_id:
- *           type: integer
- *           description: ID de la unidad de medida
- *         tipo_fruta_id:
- *           type: integer
- *           description: ID del tipo de fruta
+ *           description: ID del detalle de orden de compra
  *         num_jabas:
  *           type: integer
  *           description: Número de jabas
@@ -99,15 +87,20 @@ router.use(verifyToken);
  *         usuario_modificacion_id:
  *           type: integer
  *           description: ID del usuario que modificó el registro
+ *         fecha_creacion:
+ *           type: string
+ *           format: date-time
+ *           description: Fecha de creación del registro
+ *         fecha_modificacion:
+ *           type: string
+ *           format: date-time
+ *           description: Fecha de modificación del registro
  *       example:
  *         id: 1
  *         numero_ingreso: "ING-2023-001"
  *         fecha: "2023-05-15T10:30:00Z"
  *         socio_id: 1
- *         producto_id: 1
- *         pedido_lote_id: 1
- *         unidad_medida_id: 1
- *         tipo_fruta_id: 1
+ *         detalle_orden_id: 1
  *         num_jabas: 10
  *         dscto_merma: 2.5
  *         dscto_jaba: 1.0
@@ -300,10 +293,7 @@ router.get('/:id', ingresoController.getIngresoById);
  *               - numero_ingreso
  *               - fecha
  *               - socio_id
- *               - producto_id
- *               - pedido_lote_id
- *               - unidad_medida_id
- *               - tipo_fruta_id
+ *               - detalle_orden_id
  *               - num_jabas
  *             properties:
  *               numero_ingreso:
@@ -316,18 +306,9 @@ router.get('/:id', ingresoController.getIngresoById);
  *               socio_id:
  *                 type: integer
  *                 description: ID del socio
- *               producto_id:
+ *               detalle_orden_id:
  *                 type: integer
- *                 description: ID del producto
- *               pedido_lote_id:
- *                 type: integer
- *                 description: ID del pedido o lote
- *               unidad_medida_id:
- *                 type: integer
- *                 description: ID de la unidad de medida
- *               tipo_fruta_id:
- *                 type: integer
- *                 description: ID del tipo de fruta
+ *                 description: ID del detalle de orden de compra
  *               num_jabas:
  *                 type: integer
  *                 description: Número de jabas
@@ -370,25 +351,12 @@ router.get('/:id', ingresoController.getIngresoById);
  *               observacion:
  *                 type: string
  *                 description: Observaciones del ingreso
- *             example:
- *               numero_ingreso: "ING-2023-001"
- *               fecha: "2023-05-15T10:30:00Z"
- *               socio_id: 1
- *               producto_id: 1
- *               pedido_lote_id: 1
- *               unidad_medida_id: 1
- *               tipo_fruta_id: 1
- *               num_jabas: 10
- *               dscto_merma: 2.5
- *               dscto_jaba: 1.0
- *               peso_neto: 150.75
- *               precio_venta_kg: 5.50
- *               total: 829.13
- *               pago_transporte: 50.00
- *               ingreso_cooperativa: 82.91
- *               pago_socio: 696.22
- *               pago_con_descuento: 696.22
- *               observacion: "Ingreso de camu camu fresco"
+ *               estado:
+ *                 type: boolean
+ *                 description: Estado del ingreso (activo/inactivo)
+ *               usuario_creacion_id:
+ *                 type: integer
+ *                 description: ID del usuario que creó el registro
  *     responses:
  *       201:
  *         description: Ingreso creado exitosamente
@@ -405,7 +373,6 @@ router.get('/:id', ingresoController.getIngresoById);
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Faltan campos obligatorios
  *       401:
  *         description: No autorizado - Token no proporcionado o inválido
  *         content:
@@ -454,25 +421,16 @@ router.post('/', ingresoController.createIngreso);
  *               numero_ingreso:
  *                 type: string
  *                 description: Número único de ingreso
+ *               socio_id:
+ *                 type: integer
+ *                 description: ID del socio
+ *               detalle_orden_id:
+ *                 type: integer
+ *                 description: ID del detalle de orden de compra
  *               fecha:
  *                 type: string
  *                 format: date-time
  *                 description: Fecha del ingreso
- *               socio_id:
- *                 type: integer
- *                 description: ID del socio
- *               producto_id:
- *                 type: integer
- *                 description: ID del producto
- *               pedido_lote_id:
- *                 type: integer
- *                 description: ID del pedido o lote
- *               unidad_medida_id:
- *                 type: integer
- *                 description: ID de la unidad de medida
- *               tipo_fruta_id:
- *                 type: integer
- *                 description: ID del tipo de fruta
  *               num_jabas:
  *                 type: integer
  *                 description: Número de jabas
@@ -518,26 +476,6 @@ router.post('/', ingresoController.createIngreso);
  *               estado:
  *                 type: boolean
  *                 description: Estado del ingreso (activo/inactivo)
- *             example:
- *               numero_ingreso: "ING-2023-001-UPDATED"
- *               fecha: "2023-05-16T10:30:00Z"
- *               socio_id: 2
- *               producto_id: 1
- *               pedido_lote_id: 1
- *               unidad_medida_id: 1
- *               tipo_fruta_id: 2
- *               num_jabas: 12
- *               dscto_merma: 3.0
- *               dscto_jaba: 1.5
- *               peso_neto: 180.50
- *               precio_venta_kg: 6.00
- *               total: 1083.00
- *               pago_transporte: 60.00
- *               ingreso_cooperativa: 108.30
- *               pago_socio: 914.70
- *               pago_con_descuento: 914.70
- *               observacion: "Ingreso actualizado de camu camu"
- *               estado: true
  *     responses:
  *       200:
  *         description: Ingreso actualizado exitosamente
@@ -547,42 +485,12 @@ router.post('/', ingresoController.createIngreso);
  *               $ref: '#/components/schemas/Ingreso'
  *       400:
  *         description: Datos inválidos
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
  *       401:
- *         description: No autorizado - Token no proporcionado o inválido
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
+ *         description: No autorizado
  *       404:
  *         description: Ingreso no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
  *       500:
  *         description: Error del servidor
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                 details:
- *                   type: string
  */
 router.put('/:id', ingresoController.updateIngreso);
 
@@ -625,35 +533,11 @@ router.put('/:id', ingresoController.updateIngreso);
  *                 details:
  *                   type: string
  *       401:
- *         description: No autorizado - Token no proporcionado o inválido
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
+ *         description: No autorizado
  *       404:
  *         description: Ingreso no encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Ingreso no encontrado
  *       500:
  *         description: Error del servidor
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                 details:
- *                   type: string
  */
 router.delete('/:id', ingresoController.deleteIngreso);
 

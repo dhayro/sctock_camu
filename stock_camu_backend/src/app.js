@@ -7,20 +7,21 @@ require('dotenv').config();
 const path = require('path');
 const { initBalanzaService } = require('./config/balanzaInit');
 
-// Importar rutas
-const rolesRoutes = require('./routes/rolesRoutes');
-const socioRoutes = require('./routes/socioRoutes');
-// Importar rutas de la balanza
+// // Importar rutas
+// const rolesRoutes = require('./routes/rolesRoutes');
+// const socioRoutes = require('./routes/socioRoutes');
+// // Importar rutas de la balanza
 const balanzaRoutes = require('./routes/balanzaRoutes');
-// Importar rutas adicionales
-const clienteRoutes = require('./routes/clienteRoutes');
 const ingresoRoutes = require('./routes/ingresoRoutes');
-// const pedidoLoteRoutes = require('./routes/pedidoLoteRoutes');
-const tipoFrutaRoutes = require('./routes/tipoFrutaRoutes');
-const usuarioRoutes = require('./routes/usuarioRoutes');
-const areasRoutes = require('./routes/areasRoutes');
-const cargosRoutes = require('./routes/cargosRoutes');
-const personalRoutes = require('./routes/personalRoutes');
+// // Importar rutas adicionales
+// const clienteRoutes = require('./routes/clienteRoutes');
+// const ingresoRoutes = require('./routes/ingresoRoutes');
+// // const pedidoLoteRoutes = require('./routes/pedidoLoteRoutes');
+// const tipoFrutaRoutes = require('./routes/tipoFrutaRoutes');
+// const usuarioRoutes = require('./routes/usuarioRoutes');
+// const areasRoutes = require('./routes/areasRoutes');
+// const cargosRoutes = require('./routes/cargosRoutes');
+// const personalRoutes = require('./routes/personalRoutes');
 
 const app = express();
 
@@ -60,14 +61,17 @@ loadRoutes('./routes/personalRoutes', '/api/personal');
 loadRoutes('./routes/usuarioRoutes', '/api/usuarios');
 loadRoutes('./routes/socioRoutes', '/api/socios');
 loadRoutes('./routes/clienteRoutes', '/api/clientes');
-loadRoutes('./routes/ingresoRoutes', '/api/ingresos');
 // loadRoutes('./routes/pedidoLoteRoutes', '/api/pedidos-lotes');
 loadRoutes('./routes/tipoFrutaRoutes', '/api/tipos-fruta');
 loadRoutes('./routes/unidadMedidaRoutes', '/api/unidades-medida');
 loadRoutes('./routes/productoRoutes', '/api/productos');
+loadRoutes('./routes/ordenCompraRoutes', '/api/ordenes-compra');
+loadRoutes('./routes/detalleOrdenCompraRoutes', '/api/detalles-orden-compra');
+
 
 // Usar rutas de la balanza
 app.use('/api/balanza', balanzaRoutes);
+app.use('/api/ingresos', ingresoRoutes);
 
 // Ruta específica para el monitor de balanza
 app.get('/monitor-balanza', (req, res) => {

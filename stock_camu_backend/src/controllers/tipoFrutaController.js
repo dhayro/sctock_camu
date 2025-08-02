@@ -86,12 +86,15 @@ exports.getTipoFrutaById = async (req, res) => {
 // Crear un nuevo tipo de fruta
 exports.createTipoFruta = async (req, res) => {
   try {
-    const { nombre, descripcion } = req.body;
+    let { nombre, descripcion } = req.body;
     
     // Validaciones básicas
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
     }
+    
+    // Convert nombre to uppercase
+    nombre = nombre.trim().toUpperCase();
     
     // Verificar si ya existe un tipo de fruta con el mismo nombre
     const existingTipoFruta = await TipoFruta.findOne({ where: { nombre } });
@@ -115,7 +118,7 @@ exports.createTipoFruta = async (req, res) => {
 exports.updateTipoFruta = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, descripcion } = req.body;
+    let { nombre, descripcion } = req.body;
     
     const tipoFruta = await TipoFruta.findByPk(id);
     
@@ -125,6 +128,9 @@ exports.updateTipoFruta = async (req, res) => {
     
     // Si se cambia el nombre, verificar que no exista otro tipo de fruta con ese nombre
     if (nombre && nombre !== tipoFruta.nombre) {
+      // Convert nombre to uppercase
+      nombre = nombre.trim().toUpperCase();
+      
       const existingTipoFruta = await TipoFruta.findOne({ where: { nombre } });
       if (existingTipoFruta) {
         return res.status(400).json({ error: 'Ya existe un tipo de fruta con ese nombre' });

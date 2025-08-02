@@ -100,45 +100,56 @@ CREATE TABLE productos (
 CREATE TABLE clientes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     razon_social VARCHAR(150) NOT NULL,
-    ruc CHAR(11) NOT NULL,
+    ruc CHAR(11) UNIQUE NOT NULL ,
     direccion VARCHAR(200),
     telefono VARCHAR(20),
     email VARCHAR(100),
     estado BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE pedidos_lotes (
+CREATE TABLE ordenes_compra (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    codigo VARCHAR(20) UNIQUE NOT NULL,
+    codigo_lote VARCHAR(20) UNIQUE NOT NULL,
     cliente_id INT NOT NULL,
-    producto_id INT NOT NULL,
-    cantidad DECIMAL(10,2) NOT NULL,
-    unidad_medida_id INT NOT NULL,
-    fecha_pedido DATE NOT NULL,
-    tipo_fruta_id INT NOT NULL,
-    fecha_limite DATE,
-    estado ENUM('pendiente', 'completado', 'cancelado') DEFAULT 'pendiente',
+    numero_orden VARCHAR(20),
+    fecha_emision DATE NOT NULL,
+    fecha_entrega DATE,
+    lugar_entrega TEXT,
+    estado ENUM('pendiente', 'en_proceso', 'completado', 'cancelado') DEFAULT 'pendiente',
     observacion TEXT,
+    forma_pago VARCHAR(50),
     usuario_creacion_id INT NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
-    FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    fecha_modificacion DATETIME,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE RESTRICT,
-    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
-    FOREIGN KEY (tipo_fruta_id) REFERENCES tipos_fruta(id) ON DELETE RESTRICT,
-    FOREIGN KEY (unidad_medida_id) REFERENCES unidades_medida(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
 
--- Tabla de ingresos
+CREATE TABLE detalle_ordenes_compra (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    orden_compra_id INT NOT NULL,
+    producto_id INT NOT NULL,
+    tipo_fruta_id INT,
+    cantidad DECIMAL(10,2) NOT NULL,
+    precio DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    cantidad_ingresada DECIMAL(10,2) DEFAULT 0,  -- Para ir acumulando ingresos
+    estado ENUM('pendiente', 'completado') DEFAULT 'pendiente',
+    observacion TEXT,
+    FOREIGN KEY (orden_compra_id) REFERENCES ordenes_compra(id) ON DELETE CASCADE,
+    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
+    FOREIGN KEY (tipo_fruta_id) REFERENCES tipos_fruta(id) ON DELETE RESTRICT
+);
+
+
 CREATE TABLE ingresos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     numero_ingreso VARCHAR(20) UNIQUE NOT NULL,
     fecha DATETIME NOT NULL,
     socio_id INT NOT NULL,
-    producto_id INT NOT NULL,
-    pedido_lote_id INT NOT NULL,
-    unidad_medida_id INT NOT NULL,
-    tipo_fruta_id INT NOT NULL,
+    detalle_orden_id INT NOT NULL,
     num_jabas INT,
     dscto_merma DECIMAL(10,2),
     dscto_jaba DECIMAL(10,2),
@@ -153,14 +164,12 @@ CREATE TABLE ingresos (
     estado BOOLEAN DEFAULT TRUE,
     usuario_creacion_id INT NOT NULL,
     usuario_modificacion_id INT,
-    FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (detalle_orden_id) REFERENCES detalle_ordenes_compra(id) ON DELETE RESTRICT,
     FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
-    FOREIGN KEY (pedido_lote_id) REFERENCES pedidos_lotes(id) ON DELETE RESTRICT,
-    FOREIGN KEY (unidad_medida_id) REFERENCES unidades_medida(id) ON DELETE RESTRICT,
-    FOREIGN KEY (tipo_fruta_id) REFERENCES tipos_fruta(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
+
 
 CREATE TABLE detalle_pesajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -170,100 +179,22 @@ CREATE TABLE detalle_pesajes (
     estado BOOLEAN DEFAULT TRUE,
     usuario_creacion_id INT NOT NULL,
     usuario_modificacion_id INT,
+    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE salidas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     fecha DATETIME NOT NULL,
-    pedido_lote_id INT NOT NULL,
-    cliente_id INT NOT NULL,
-    producto_id INT NOT NULL,
-    cantidad DECIMAL(10,2) NOT NULL,
-    unidad_medida_id INT NOT NULL,
+    detalle_orden_id INT NOT NULL,
     guia_remision VARCHAR(30),
     destino VARCHAR(200),
     observacion TEXT,
     usuario_creacion_id INT NOT NULL,
     usuario_modificacion_id INT,
+    FOREIGN KEY (detalle_orden_id) REFERENCES detalle_ordenes_compra(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (pedido_lote_id) REFERENCES pedidos_lotes(id) ON DELETE RESTRICT,
-    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE RESTRICT,
-    FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
-    FOREIGN KEY (unidad_medida_id) REFERENCES unidades_medida(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
 );
 
--- Índices
-CREATE INDEX idx_personal_dni ON personal(dni);
-CREATE INDEX idx_usuarios_usuario ON usuarios(usuario);
-CREATE INDEX idx_clientes_ruc ON clientes(ruc);
-CREATE INDEX idx_ingresos_fecha ON ingresos(fecha);
-CREATE INDEX idx_salidas_fecha ON salidas(fecha);
-CREATE INDEX idx_socios_codigo ON socios(codigo);
-CREATE INDEX idx_pedidos_lotes_codigo ON pedidos_lotes(codigo);
-CREATE INDEX idx_ingresos_socio_id ON ingresos(socio_id);
-CREATE INDEX idx_ingresos_producto_id ON ingresos(producto_id);
-CREATE INDEX idx_ingresos_tipo_fruta_id ON ingresos(tipo_fruta_id);
-CREATE INDEX idx_salidas_cliente_id ON salidas(cliente_id);
-CREATE INDEX idx_salidas_producto_id ON salidas(producto_id);
-CREATE INDEX idx_productos_nombre ON productos(nombre);
-CREATE INDEX idx_socios_nombres ON socios(nombres);
-CREATE INDEX idx_ingresos_pedido_lote_id ON ingresos(pedido_lote_id);
-CREATE INDEX idx_salidas_pedido_lote_id ON salidas(pedido_lote_id);
-CREATE INDEX idx_detalle_pesajes_ingreso_id ON detalle_pesajes(ingreso_id);
-
--- Vistas
-CREATE OR REPLACE VIEW detalle_salidas AS
-SELECT
-    s.id AS salida_id,
-    s.fecha,
-    c.razon_social AS cliente,
-    pl.id AS pedido_lote_id,
-    pr.nombre AS producto,
-    s.cantidad,
-    um.abreviatura AS unidad,
-    pl.codigo AS codigo_lote,
-    s.destino,
-    s.guia_remision
-FROM salidas s
-JOIN pedidos_lotes pl ON s.pedido_lote_id = pl.id
-JOIN clientes c ON s.cliente_id = c.id
-JOIN productos pr ON s.producto_id = pr.id
-JOIN unidades_medida um ON s.unidad_medida_id = um.id;
-
-CREATE OR REPLACE VIEW avance_pedidos AS
-SELECT
-    pl.id AS pedido_id,
-    c.razon_social AS cliente,
-    pr.nombre AS producto,
-    pl.cantidad AS cantidad_solicitada,
-    COALESCE(SUM(dp.peso), 0) AS cantidad_acopiada,
-    (pl.cantidad - COALESCE(SUM(dp.peso), 0)) AS cantidad_faltante,
-    CASE
-        WHEN COALESCE(SUM(dp.peso), 0) >= pl.cantidad THEN 'completo'
-        ELSE 'pendiente'
-    END AS estado_acopio
-FROM pedidos_lotes pl
-JOIN clientes c ON pl.cliente_id = c.id
-JOIN productos pr ON pl.producto_id = pr.id
-LEFT JOIN ingresos i ON i.pedido_lote_id = pl.id
-LEFT JOIN detalle_pesajes dp ON dp.ingreso_id = i.id
-GROUP BY pl.id, c.razon_social, pr.nombre, pl.cantidad;
-
-CREATE OR REPLACE VIEW contribucion_por_socio AS
-SELECT
-    pl.id AS pedido_id,
-    s.codigo AS codigo_socio,
-    s.nombres,
-    s.apellidos,
-    pr.nombre AS producto,
-    SUM(dp.peso) AS total_aportado
-FROM ingresos i
-JOIN socios s ON i.socio_id = s.id
-JOIN productos pr ON i.producto_id = pr.id
-JOIN pedidos_lotes pl ON i.pedido_lote_id = pl.id
-JOIN detalle_pesajes dp ON dp.ingreso_id = i.id
-GROUP BY pl.id, s.id, pr.id;

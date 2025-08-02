@@ -11,8 +11,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     ruc: {
       type: DataTypes.STRING(11),
-      allowNull: false,
-      unique: true,
+      allowNull: false, 
+      unique: true,     
       validate: {
         isNumeric: {
           msg: 'El RUC debe contener solo números'
@@ -53,15 +53,15 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Cliente.associate = function(models) {
-    Cliente.hasMany(models.PedidoLote, {
-      foreignKey: 'cliente_id',
-      as: 'pedidos'
-    });
+    // Cliente.hasMany(models.PedidoLote, {
+    //   foreignKey: 'cliente_id',
+    //   as: 'pedidos'
+    // });
     
-    Cliente.hasMany(models.Salida, {
-      foreignKey: 'cliente_id',
-      as: 'salidas'
-    });
+    // Cliente.hasMany(models.Salida, {
+    //   foreignKey: 'cliente_id',
+    //   as: 'salidas'
+    // });
   };
 
   return Cliente;

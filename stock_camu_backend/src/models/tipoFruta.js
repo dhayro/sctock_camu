@@ -19,15 +19,15 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   TipoFruta.associate = function(models) {
-    TipoFruta.hasMany(models.PedidoLote, {
-      foreignKey: 'tipo_fruta_id',
-      as: 'pedidos'
-    });
+    // TipoFruta.hasMany(models.PedidoLote, {
+    //   foreignKey: 'tipo_fruta_id',
+    //   as: 'pedidos'
+    // });
     
-    TipoFruta.hasMany(models.Ingreso, {
-      foreignKey: 'tipo_fruta_id',
-      as: 'ingresos'
-    });
+    // TipoFruta.hasMany(models.Ingreso, {
+    //   foreignKey: 'tipo_fruta_id',
+    //   as: 'ingresos'
+    // });
   };
 
   return TipoFruta;

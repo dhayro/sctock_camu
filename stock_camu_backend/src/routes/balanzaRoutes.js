@@ -1023,4 +1023,12 @@ router.get('/monitor-data', (req, res) => {
     sseStream.init(req, res);
 });
 
+// Agregar esta ruta para debug
+router.get('/debug', balanzaController.debugBalanzaService);
+
+router.get('/service-info', balanzaController.getServiceInfo);
+
+router.get('/last-processed-weight', balanzaController.getLastProcessedWeight);
+router.get('/service-info', balanzaController.getServiceInfo);
+
 module.exports = router;

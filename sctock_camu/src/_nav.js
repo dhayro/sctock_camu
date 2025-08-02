@@ -105,7 +105,7 @@ const _nav = [
       {
         component: CNavItem,
         name: 'Productos',
-        to: '/productos/productos',
+        to: '/productos',
       },
     ],
   },
@@ -120,6 +120,24 @@ const _nav = [
         name: 'Clientes',
         to: '/clientes', // Ensure this matches your route for managing clients
       },
+    ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Gestión de Pedidos',
+    to: '/pedidos',
+    icon: <CIcon icon={cilTruck} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Ordenes de Compra',
+        to: '/pedidos/ordenes-compra',
+      },
+      {
+        component: CNavItem,
+        name: 'Ingresos',
+        to: '/pedidos/ingresos',
+      }
     ],
   },
   {
@@ -142,29 +160,6 @@ const _nav = [
         component: CNavItem,
         name: 'Pesajes',
         to: '/operaciones/pesajes',
-      },
-    ],
-  },
-  {
-    component: CNavGroup,
-    name: 'Pedidos y Lotes',
-    to: '/pedidos',
-    icon: <CIcon icon={cilTruck} customClassName="nav-icon" />,
-    items: [
-      {
-        component: CNavItem,
-        name: 'Lista de Pedidos',
-        to: '/pedidos/lista',
-      },
-      {
-        component: CNavItem,
-        name: 'Nuevo Pedido',
-        to: '/pedidos/nuevo',
-      },
-      {
-        component: CNavItem,
-        name: 'Seguimiento',
-        to: '/pedidos/seguimiento',
       },
     ],
   },

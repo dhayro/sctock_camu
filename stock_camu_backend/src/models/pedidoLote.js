@@ -87,10 +87,10 @@ module.exports = (sequelize, DataTypes) => {
       as: 'usuario_modificacion'
     });
     
-    PedidoLote.hasMany(models.Ingreso, {
-      foreignKey: 'pedido_lote_id',
-      as: 'ingresos'
-    });
+    // PedidoLote.hasMany(models.Ingreso, {
+    //   foreignKey: 'pedido_lote_id',
+    //   as: 'ingresos'
+    // });
     
     PedidoLote.hasMany(models.Salida, {
       foreignKey: 'pedido_lote_id',

@@ -1,4 +1,5 @@
 import React from 'react'
+// import ingreso from '../../stock_camu_backend/src/models/ingreso'
 
 const Dashboard = React.lazy(() => import('./views/dashboard/Dashboard'))
 const Colors = React.lazy(() => import('./views/theme/colors/Colors'))
@@ -12,16 +13,18 @@ const Usuarios = React.lazy(() => import('./views/maestros/Usuarios'))
 const Socios = React.lazy(() => import('./views/socios/index')) 
 
 // Import the TiposFruta component
-const TiposFruta = React.lazy(() => import('./views/Productos/TiposFruta'));
+const TiposFruta = React.lazy(() => import('./views/productos/TiposFruta'));
 
 // Import the UnidadesMedida component
-const UnidadesMedida = React.lazy(() => import('./views/Productos/UnidadesMedida'));
+const UnidadesMedida = React.lazy(() => import('./views/productos/UnidadesMedida'));
 
 // Import the Productos component
-const Productos = React.lazy(() => import('./views/Productos/Productos'));
+const Productos = React.lazy(() => import('./views/productos/Productos'));
 
 // Import the Clientes component
 const Clientes = React.lazy(() => import('./views/clientes/index'))
+const Orden = React.lazy(() => import('./views/pedidos/Ordenes'))
+const Ingreso = React.lazy(() => import('./views/pedidos/Ingresos'))
 
 // Base
 const Accordion = React.lazy(() => import('./views/base/accordion/Accordion'))
@@ -93,10 +96,12 @@ const routes = [
   { path: '/productos/unidades-medida', name: 'Unidades de Medida', element: UnidadesMedida },
 
   // Add the route for Productos
-  { path: '/productos/productos', name: 'Productos', element: Productos },
+  { path: '/productos', name: 'Productos', element: Productos },
 
   // Add the route for Gestión de Clientes
   { path: '/clientes', name: 'Clientes', element: Clientes },
+  { path: '/pedidos/ordenes-compra', name: 'Orden', element: Orden },
+  { path: '/pedidos/ingresos', name: 'Ingreso', element: Ingreso },
 
   { path: '/base', name: 'Base', element: Cards, exact: true },
   { path: '/base/accordion', name: 'Accordion', element: Accordion },

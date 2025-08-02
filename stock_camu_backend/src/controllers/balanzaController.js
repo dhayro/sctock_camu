@@ -215,14 +215,186 @@ const balanzaController = {
       const status = balanzaService.getStatus();
 
       if (!status.connected) {
-        return res.status(400).json({ error: 'La balanza no está conectada' });
+        return res.status(400).json({ 
+          error: 'La balanza no está conectada',
+          weight: 0,
+          unit: 'kg',
+          stable: false,
+          timestamp: new Date().toISOString(),
+          connected: false
+        });
       }
 
-      const weightData = balanzaService.getWeight();
-      res.json(weightData);
+      // Intentar obtener el peso de diferentes maneras según los datos disponibles
+      let weightData = null;
+
+      // Opción 1: Verificar si hay datos en las propiedades internas del servicio
+      if (balanzaService.lastProcessedData) {
+        const lastData = balanzaService.lastProcessedData;
+        weightData = {
+          weight: lastData.parsedWeight || lastData.weight || 0,
+          unit: 'kg',
+          stable: lastData.stable || false,
+          timestamp: lastData.timestamp || new Date().toISOString(),
+          rawData: lastData.rawData || null
+        };
+      }
+
+      // Opción 2: Verificar si hay datos en el buffer de datos crudos
+      if (!weightData && balanzaService.rawDataHistory && balanzaService.rawDataHistory.length > 0) {
+        const lastRawData = balanzaService.rawDataHistory[balanzaService.rawDataHistory.length - 1];
+        
+        // Intentar procesar el último dato crudo usando los métodos disponibles
+        let parsedWeight = 0;
+        let isStable = false;
+        
+        if (lastRawData.rawData && typeof balanzaService.extractWeight === 'function') {
+          try {
+            parsedWeight = balanzaService.extractWeight(lastRawData.rawData);
+            if (typeof balanzaService.isStableWeight === 'function') {
+              isStable = balanzaService.isStableWeight(lastRawData.rawData);
+            }
+          } catch (error) {
+            console.warn('Error al procesar peso:', error);
+          }
+        }
+
+        weightData = {
+          weight: parsedWeight,
+          unit: 'kg',
+          stable: isStable,
+          timestamp: lastRawData.timestamp || new Date().toISOString(),
+          rawData: lastRawData.rawData
+        };
+      }
+
+      // Opción 3: Verificar propiedades directas del servicio
+      if (!weightData) {
+        const currentWeight = balanzaService.currentWeight || 
+                             balanzaService.lastWeight || 
+                             balanzaService.weight || 
+                             0;
+        
+        const isStable = balanzaService.isStable || 
+                         balanzaService.stable || 
+                         false;
+
+        const lastRawData = balanzaService.lastRawData || 
+                           balanzaService.rawData || 
+                           null;
+
+        weightData = {
+          weight: currentWeight,
+          unit: 'kg',
+          stable: isStable,
+          timestamp: new Date().toISOString(),
+          rawData: lastRawData
+        };
+      }
+
+      // Opción 4: Verificar si el status contiene información de peso
+      if (!weightData || (weightData.weight === 0 && !weightData.rawData)) {
+        if (status.lastWeight !== undefined) {
+          weightData = {
+            weight: status.lastWeight || 0,
+            unit: 'kg',
+            stable: status.isStable || false,
+            timestamp: status.lastUpdate || new Date().toISOString(),
+            rawData: status.lastRawData || null
+          };
+        }
+      }
+
+      // Si todavía no hay datos útiles, devolver valores por defecto
+      if (!weightData) {
+        weightData = {
+          weight: 0,
+          unit: 'kg',
+          stable: false,
+          timestamp: new Date().toISOString(),
+          rawData: null
+        };
+      }
+
+      // Asegurar que el peso tenga la estructura esperada
+      const response = {
+        weight: parseFloat(weightData.weight) || 0,
+        unit: weightData.unit || 'kg',
+        stable: Boolean(weightData.stable),
+        timestamp: weightData.timestamp || new Date().toISOString(),
+        rawData: weightData.rawData || null,
+        connected: status.connected,
+        hasRawDataHistory: balanzaService.rawDataHistory ? balanzaService.rawDataHistory.length : 0
+      };
+
+      console.log('Peso actual obtenido:', response);
+      res.json(response);
     } catch (error) {
       console.error('Error al obtener el peso:', error);
-      res.status(500).json({ error: 'Error al obtener el peso de la balanza', details: error.message });
+      res.status(500).json({ 
+        error: 'Error al obtener el peso de la balanza', 
+        details: error.message,
+        weight: 0,
+        unit: 'kg',
+        stable: false,
+        timestamp: new Date().toISOString(),
+        connected: false
+      });
+    }
+  },
+
+  // Agregar este método después de checkBalanzaService
+  debugBalanzaService: (req, res) => {
+    try {
+      const serviceMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(balanzaService));
+      const serviceProperties = Object.getOwnPropertyNames(balanzaService);
+      const status = balanzaService.getStatus ? balanzaService.getStatus() : 'getStatus no disponible';
+
+      res.json({
+        serviceMethods,
+        serviceProperties,
+        status,
+        isConnected: balanzaService.isConnected,
+        hasGetWeight: typeof balanzaService.getWeight === 'function',
+        hasGetCurrentWeight: typeof balanzaService.getCurrentWeight === 'function',
+        hasGetLastWeight: typeof balanzaService.getLastWeight === 'function',
+        hasRawDataHistory: typeof balanzaService.getRawDataHistory === 'function'
+      });
+    } catch (error) {
+      console.error('Error debugging balanza service:', error);
+      res.status(500).json({ error: 'Error debugging balanza service', details: error.message });
+    }
+  },
+
+  // Agregar después del método debugBalanzaService
+  getServiceInfo: (req, res) => {
+    try {
+      const serviceMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(balanzaService));
+      const serviceProperties = Object.getOwnPropertyNames(balanzaService);
+      const status = balanzaService.getStatus();
+
+      // Intentar acceder a propiedades internas
+      const internalData = {
+        currentWeight: balanzaService.currentWeight,
+        lastWeight: balanzaService.lastWeight,
+        weight: balanzaService.weight,
+        isStable: balanzaService.isStable,
+        stable: balanzaService.stable,
+        lastRawData: balanzaService.lastRawData,
+        rawData: balanzaService.rawData,
+        rawDataHistory: balanzaService.rawDataHistory ? balanzaService.rawDataHistory.length : 0
+      };
+
+      res.json({
+        serviceMethods,
+        serviceProperties,
+        status,
+        internalData,
+        hasRawDataHistory: typeof balanzaService.getRawDataHistory === 'function'
+      });
+    } catch (error) {
+      console.error('Error getting service info:', error);
+      res.status(500).json({ error: 'Error getting service info', details: error.message });
     }
   },
 
@@ -438,7 +610,59 @@ const balanzaController = {
   // Controlador para el monitor de balanza (página HTML)
   monitorBalanza: (req, res) => {
     res.sendFile('balanza-monitor.html', { root: './src/public' });
-  }
+  },
+
+  // Método para obtener el último peso procesado desde los eventos
+  getLastProcessedWeight: (req, res) => {
+    try {
+      const status = balanzaService.getStatus();
+
+      if (!status.connected) {
+        return res.status(400).json({ 
+          error: 'La balanza no está conectada',
+          weight: 0,
+          stable: false,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Buscar en el historial de datos procesados
+      let lastProcessedWeight = null;
+
+      if (balanzaService.rawDataHistory && balanzaService.rawDataHistory.length > 0) {
+        // Buscar el último dato que tenga peso procesado
+        for (let i = balanzaService.rawDataHistory.length - 1; i >= 0; i--) {
+          const data = balanzaService.rawDataHistory[i];
+          if (data.parsedWeight !== undefined && data.parsedWeight !== null) {
+            lastProcessedWeight = {
+              weight: data.parsedWeight,
+              stable: data.stable || false,
+              timestamp: data.timestamp,
+              rawData: data.rawData
+            };
+            break;
+          }
+        }
+      }
+
+      if (!lastProcessedWeight) {
+        return res.json({
+          weight: 0,
+          stable: false,
+          timestamp: new Date().toISOString(),
+          message: 'No hay datos de peso procesados disponibles'
+        });
+      }
+
+      res.json(lastProcessedWeight);
+    } catch (error) {
+      console.error('Error al obtener el último peso procesado:', error);
+      res.status(500).json({ 
+        error: 'Error al obtener el último peso procesado', 
+        details: error.message 
+      });
+    }
+  },
 };
 
 module.exports = balanzaController;

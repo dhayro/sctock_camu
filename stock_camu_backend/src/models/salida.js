@@ -10,39 +10,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: DataTypes.NOW
     },
-    pedido_lote_id: {
+    detalle_orden_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'pedidos_lotes',
-        key: 'id'
-      }
-    },
-    cliente_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'clientes',
-        key: 'id'
-      }
-    },
-    producto_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'productos',
-        key: 'id'
-      }
-    },
-    cantidad: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false
-    },
-    unidad_medida_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'unidades_medida',
+        model: 'detalle_ordenes_compra',
         key: 'id'
       }
     },
@@ -80,24 +52,9 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Salida.associate = function(models) {
-    Salida.belongsTo(models.PedidoLote, {
-      foreignKey: 'pedido_lote_id',
-      as: 'pedido_lote'
-    });
-    
-    Salida.belongsTo(models.Cliente, {
-      foreignKey: 'cliente_id',
-      as: 'cliente'
-    });
-    
-    Salida.belongsTo(models.Producto, {
-      foreignKey: 'producto_id',
-      as: 'producto'
-    });
-    
-    Salida.belongsTo(models.UnidadMedida, {
-      foreignKey: 'unidad_medida_id',
-      as: 'unidad_medida'
+    Salida.belongsTo(models.DetalleOrdenCompra, {
+      foreignKey: 'detalle_orden_id',
+      as: 'detalle_orden'
     });
     
     Salida.belongsTo(models.Usuario, {

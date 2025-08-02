@@ -22,41 +22,17 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    producto_id: {
+    detalle_orden_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'productos',
-        key: 'id'
-      }
-    },
-    pedido_lote_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'pedidos_lotes',
-        key: 'id'
-      }
-    },
-    unidad_medida_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'unidades_medida',
-        key: 'id'
-      }
-    },
-    tipo_fruta_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      references: {
-        model: 'tipos_fruta',
+        model: 'detalle_ordenes_compra',
         key: 'id'
       }
     },
     num_jabas: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      allowNull: true
     },
     dscto_merma: {
       type: DataTypes.DECIMAL(10, 2),
@@ -95,7 +71,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     },
     observacion: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     estado: {
       type: DataTypes.BOOLEAN,
@@ -111,6 +88,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     usuario_modificacion_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
       references: {
         model: 'usuarios',
         key: 'id'
@@ -118,48 +96,34 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'ingresos',
-    timestamps: false
+    timestamps: false,
+    // Forzar la sincronización del modelo
+    freezeTableName: true
   });
 
   Ingreso.associate = function(models) {
+    // Relación con Socio
     Ingreso.belongsTo(models.Socio, {
       foreignKey: 'socio_id',
       as: 'socio'
     });
-    
-    Ingreso.belongsTo(models.Producto, {
-      foreignKey: 'producto_id',
-      as: 'producto'
+
+    // Relación con DetalleOrdenCompra
+    Ingreso.belongsTo(models.DetalleOrdenCompra, {
+      foreignKey: 'detalle_orden_id',
+      as: 'detalle_orden'
     });
-    
-    Ingreso.belongsTo(models.PedidoLote, {
-      foreignKey: 'pedido_lote_id',
-      as: 'pedido_lote'
-    });
-    
-    Ingreso.belongsTo(models.UnidadMedida, {
-      foreignKey: 'unidad_medida_id',
-      as: 'unidad_medida'
-    });
-    
-    Ingreso.belongsTo(models.TipoFruta, {
-      foreignKey: 'tipo_fruta_id',
-      as: 'tipo_fruta'
-    });
-    
+
+    // Relación con Usuario (creación)
     Ingreso.belongsTo(models.Usuario, {
       foreignKey: 'usuario_creacion_id',
       as: 'usuario_creacion'
     });
-    
+
+    // Relación con Usuario (modificación)
     Ingreso.belongsTo(models.Usuario, {
       foreignKey: 'usuario_modificacion_id',
       as: 'usuario_modificacion'
-    });
-    
-    Ingreso.hasMany(models.DetallePesaje, {
-      foreignKey: 'ingreso_id',
-      as: 'detalles_pesaje'
     });
   };
 

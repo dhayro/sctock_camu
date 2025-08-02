@@ -57,7 +57,7 @@ exports.getClienteById = async (req, res) => {
 // Crear un nuevo cliente
 exports.createCliente = async (req, res) => {
   try {
-    const { razon_social, ruc, direccion, telefono, email } = req.body;
+    let { razon_social, ruc, direccion, telefono, email } = req.body;
     
     // Validaciones básicas
     if (!razon_social || !ruc) {
@@ -66,6 +66,9 @@ exports.createCliente = async (req, res) => {
     if (!/^\d{11}$/.test(ruc)) {
       return res.status(400).json({ error: 'El RUC debe tener exactamente 11 dígitos numéricos' });
     }
+
+    // Convert razon_social to uppercase
+    razon_social = razon_social.trim().toUpperCase();
 
     const newCliente = await Cliente.create({
       razon_social,
@@ -87,7 +90,7 @@ exports.createCliente = async (req, res) => {
 exports.updateCliente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { razon_social, ruc, direccion, telefono, email, estado } = req.body;
+    let { razon_social, ruc, direccion, telefono, email, estado } = req.body;
     
     const cliente = await Cliente.findByPk(id);
     
@@ -95,7 +98,10 @@ exports.updateCliente = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
     
-    if (razon_social !== undefined) cliente.razon_social = razon_social;
+    if (razon_social !== undefined) {
+      // Convert razon_social to uppercase
+      cliente.razon_social = razon_social.trim().toUpperCase();
+    }
     if (ruc !== undefined) {
       if (!/^\d{11}$/.test(ruc)) {
         return res.status(400).json({ error: 'El RUC debe tener exactamente 11 dígitos numéricos' });

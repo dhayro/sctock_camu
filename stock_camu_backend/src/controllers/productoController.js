@@ -83,7 +83,7 @@ exports.getProductoById = async (req, res) => {
 // Crear un nuevo producto
 exports.createProducto = async (req, res) => {
   try {
-    const { nombre, unidad_medida_id, descripcion, estado } = req.body;
+    let { nombre, unidad_medida_id, descripcion, estado } = req.body;
     
     // Validaciones básicas
     if (!nombre || !unidad_medida_id) {
@@ -91,6 +91,9 @@ exports.createProducto = async (req, res) => {
         message: 'Datos incompletos. Nombre y unidad de medida son obligatorios' 
       });
     }
+    
+    // Convert nombre to uppercase
+    nombre = nombre.trim().toUpperCase();
     
     // Verificar si la unidad de medida existe
     const unidadMedidaExists = await UnidadMedida.findByPk(unidad_medida_id);
@@ -122,12 +125,17 @@ exports.createProducto = async (req, res) => {
 // Actualizar un producto existente
 exports.updateProducto = async (req, res) => {
   try {
-    const { nombre, unidad_medida_id, descripcion, estado } = req.body;
+    let { nombre, unidad_medida_id, descripcion, estado } = req.body;
     
     const producto = await Producto.findByPk(req.params.id);
     
     if (!producto) {
       return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+    
+    // Convert nombre to uppercase if provided
+    if (nombre) {
+      nombre = nombre.trim().toUpperCase();
     }
     
     // Verificar si la unidad de medida existe (si se está actualizando)
