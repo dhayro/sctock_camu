@@ -8,6 +8,12 @@ body {
   background-color: var(--cui-tertiary-bg);
 }
 
+@media (min-width: 1200px) {
+  .modal-95vw .modal-xl {
+      --cui-modal-width: 1540px;
+  }
+}
+
 .wrapper {
   width: 100%;
   padding-inline: var(--cui-sidebar-occupy-start, 0) var(--cui-sidebar-occupy-end, 0);

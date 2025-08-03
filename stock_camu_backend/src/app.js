@@ -67,6 +67,8 @@ loadRoutes('./routes/unidadMedidaRoutes', '/api/unidades-medida');
 loadRoutes('./routes/productoRoutes', '/api/productos');
 loadRoutes('./routes/ordenCompraRoutes', '/api/ordenes-compra');
 loadRoutes('./routes/detalleOrdenCompraRoutes', '/api/detalles-orden-compra');
+loadRoutes('./routes/detallePesajeRoutes', '/api/detalles-pesaje');
+
 
 
 // Usar rutas de la balanza

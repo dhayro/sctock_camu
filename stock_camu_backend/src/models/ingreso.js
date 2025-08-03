@@ -30,46 +30,112 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    // Campos de peso y medidas
+    peso_bruto: {
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 0.000,
+      comment: 'Peso total incluyendo jabas'
+    },
+    peso_total_jabas: {
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 0.000,
+      comment: 'Peso total de las jabas vacías'
+    },
     num_jabas: {
       type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    dscto_merma: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
-    },
-    dscto_jaba: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Número total de jabas'
     },
     peso_neto: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 0.000,
+      comment: 'Peso neto del producto (bruto - jabas - merma)'
     },
+    peso_jaba_unitario: {
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 2.000,
+      comment: 'Peso de cada jaba vacía'
+    },
+    // Campos de descuentos
+    dscto_merma: {
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 0.000,
+      comment: 'Descuento por merma en kg'
+    },
+    dscto_jaba: {
+      type: DataTypes.DECIMAL(10, 3),
+      allowNull: true,
+      defaultValue: 0.000,
+      comment: 'Descuento por peso de jabas'
+    },
+    // Campos financieros
     precio_venta_kg: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Precio por kilogramo'
+    },
+    impuesto: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Porcentaje de impuesto'
+    },
+    subtotal: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Subtotal sin impuesto'
+    },
+    monto_impuesto: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Monto del impuesto calculado'
     },
     total: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Total con impuesto'
     },
     pago_transporte: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Porcentaje para pago de transporte'
+    },
+    monto_transporte: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Monto calculado para transporte'
     },
     ingreso_cooperativa: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Monto que ingresa a la cooperativa'
     },
     pago_socio: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Monto a pagar al socio'
     },
     pago_con_descuento: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Pago final con descuentos aplicados'
     },
+    // Campos de control
     observacion: {
       type: DataTypes.TEXT,
       allowNull: true
@@ -86,6 +152,11 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    fecha_creacion: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW
+    },
     usuario_modificacion_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -93,12 +164,33 @@ module.exports = (sequelize, DataTypes) => {
         model: 'usuarios',
         key: 'id'
       }
+    },
+    fecha_modificacion: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     tableName: 'ingresos',
     timestamps: false,
-    // Forzar la sincronización del modelo
-    freezeTableName: true
+    freezeTableName: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['numero_ingreso']
+      },
+      {
+        fields: ['fecha']
+      },
+      {
+        fields: ['socio_id']
+      },
+      {
+        fields: ['detalle_orden_id']
+      },
+      {
+        fields: ['estado']
+      }
+    ]
   });
 
   Ingreso.associate = function(models) {
@@ -124,6 +216,12 @@ module.exports = (sequelize, DataTypes) => {
     Ingreso.belongsTo(models.Usuario, {
       foreignKey: 'usuario_modificacion_id',
       as: 'usuario_modificacion'
+    });
+
+    // Relación con DetallePesajes (uno a muchos)
+    Ingreso.hasMany(models.DetallePesaje, {
+      foreignKey: 'ingreso_id',
+      as: 'pesajes'
     });
   };
 

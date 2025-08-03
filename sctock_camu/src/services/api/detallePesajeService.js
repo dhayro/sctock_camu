@@ -4,7 +4,7 @@ const detallePesajeService = {
   // Obtener todos los detalles de pesaje
   getAll: async (params = {}) => {
     try {
-      const response = await api.get('/detalle-pesaje', { params });
+      const response = await api.get('/detalles-pesaje', { params });
       return response.data;
     } catch (error) {
       throw error;
@@ -14,7 +14,7 @@ const detallePesajeService = {
   // Obtener detalles de pesaje por ID de ingreso
   getByIngresoId: async (ingresoId) => {
     try {
-      const response = await api.get(`/balanza/pesajes/${ingresoId}`);
+      const response = await api.get(`/detalles-pesaje/ingreso/${ingresoId}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -24,7 +24,7 @@ const detallePesajeService = {
   // Obtener un detalle de pesaje por ID
   getById: async (id) => {
     try {
-      const response = await api.get(`/detalle-pesaje/${id}`);
+      const response = await api.get(`/detalles-pesaje/${id}`);
       return response.data;
     } catch (error) {
       throw error;
@@ -34,7 +34,17 @@ const detallePesajeService = {
   // Crear un nuevo detalle de pesaje
   create: async (detallePesajeData) => {
     try {
-      const response = await api.post('/balanza/guardar-peso', detallePesajeData);
+      const response = await api.post('/detalles-pesaje', detallePesajeData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Crear múltiples detalles de pesaje para un ingreso
+  createBulk: async (bulkData) => {
+    try {
+      const response = await api.post('/detalles-pesaje/bulk', bulkData);
       return response.data;
     } catch (error) {
       throw error;
@@ -44,17 +54,7 @@ const detallePesajeService = {
   // Actualizar un detalle de pesaje
   update: async (id, detallePesajeData) => {
     try {
-      const response = await api.put(`/detalle-pesaje/${id}`, detallePesajeData);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  // Actualizar observación de un pesaje
-  updateObservacion: async (id, observacion) => {
-    try {
-      const response = await api.patch(`/balanza/pesajes/${id}/observacion`, { observacion });
+      const response = await api.put(`/detalles-pesaje/${id}`, detallePesajeData);
       return response.data;
     } catch (error) {
       throw error;
@@ -64,7 +64,7 @@ const detallePesajeService = {
   // Eliminar un detalle de pesaje
   delete: async (id) => {
     try {
-      const response = await api.delete(`/balanza/pesajes/${id}`);
+      const response = await api.delete(`/detalles-pesaje/${id}`);
       return response.data;
     } catch (error) {
       throw error;

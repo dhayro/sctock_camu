@@ -53,20 +53,18 @@ const ingresoService = {
 
   // Cambiar el estado de un ingreso (activar/desactivar)
   changeState: async (id, estado) => {
-    // Change the state of an ingreso (activate/deactivate)
-    return api.patch(`/ingresos/${id}/cambiar-estado`, { estado });
+    try {
+      const response = await api.patch(`/ingresos/${id}/estado`, { estado });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   // Buscar ingresos por término (número de ingreso o nombre de socio)
   search: async (term) => {
-    // Search ingresos by term (numero_ingreso or socio name)
-    return api.get('/ingresos/search', { params: { term } });
-  },
-
-  // Obtener estadísticas de ingresos
-  getStats: async () => {
     try {
-      const response = await api.get('/ingresos/stats');
+      const response = await api.get('/ingresos/search', { params: { term } });
       return response.data;
     } catch (error) {
       throw error;

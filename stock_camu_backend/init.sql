@@ -144,44 +144,92 @@ CREATE TABLE detalle_ordenes_compra (
 );
 
 
+-- Tabla de ingresos actualizada
+DROP TABLE IF EXISTS ingresos;
+
 CREATE TABLE ingresos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     numero_ingreso VARCHAR(20) UNIQUE NOT NULL,
     fecha DATETIME NOT NULL,
     socio_id INT NOT NULL,
     detalle_orden_id INT NOT NULL,
-    num_jabas INT,
-    dscto_merma DECIMAL(10,2),
-    dscto_jaba DECIMAL(10,2),
-    peso_neto DECIMAL(10,2),
-    precio_venta_kg DECIMAL(10,2),
-    total DECIMAL(10,2),
-    pago_transporte DECIMAL(10,2),
-    ingreso_cooperativa DECIMAL(10,2),
-    pago_socio DECIMAL(10,2),
-    pago_con_descuento DECIMAL(10,2),
+    
+    -- Campos de peso y medidas
+    peso_bruto DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Peso total incluyendo jabas',
+    peso_total_jabas DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Peso total de las jabas vacías',
+    num_jabas INT DEFAULT 0 COMMENT 'Número total de jabas',
+    peso_neto DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Peso neto del producto (bruto - jabas - merma)',
+    peso_jaba_unitario DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de cada jaba vacía',
+    
+    -- Campos de descuentos
+    dscto_merma DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por merma en kg',
+    dscto_jaba DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por peso de jabas',
+    
+    -- Campos financieros
+    precio_venta_kg DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Precio por kilogramo',
+    impuesto DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Porcentaje de impuesto',
+    subtotal DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Subtotal sin impuesto',
+    monto_impuesto DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto del impuesto calculado',
+    total DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Total con impuesto',
+    pago_transporte DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Porcentaje para pago de transporte',
+    monto_transporte DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto calculado para transporte',
+    ingreso_cooperativa DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto que ingresa a la cooperativa',
+    pago_socio DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto a pagar al socio',
+    pago_con_descuento DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Pago final con descuentos aplicados',
+    
+    -- Campos de control
     observacion TEXT,
     estado BOOLEAN DEFAULT TRUE,
     usuario_creacion_id INT NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
+    fecha_modificacion DATETIME ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Restricciones de clave foránea
     FOREIGN KEY (detalle_orden_id) REFERENCES detalle_ordenes_compra(id) ON DELETE RESTRICT,
     FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    
+    -- Índices para mejor rendimiento
+    INDEX idx_numero_ingreso (numero_ingreso),
+    INDEX idx_fecha (fecha),
+    INDEX idx_socio_id (socio_id),
+    INDEX idx_detalle_orden_id (detalle_orden_id),
+    INDEX idx_estado (estado)
 );
 
+-- Tabla de detalle de pesajes actualizada
+DROP TABLE IF EXISTS detalle_pesajes;
 
 CREATE TABLE detalle_pesajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ingreso_id INT NOT NULL,
     numero_pesaje INT NOT NULL,
-    peso DECIMAL(10,2) NOT NULL,
+    peso DECIMAL(10,3) NOT NULL COMMENT 'Peso registrado en kg con 3 decimales',
+    peso_jaba DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de la jaba para este pesaje',
+    descuento_merma_pesaje DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento de merma aplicado a este pesaje',
+    peso_neto_pesaje DECIMAL(10,3) GENERATED ALWAYS AS (peso - peso_jaba - descuento_merma_pesaje) STORED COMMENT 'Peso neto calculado automáticamente',
+    observacion_pesaje TEXT COMMENT 'Observaciones específicas del pesaje',
+    fecha_pesaje DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp del pesaje',
+    
+    -- Campos de control
     estado BOOLEAN DEFAULT TRUE,
     usuario_creacion_id INT NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     usuario_modificacion_id INT,
-    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE RESTRICT,
+    fecha_modificacion DATETIME ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Restricciones de clave foránea
+    FOREIGN KEY (ingreso_id) REFERENCES ingresos(id) ON DELETE CASCADE,
     FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
-    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT
+    FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
+    
+    -- Restricciones únicas e índices
+    UNIQUE KEY unique_pesaje_por_ingreso (ingreso_id, numero_pesaje),
+    INDEX idx_ingreso_id (ingreso_id),
+    INDEX idx_fecha_pesaje (fecha_pesaje),
+    INDEX idx_estado (estado)
 );
 
 CREATE TABLE salidas (

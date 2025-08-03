@@ -70,10 +70,22 @@ import ingresoService from '../../services/api/ingresoService';
 import socioService from '../../services/api/socioService';
 import productoService from '../../services/api/productoService';
 import detalleOrdenCompraService from '../../services/api/detalleOrdenCompraService';
+import detallePesajeService from '../../services/api/detallePesajeService';
 import ordenCompraService from '../../services/api/ordenCompraService';
 import unidadMedidaService from '../../services/api/unidadMedidaService';
 import tipoFrutaService from '../../services/api/tipoFrutaService';
 import balanzaService from '../../services/api/balanzaService';
+
+const modalStyles = {
+  modalDialog90vw: {
+    maxWidth: '90vw',
+    width: '90vw'
+  },
+  modalBody: {
+    maxHeight: 'calc(90vh - 140px)',
+    overflowY: 'auto'
+  }
+};
 
 const Ingresos = () => {
   const { user } = useContext(UserContext); // Obtener el usuario del contexto
@@ -93,10 +105,11 @@ const Ingresos = () => {
     unidad_medida_id: '',
     tipo_fruta_id: '',
     num_jabas: 0,
-    dscto_merma: 0,
+    descuento_merma: 0,
     dscto_jaba: 0,
     peso_bruto: 0,
     peso_neto: 0,
+    impuesto: 40,
     precio_venta_kg: 0,
     total: 0,
     pago_transporte: 0,
@@ -205,6 +218,58 @@ const Ingresos = () => {
   const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({});
   const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false);
 
+
+
+
+
+  const agregarPesajeTemporal = () => {
+    if (!productoSeleccionadoPesaje) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Producto no seleccionado',
+        text: 'Por favor seleccione un producto antes de agregar el pesaje',
+        confirmButtonColor: '#321fdb'
+      });
+      return;
+    }
+
+    if (!pesajeRealTime.stable || pesajeRealTime.weight <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Peso no estable',
+        text: 'Espere a que el peso se estabilice antes de agregarlo',
+        confirmButtonColor: '#321fdb'
+      });
+      return;
+    }
+
+    const nuevoPesaje = {
+      id: `temp_${Date.now()}`,
+      producto_id: productoSeleccionadoPesaje, // Agregar el ID del producto
+      peso_bruto: pesajeRealTime.weight,
+      num_jabas: parseInt(numJabas) || 0,
+      peso_total_jabas: (parseInt(numJabas) || 0) * pesoJaba,
+      observacion: observacionPesaje || '',
+      fecha_pesaje: new Date().toISOString(),
+      estable: true,
+      timestamp: new Date().toISOString()
+    };
+
+    setPesajesTemporales(prev => [...prev, nuevoPesaje]);
+
+    // Limpiar campos
+    setNumJabas('');
+    setObservacionPesaje('');
+
+    // Mostrar mensaje de éxito
+    Swal.fire({
+      icon: 'success',
+      title: '¡Pesaje agregado!',
+      text: `Peso: ${pesajeRealTime.weight.toFixed(3)} kg`,
+      timer: 1500,
+      showConfirmButton: false
+    });
+  };
 
 
 
@@ -470,9 +535,10 @@ const Ingresos = () => {
       unidad_medida_id: '',
       tipo_fruta_id: '',
       num_jabas: 0,
-      dscto_merma: 0,
+      descuento_merma: 0,
       dscto_jaba: 0,
       peso_bruto: 0,
+      impuesto: 40,
       peso_neto: 0,
       precio_venta_kg: 0,
       total: 0,
@@ -585,10 +651,11 @@ const Ingresos = () => {
         unidad_medida_id: '',
         tipo_fruta_id: '',
         num_jabas: 0,
-        dscto_merma: 0,
+        descuento_merma: 0,
         dscto_jaba: 0,
         peso_bruto: 0,
         peso_neto: 0,
+        impuesto: 40,
         precio_venta_kg: 0,
         total: 0,
         pago_transporte: 0,
@@ -1084,10 +1151,10 @@ const Ingresos = () => {
       const updated = { ...prev, [name]: value }
 
       // Calcular automáticamente valores dependientes
-      if (['peso_neto', 'precio_venta_kg', 'dscto_merma', 'dscto_jaba', 'pago_transporte'].includes(name)) {
+      if (['peso_neto', 'precio_venta_kg', 'descuento_merma', 'dscto_jaba', 'pago_transporte'].includes(name)) {
         const pesoNeto = parseFloat(updated.peso_neto) || 0
         const precioKg = parseFloat(updated.precio_venta_kg) || 0
-        const descuentoMerma = parseFloat(updated.dscto_merma) || 0
+        const descuentoMerma = parseFloat(updated.descuento_merma) || 0
         const descuentoJaba = parseFloat(updated.dscto_jaba) || 0
         const pagoTransporte = parseFloat(updated.pago_transporte) || 0
 
@@ -1318,7 +1385,21 @@ const Ingresos = () => {
   const camposBloqueados = pesajesTemporales.length > 0;
 
 
+  // Función para sincronizar totales del ingreso con pesajes temporales
+  const sincronizarTotalesIngreso = (pesajesActualizados) => {
+    const totalPesoBruto = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
+    const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
+    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
 
+    setCurrentIngreso(prev => ({
+      ...prev,
+      peso_bruto: totalPesoBruto.toFixed(3),
+      num_jabas: totalJabas,
+      peso_total_jabas: totalPesoJabas.toFixed(3)
+    }));
+
+    return { totalPesoBruto, totalJabas, totalPesoJabas };
+  };
 
 
   const detectarJabas = (peso) => {
@@ -1331,11 +1412,42 @@ const Ingresos = () => {
     return jabasCalculadas > 50 ? 0 : jabasCalculadas;
   };
 
-  // Modificar la función aplicarPesoRealTime
 
-  // Función completa para aplicar peso en tiempo real
 
-  // Función completa para aplicar peso en tiempo real (solo peso bruto)
+  // Agregar un useEffect para forzar re-render cuando cambien los pesajesTemporales
+  useEffect(() => {
+    // Forzar re-render cuando cambien los pesajes temporales
+    if (pesajesTemporales.length > 0) {
+      // Esto forzará que se recalculen los valores en el render
+      setProductosOrden(prev => [...prev]);
+    }
+  }, [pesajesTemporales]);
+
+  // Asegúrate de que estas funciones estén definidas ANTES del return del componente
+  const calcularPesoNetoIngresadoPorProducto = (productoId) => {
+    return pesajesTemporales
+      .filter(pesaje => pesaje.producto_id === productoId)
+      .reduce((sum, pesaje) => {
+        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0);
+        return sum + pesoNeto;
+      }, 0);
+  };
+
+  const calcularCantidadPendienteActualizada = (producto) => {
+    const cantidadOriginalPendiente = cantidadPendientePorProducto[producto.id] || 0;
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
+    return Math.max(0, cantidadOriginalPendiente - pesoNetoIngresado);
+  };
+
+  const calcularProgresoActualizado = (producto) => {
+    const cantidadTotal = producto.cantidad || 0;
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
+    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado;
+
+    return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0;
+  };
+
   const aplicarPesoRealTime = async () => {
     if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
       toast.error('El peso debe estar estabilizado para aplicarlo');
@@ -1350,45 +1462,136 @@ const Ingresos = () => {
       return;
     }
 
-    // Preguntar cuántas jabas corresponden a este peso
-    const { value: numJabas } = await Swal.fire({
-      title: 'Número de Jabas',
+    // Preguntar cuántas jabas y descuento por merma
+    const { value: formValues } = await Swal.fire({
+      title: 'Datos del Pesaje',
       html: `
-      <div style="text-align: left; margin-bottom: 15px;">
-        <p><strong>Peso bruto detectado:</strong> ${pesoBruto.toFixed(3)} kg</p>
-        <p><strong>¿Cuántas jabas corresponden a este peso?</strong></p>
+      <div class="container-fluid">
+        <div class="row mb-3">
+          <div class="col-12">
+            <div class="alert alert-primary mb-3">
+              <i class="fas fa-weight-hanging me-2"></i>
+              <strong>Peso bruto detectado:</strong> ${pesoBruto.toFixed(3)} kg
+            </div>
+          </div>
+        </div>
+        
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label for="swal-jabas" class="form-label fw-semibold">
+              <i class="fas fa-box me-1"></i>
+              Número de jabas:
+            </label>
+            <input type="number" id="swal-jabas" class="form-control" 
+                   min="1" max="50" step="1" 
+                   value="${Math.round(pesoBruto / (pesoJaba || 2))}" 
+                   placeholder="Número de jabas">
+          </div>
+          
+          <div class="col-12 col-md-6">
+            <label for="swal-merma" class="form-label fw-semibold">
+              <i class="fas fa-minus-circle me-1"></i>
+              Descuento por merma (kg):
+            </label>
+            <input type="number" id="swal-merma" class="form-control" 
+                   min="0" step="0.001" 
+                   value="0" placeholder="0.000">
+          </div>
+        </div>
+        
+        <div class="row mt-4">
+          <div class="col-12">
+            <div class="card border-info">
+              <div class="card-header bg-info text-white">
+                <h6 class="mb-0">
+                  <i class="fas fa-calculator me-2"></i>
+                  Resumen de Cálculos
+                </h6>
+              </div>
+              <div class="card-body">
+                <div class="row g-2">
+                  <div class="col-6 col-sm-3">
+                    <small class="text-muted d-block">Peso por jaba:</small>
+                    <strong class="text-primary">${pesoJaba} kg</strong>
+                  </div>
+                  <div class="col-6 col-sm-3">
+                    <small class="text-muted d-block">Peso total jabas:</small>
+                    <strong class="text-info"><span id="swal-peso-jabas">0.00</span> kg</strong>
+                  </div>
+                  <div class="col-6 col-sm-3">
+                    <small class="text-muted d-block">Descuento merma:</small>
+                    <strong class="text-warning"><span id="swal-descuento-merma">0.000</span> kg</strong>
+                  </div>
+                  <div class="col-6 col-sm-3">
+                    <small class="text-muted d-block">Peso neto final:</small>
+                    <strong class="text-success fs-6"><span id="swal-peso-neto">0.000</span> kg</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     `,
-      input: 'number',
-      inputAttributes: {
-        min: 1,
-        max: 50,
-        step: 1,
-        placeholder: 'Número de jabas'
-      },
-      inputValue: Math.round(pesoBruto / (pesoJaba || 25)), // Sugerencia basada en peso promedio
+      focusConfirm: false,
       showCancelButton: true,
       confirmButtonText: 'Aplicar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#321fdb',
       cancelButtonColor: '#6c757d',
-      inputValidator: (value) => {
-        if (!value || value <= 0) {
-          return 'Debe ingresar un número válido de jabas';
+      width: '600px',
+      didOpen: () => {
+        const jabasInput = document.getElementById('swal-jabas');
+        const mermaInput = document.getElementById('swal-merma');
+        const pesoJabasSpan = document.getElementById('swal-peso-jabas');
+        const descuentoMermaSpan = document.getElementById('swal-descuento-merma');
+        const pesoNetoSpan = document.getElementById('swal-peso-neto');
+
+        const calcularPesos = () => {
+          const jabas = parseInt(jabasInput.value) || 0;
+          const merma = parseFloat(mermaInput.value) || 0;
+          const pesoTotalJabas = jabas * pesoJaba;
+          const pesoNeto = Math.max(0, pesoBruto - pesoTotalJabas - merma);
+
+          pesoJabasSpan.textContent = pesoTotalJabas.toFixed(2);
+          descuentoMermaSpan.textContent = merma.toFixed(3);
+          pesoNetoSpan.textContent = pesoNeto.toFixed(3);
+        };
+
+        jabasInput.addEventListener('input', calcularPesos);
+        mermaInput.addEventListener('input', calcularPesos);
+        calcularPesos(); // Calcular inicial
+      },
+      preConfirm: () => {
+        const jabas = parseInt(document.getElementById('swal-jabas').value);
+        const merma = parseFloat(document.getElementById('swal-merma').value) || 0;
+
+        if (!jabas || jabas <= 0) {
+          Swal.showValidationMessage('Debe ingresar un número válido de jabas');
+          return false;
         }
-        if (value > 50) {
-          return 'El número de jabas no puede ser mayor a 50';
+        if (jabas > 50) {
+          Swal.showValidationMessage('El número de jabas no puede ser mayor a 50');
+          return false;
         }
+        if (merma < 0) {
+          Swal.showValidationMessage('El descuento por merma no puede ser negativo');
+          return false;
+        }
+
+        return { jabas, merma };
       }
     });
 
-    // Si el usuario canceló o no ingresó un valor válido
-    if (!numJabas) {
+    // Si el usuario canceló o no ingresó valores válidos
+    if (!formValues) {
       return;
     }
 
-    const jabasIngresadas = parseInt(numJabas);
+    const jabasIngresadas = formValues.jabas;
+    const descuentoMerma = formValues.merma;
     const pesoTotalJabas = jabasIngresadas * pesoJaba;
+    const pesoNeto = pesoBruto - pesoTotalJabas - descuentoMerma;
 
     // Buscar el producto seleccionado en la lista de productos de la orden
     const productoOrden = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
@@ -1397,56 +1600,226 @@ const Ingresos = () => {
       return;
     }
 
-    // Crear el pesaje temporal (solo con peso bruto, el neto se calculará después)
-    const nuevoPesajeTemporal = {
-      id: Date.now(), // ID temporal único
+    // Crear el pesaje temporal con TODA la información necesaria
+    const nuevoPesaje = {
+      id: Date.now(),
       numero: contadorPesajes,
-      producto_id: productoOrden.producto_id,
+      // Información del producto
+      producto_id: parseInt(productoSeleccionadoPesaje),
+      detalle_orden_id: productoOrden.id,
       producto_nombre: productoOrden.producto_nombre,
       tipo_fruta_id: productoOrden.tipo_fruta_id,
       tipo_fruta_nombre: productoOrden.tipo_fruta_nombre,
+      // Información del pesaje
       peso_bruto: pesoBruto,
       num_jabas: jabasIngresadas,
       peso_total_jabas: pesoTotalJabas,
-      // El peso neto se calculará después en el procesamiento final
-      peso_neto: 0, // Por ahora en 0, se calculará después
+      descuento_merma: descuentoMerma, // ← NUEVO CAMPO
+      peso_neto: pesoNeto, // Ya incluye el descuento por merma
       precio_kg: productoOrden.precio || 0,
-      subtotal: 0, // Se calculará después cuando se determine el peso neto
+      subtotal: pesoNeto * (productoOrden.precio || 0),
+      // Metadatos
       timestamp: new Date().toISOString(),
-      observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}`
+      stable: pesajeRealTime.stable,
+      rawData: pesajeRealTime.rawData,
+      observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}${descuentoMerma > 0 ? ` - Merma: ${descuentoMerma.toFixed(3)}kg` : ''}`
     };
 
-    // Agregar el pesaje a la lista temporal
-    setPesajesTemporales(prev => [...prev, nuevoPesajeTemporal]);
+    console.log('Aplicando peso con merma:', nuevoPesaje);
+
+
+
+    setPesajesTemporales(prev => {
+      const nuevosTemporales = [...prev, nuevoPesaje];
+
+      const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
+      const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
+      const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+      const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
+      const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+
+      // Actualizar el currentIngreso con los nuevos totales
+      setCurrentIngreso(prev => ({
+        ...prev,
+        peso_bruto: totalPesoBruto.toFixed(3),
+        num_jabas: totalJabas,
+        peso_total_jabas: totalPesoJabas.toFixed(3),
+        descuento_merma: totalDescuentoMerma.toFixed(3),
+        peso_neto: totalPesoNeto.toFixed(3),
+        // Recalcular el total basado en el nuevo peso neto
+        total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
+      }));
+
+
+      return nuevosTemporales;
+    });
 
     // Incrementar el contador para el próximo pesaje
     setContadorPesajes(prev => prev + 1);
 
-    // Actualizar el formulario principal con los totales acumulados (solo peso bruto por ahora)
-    const nuevosPesajes = [...pesajesTemporales, nuevoPesajeTemporal];
-    const pesoBrutoTotal = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_bruto, 0);
-    const jabasTotales = nuevosPesajes.reduce((total, pesaje) => total + pesaje.num_jabas, 0);
-    const pesoTotalJabasAcumulado = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_total_jabas, 0);
-
-    // Actualizar el formulario principal (solo peso bruto y jabas)
-    setCurrentIngreso(prev => ({
-      ...prev,
-      peso_bruto: pesoBrutoTotal.toFixed(3),
-      num_jabas: jabasTotales,
-      peso_total_jabas: pesoTotalJabasAcumulado.toFixed(3),
-      // El peso neto y totales se calcularán en el procesamiento final
-      peso_neto: 0, // Se calculará después
-      total: 0 // Se calculará después
-    }));
-
     // Agregar al historial de pesajes
     setHistorialPesajes(prev => [...prev, {
-      ...nuevoPesajeTemporal,
+      ...nuevoPesaje,
       fecha_hora: new Date().toLocaleString()
     }]);
 
-    toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto con ${jabasIngresadas} jabas`);
+    // Forzar re-render de la tabla de productos para actualizar progreso
+    setProductosOrden(prev => [...prev]);
+
+    toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto, ${jabasIngresadas} jabas${descuentoMerma > 0 ? `, merma ${descuentoMerma.toFixed(3)} kg` : ''} = ${pesoNeto.toFixed(3)} kg neto`);
   };
+
+
+
+  // const aplicarPesoRealTime = async () => {
+  //   if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
+  //     toast.error('El peso debe estar estabilizado para aplicarlo');
+  //     return;
+  //   }
+
+  //   const pesoBruto = pesajeRealTime.weight;
+
+  //   // Verificar que hay un producto seleccionado
+  //   if (!productoSeleccionadoPesaje) {
+  //     toast.warning('Debe seleccionar un producto antes de aplicar el peso');
+  //     return;
+  //   }
+
+  //   // Preguntar cuántas jabas corresponden a este peso
+  //   const { value: numJabas } = await Swal.fire({
+  //     title: 'Número de Jabas',
+  //     html: `
+  //     <div style="text-align: left; margin-bottom: 15px;">
+  //       <p><strong>Peso bruto detectado:</strong> ${pesoBruto.toFixed(3)} kg</p>
+  //       <p><strong>¿Cuántas jabas corresponden a este peso?</strong></p>
+  //     </div>
+  //   `,
+  //     input: 'number',
+  //     inputAttributes: {
+  //       min: 1,
+  //       max: 50,
+  //       step: 1,
+  //       placeholder: 'Número de jabas'
+  //     },
+  //     inputValue: Math.round(pesoBruto / (pesoJaba || 25)), // Sugerencia basada en peso promedio
+  //     showCancelButton: true,
+  //     confirmButtonText: 'Aplicar',
+  //     cancelButtonText: 'Cancelar',
+  //     confirmButtonColor: '#321fdb',
+  //     cancelButtonColor: '#6c757d',
+  //     inputValidator: (value) => {
+  //       if (!value || value <= 0) {
+  //         return 'Debe ingresar un número válido de jabas';
+  //       }
+  //       if (value > 50) {
+  //         return 'El número de jabas no puede ser mayor a 50';
+  //       }
+  //     }
+  //   });
+
+  //   // Si el usuario canceló o no ingresó un valor válido
+  //   if (!numJabas) {
+  //     return;
+  //   }
+
+  //   const jabasIngresadas = parseInt(numJabas);
+  //   const pesoTotalJabas = jabasIngresadas * pesoJaba;
+
+  //   // Buscar el producto seleccionado en la lista de productos de la orden
+  //   const productoOrden = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
+  //   if (!productoOrden) {
+  //     toast.error('No se encontró el producto seleccionado en la orden');
+  //     return;
+  //   }
+
+  //   // Crear el pesaje temporal (solo con peso bruto, el neto se calculará después)
+  //   const nuevoPesajeTemporal = {
+  //     id: Date.now(), // ID temporal único
+  //     numero: contadorPesajes,
+  //     producto_id: productoOrden.producto_id,
+  //     producto_nombre: productoOrden.producto_nombre,
+  //     tipo_fruta_id: productoOrden.tipo_fruta_id,
+  //     tipo_fruta_nombre: productoOrden.tipo_fruta_nombre,
+  //     peso_bruto: pesoBruto,
+  //     num_jabas: jabasIngresadas,
+  //     peso_total_jabas: pesoTotalJabas,
+  //     // El peso neto se calculará después en el procesamiento final
+  //     peso_neto: 0, // Por ahora en 0, se calculará después
+  //     precio_kg: productoOrden.precio || 0,
+  //     subtotal: 0, // Se calculará después cuando se determine el peso neto
+  //     timestamp: new Date().toISOString(),
+  //     observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}`
+  //   };
+
+  //   // Agregar el pesaje a la lista temporal
+  //   setPesajesTemporales(prev => [...prev, nuevoPesajeTemporal]);
+
+  //   setProductosOrden(prev => [...prev]);
+
+
+  //   // Incrementar el contador para el próximo pesaje
+  //   setContadorPesajes(prev => prev + 1);
+
+  //   // Actualizar el formulario principal con los totales acumulados (solo peso bruto por ahora)
+  //   const nuevosPesajes = [...pesajesTemporales, nuevoPesajeTemporal];
+  //   const pesoBrutoTotal = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_bruto, 0);
+  //   const jabasTotales = nuevosPesajes.reduce((total, pesaje) => total + pesaje.num_jabas, 0);
+  //   const pesoTotalJabasAcumulado = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_total_jabas, 0);
+
+  //   // Actualizar el formulario principal (solo peso bruto y jabas)
+  //   setCurrentIngreso(prev => ({
+  //     ...prev,
+  //     peso_bruto: pesoBrutoTotal.toFixed(3),
+  //     num_jabas: jabasTotales,
+  //     peso_total_jabas: pesoTotalJabasAcumulado.toFixed(3),
+  //     // El peso neto y totales se calcularán en el procesamiento final
+  //     peso_neto: 0, // Se calculará después
+  //     total: 0 // Se calculará después
+  //   }));
+
+  //   // Agregar al historial de pesajes
+  //   setHistorialPesajes(prev => [...prev, {
+  //     ...nuevoPesajeTemporal,
+  //     fecha_hora: new Date().toLocaleString()
+  //   }]);
+
+  //   toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto con ${jabasIngresadas} jabas`);
+  // }; 
+
+  // Modificar la función aplicarPesoRealTime para incluir logs de debug
+  // const aplicarPesoRealTime = () => {
+  //   if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
+  //     toast.error('El peso no está estabilizado');
+  //     return;
+  //   }
+
+  //   if (!productoSeleccionadoPesaje) {
+  //     toast.error('Debe seleccionar un producto para el pesaje');
+  //     return;
+  //   }
+
+  //   const nuevoPesaje = {
+  //     id: Date.now(),
+  //     producto_id: productoSeleccionadoPesaje,
+  //     peso_bruto: pesajeRealTime.weight,
+  //     peso_total_jabas: pesoJaba * Math.ceil(pesajeRealTime.weight / pesoJaba),
+  //     num_jabas: Math.ceil(pesajeRealTime.weight / pesoJaba),
+  //     timestamp: new Date().toISOString(),
+  //     stable: pesajeRealTime.stable,
+  //     rawData: pesajeRealTime.rawData
+  //   };
+
+  //   console.log('Aplicando peso:', nuevoPesaje);
+  //   console.log('Pesajes temporales antes:', pesajesTemporales);
+
+  //   setPesajesTemporales(prev => {
+  //     const nuevosTemporales = [...prev, nuevoPesaje];
+  //     console.log('Pesajes temporales después:', nuevosTemporales);
+  //     return nuevosTemporales;
+  //   });
+
+  //   toast.success(`Peso aplicado: ${pesajeRealTime.weight.toFixed(3)} kg`);
+  // };
 
 
   const limpiarPesajesTemporales = async () => {
@@ -1481,6 +1854,7 @@ const Ingresos = () => {
         peso_bruto: '0.000',
         num_jabas: 0,
         peso_total_jabas: '0.000',
+        descuento_merma: '0.000',
         peso_neto: '0.000',
         total: '0.00',
         ingreso_cooperativa: '0.00',
@@ -1511,21 +1885,33 @@ const Ingresos = () => {
     });
   };
 
-  // Función para eliminar pesaje temporal
-  const eliminarPesajeTemporal = (index) => {
-    const pesajeEliminado = pesajesTemporales[index];
+  const eliminarPesajeTemporal = (pesajeId) => {
+    setPesajesTemporales(prev => {
+      const updatedPesajes = prev.filter(p => p.id !== pesajeId);
 
-    // Restaurar la cantidad pendiente del producto
-    if (pesajeEliminado.producto_id) {
-      setCantidadPendientePorProducto(prev => ({
+      // Recalcular todos los totales después de eliminar
+      const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
+      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
+      const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+      const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
+      const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+
+      // Actualizar el currentIngreso con los nuevos totales
+      setCurrentIngreso(prev => ({
         ...prev,
-        [pesajeEliminado.producto_id]: (prev[pesajeEliminado.producto_id] || 0) + pesajeEliminado.peso_neto
+        peso_bruto: totalPesoBruto.toFixed(3),
+        num_jabas: totalJabas,
+        peso_total_jabas: totalPesoJabas.toFixed(3),
+        descuento_merma: totalDescuentoMerma.toFixed(3),
+        peso_neto: totalPesoNeto.toFixed(3),
+        // Recalcular el total basado en el nuevo peso neto
+        total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
       }));
-    }
 
-    // Eliminar el pesaje de la lista
-    setPesajesTemporales(prev => prev.filter((_, i) => i !== index));
-    toast.success('Pesaje eliminado');
+      return updatedPesajes;
+    });
+
+    toast.success('Pesaje eliminado y totales actualizados');
   };
 
   // Modificar la función guardarPesajeAutomatico para incluir el producto seleccionado
@@ -1566,6 +1952,7 @@ const Ingresos = () => {
       producto_nombre: productosOrden.find(p => p.id === productoSeleccionadoPesaje)?.producto_nombre || '',
       peso_bruto: pesajeRealTime.weight,
       num_jabas: currentIngreso.num_jabas,
+      impuesto: currentIngreso.impuesto,
       peso_total_jabas: pesoTotalJabas,
       peso_neto: pesoNeto,
       fecha_pesaje: new Date().toISOString(),
@@ -1620,7 +2007,7 @@ const Ingresos = () => {
       // Recalcular totales automáticamente
       const pesoNeto = parseFloat(updated.peso_neto) || 0;
       const precioKg = parseFloat(updated.precio_venta_kg) || 0;
-      const descuentoMerma = parseFloat(updated.dscto_merma) || 0;
+      const descuentoMerma = parseFloat(updated.descuento_merma) || 0;
       const descuentoJaba = parseFloat(updated.dscto_jaba) || 0;
       const pagoTransporte = parseFloat(updated.pago_transporte) || 0;
 
@@ -2239,34 +2626,35 @@ const Ingresos = () => {
   };
 
 
-  // Funciones CRUD
-  const handleCreate = () => {
-    setCurrentIngreso({
-      numero_ingreso: '',
-      fecha: new Date().toISOString().split('T')[0],
-      socio_id: '',
-      producto_id: '',
-      detalle_orden_id: '',
-      unidad_medida_id: '',
-      tipo_fruta_id: '',
-      num_jabas: 0,
-      dscto_merma: 0,
-      dscto_jaba: 0,
-      peso_neto: 0,
-      precio_venta_kg: 0,
-      total: 0,
-      pago_transporte: 0,
-      ingreso_cooperativa: 0,
-      pago_socio: 0,
-      pago_con_descuento: 0,
-      observacion: ''
-    })
-    setFormErrors({})
-    setActiveTab('general')
-    setPesajes([])
-    setModalTitle('Crear Nuevo Ingreso')
-    setShowModal(true)
-  }
+  // // Funciones CRUD
+  // const handleCreate = () => {
+  //   setCurrentIngreso({
+  //     numero_ingreso: '',
+  //     fecha: new Date().toISOString().split('T')[0],
+  //     socio_id: '',
+  //     producto_id: '',
+  //     detalle_orden_id: '',
+  //     unidad_medida_id: '',
+  //     tipo_fruta_id: '',
+  //     num_jabas: 0,
+  //     descuento_merma: 0,
+  //     dscto_jaba: 0,
+  //     peso_neto: 0,
+  //     impuesto: 40,
+  //     precio_venta_kg: 0,
+  //     total: 0,
+  //     pago_transporte: 0,
+  //     ingreso_cooperativa: 0,
+  //     pago_socio: 0,
+  //     pago_con_descuento: 0,
+  //     observacion: ''
+  //   })
+  //   setFormErrors({})
+  //   setActiveTab('general')
+  //   setPesajes([])
+  //   setModalTitle('Crear Nuevo Ingreso')
+  //   setShowModal(true)
+  // }
 
   const handleEdit = (ingreso) => {
     setCurrentIngreso({
@@ -2335,7 +2723,7 @@ const Ingresos = () => {
       const ingresoData = {
         ...currentIngreso,
         num_jabas: parseInt(currentIngreso.num_jabas) || 0,
-        dscto_merma: parseFloat(currentIngreso.dscto_merma) || 0,
+        descuento_merma: parseFloat(currentIngreso.descuento_merma) || 0,
         dscto_jaba: parseFloat(currentIngreso.dscto_jaba) || 0,
         peso_neto: parseFloat(currentIngreso.peso_neto) || 0,
         precio_venta_kg: parseFloat(currentIngreso.precio_venta_kg) || 0,
@@ -2773,13 +3161,271 @@ const Ingresos = () => {
   const [leyendoPeso, setLeyendoPeso] = useState(false)
   const [editingId, setEditingId] = useState(null)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    await handleSave()
-  }
 
 
+  const handleSubmit = async () => {
+    try {
+      setSubmitting(true);
+      setFormErrors({});
+      
+      // Validar campos requeridos
+      const errors = {};
+      
+      if (!ordenSeleccionada) {
+        errors.orden_id = 'Debe seleccionar una orden pendiente';
+      }
+      
+      if (!socioSeleccionado) {
+        errors.socio_id = 'Debe seleccionar un socio';
+      }
+      
+      if (!productoSeleccionadoPesaje) {
+        errors.producto_seleccionado = 'Debe seleccionar un producto de la orden para el pesaje';
+      }
+      
+      if (pesajesTemporales.length === 0) {
+        errors.pesajes = 'Debe registrar al menos un pesaje antes de crear el ingreso';
+      }
+      
+      if (!pesoJaba || pesoJaba <= 0) {
+        errors.peso_jaba = 'El peso por jaba debe ser mayor a 0';
+      }
+      
+      if (!precioVentaKg || precioVentaKg <= 0) {
+        errors.precio_venta = 'El precio de venta debe ser mayor a 0';
+      }
+      
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        
+        // Mostrar alerta con los errores
+        Swal.fire({
+          icon: 'error',
+          title: 'Errores de validación',
+          html: Object.values(errors).map(error => `• ${error}`).join('<br>'),
+          confirmButtonColor: '#321fdb'
+        });
+        
+        setSubmitting(false);
+        return;
+      }
+      
+      // Obtener el producto seleccionado para obtener sus datos
+      const productoSeleccionado = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
+      
+      if (!productoSeleccionado) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo encontrar el producto seleccionado',
+          confirmButtonColor: '#321fdb'
+        });
+        setSubmitting(false);
+        return;
+      }
+      
+      // Crear un ingreso consolidado con todos los pesajes
+      const pesoNetoTotal = pesajesTemporales.reduce((total, pesaje) => {
+        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
+        return total + pesoNeto;
+      }, 0);
+      
+      const numJabasTotal = pesajesTemporales.reduce((total, pesaje) => {
+        return total + parseInt(pesaje.num_jabas || 0);
+      }, 0);
+      
+      const pesoBrutoTotal = pesajesTemporales.reduce((total, pesaje) => {
+        return total + parseFloat(pesaje.peso_bruto || 0);
+      }, 0);
+      
+      const descuentoMermaTotal = pesajesTemporales.reduce((total, pesaje) => {
+        return total + parseFloat(pesaje.descuento_merma || 0);
+      }, 0);
+      
+      // Calcular montos totales
+      const subtotal = pesoNetoTotal * precioVentaKg;
+      
+      // Calcular pagos basados en porcentajes
+      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+      const pagoTransporte = pesoNetoTotal * porcentajeTransporte;
+      
+      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+      const ingresoCooperativa = pesoNetoTotal * porcentajeImpuesto;
+      
+      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
+      
+      // Preparar datos del ingreso consolidado
+      const ingresoData = {
+        numero_ingreso: currentIngreso.numero_ingreso || `ING-${Date.now()}`,
+        fecha: currentIngreso.fecha || new Date().toISOString().split('T')[0],
+        socio_id: parseInt(socioSeleccionado),
+        producto_id: productoSeleccionado.producto_id,
+        detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+        unidad_medida_id: currentIngreso.unidad_medida_id || null,
+        tipo_fruta_id: productoSeleccionado.tipo_fruta_id || null,
+        num_jabas: numJabasTotal,
+        descuento_merma: descuentoMermaTotal,
+        dscto_jaba: parseFloat(pesoJaba || 0),
+        peso_bruto: pesoBrutoTotal,
+        peso_neto: pesoNetoTotal,
+        impuesto: parseFloat(porcentajeImpuesto * 100),
+        precio_venta_kg: parseFloat(precioVentaKg || 0),
+        total: subtotal,
+        pago_transporte: pagoTransporte,
+        ingreso_cooperativa: ingresoCooperativa,
+        pago_socio: pagoSocio,
+        pago_con_descuento: pagoSocio,
+        observacion: currentIngreso.observacion || '',
+        usuario_creacion_id: user?.id
+      };
+      
+      console.log('Datos del ingreso consolidado a enviar:', ingresoData);
+      
+      // Crear el ingreso principal
+      const ingresoResponse = await ingresoService.create(ingresoData);
+      const ingresoCreado = ingresoResponse.data || ingresoResponse;
+      
+      console.log('Ingreso creado:', ingresoCreado);
+      
+      // Guardar todos los detalles de pesaje asociados al ingreso
+      if (pesajesTemporales.length > 0 && ingresoCreado.id) {
+        console.log('Guardando detalles de pesaje para ingreso ID:', ingresoCreado.id);
+        
+        let detallesCreados = 0;
+        let erroresDetalles = 0;
+        
+        for (let i = 0; i < pesajesTemporales.length; i++) {
+          const pesaje = pesajesTemporales[i];
+          
+          try {
+            const detallePesajeData = {
+              ingreso_id: ingresoCreado.id,
+              numero_pesaje: pesaje.numero || (i + 1),
+              peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
+              peso_jaba: parseFloat(pesaje.peso_total_jabas) || 0,
+              descuento_merma_pesaje: parseFloat(pesaje.descuento_merma) || 0,
+              peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_total_jabas) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
+              num_jabas_pesaje: parseInt(pesaje.num_jabas) || 0,
+              observacion_pesaje: pesaje.observacion || '',
+              producto_id: productoSeleccionado.producto_id,
+              tipo_fruta_id: productoSeleccionado.tipo_fruta_id,
+              fecha_pesaje: new Date().toISOString(),
+              usuario_pesaje_id: user?.id
+            };
+            
+            console.log(`Creando detalle de pesaje ${i + 1}:`, detallePesajeData);
+            
+            await detallePesajeService.create(detallePesajeData);
+            detallesCreados++;
+            
+          } catch (pesajeError) {
+            console.error(`Error al crear detalle de pesaje ${i + 1}:`, pesajeError);
+            erroresDetalles++;
+          }
+        }
+        
+        // Mostrar resultado del proceso de detalles
+        if (erroresDetalles > 0) {
+          console.warn(`Se crearon ${detallesCreados} detalles correctamente, pero hubo ${erroresDetalles} errores`);
+        } else {
+          console.log(`Todos los ${detallesCreados} detalles de pesaje se crearon correctamente`);
+        }
+      }
+      
+      // Mostrar mensaje de éxito
+      Swal.fire({
+        icon: 'success',
+        title: '¡Ingreso creado exitosamente!',
+        html: `
+          <div class="text-start">
+            <p><strong>Ingreso:</strong> ${ingresoCreado.numero_ingreso}</p>
+            <p><strong>Pesajes registrados:</strong> ${pesajesTemporales.length}</p>
+            <p><strong>Peso neto total:</strong> ${pesoNetoTotal.toFixed(3)} kg</p>
+            <p><strong>Total:</strong> S/ ${subtotal.toFixed(2)}</p>
+          </div>
+        `,
+        confirmButtonColor: '#321fdb',
+        timer: 4000,
+        timerProgressBar: true
+      });
+      
+      // Recargar la lista de ingresos
+      await fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter, fechaFilter);
+      
+      // Cerrar modal y limpiar
+      cerrarModal();
+      
+    } catch (error) {
+      console.error('Error al crear ingreso:', error);
+      
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al crear ingreso',
+        text: error.response?.data?.error || error.message || 'Ocurrió un error inesperado',
+        confirmButtonColor: '#321fdb'
+      });
+      
+      setFormErrors({
+        api: error.response?.data?.error || 'Error al crear el ingreso'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
+  // También necesitas la función handleCloseModal si no existe
+  const handleCloseModal = () => {
+    setCurrentIngreso({
+      numero_ingreso: '',
+      cliente_id: '',
+      producto_id: '',
+      tipo_fruta_id: '',
+      fecha_ingreso: '',
+      precio_kg: '',
+      peso_bruto: '0.000',
+      num_jabas: 0,
+      peso_total_jabas: '0.000',
+      descuento_merma: '0.000',
+      peso_neto: '0.000',
+      pago_transporte: '0.00',
+      impuesto: '0.00',
+      total: '0.00',
+      observacion: '',
+      estado: 'activo'
+    });
+
+    setPesajesTemporales([]);
+    setFormErrors({});
+    setEditingId(null);
+    setShowModal(false);
+  };
+
+  // Y la función handleCreate si no existe
+  const handleCreate = () => {
+    setEditingId(null);
+    setCurrentIngreso({
+      numero_ingreso: '',
+      cliente_id: '',
+      producto_id: '',
+      tipo_fruta_id: '',
+      fecha_ingreso: new Date().toISOString().split('T')[0], // Fecha actual
+      precio_kg: '',
+      peso_bruto: '0.000',
+      num_jabas: 0,
+      peso_total_jabas: '0.000',
+      descuento_merma: '0.000',
+      peso_neto: '0.000',
+      pago_transporte: '0.00',
+      impuesto: '0.00',
+      total: '0.00',
+      observacion: '',
+      estado: 'activo'
+    });
+
+    setPesajesTemporales([]);
+    setFormErrors({});
+    setShowModal(true);
+  };
 
   const guardarConfiguracionPesaje = async () => {
     try {
@@ -3327,6 +3973,7 @@ const Ingresos = () => {
             onClose={cerrarModal}
             size="xl"
             backdrop="static"
+            className="modal-95vw"
           >
             <CModalHeader>
               <CModalTitle>{modalTitle} {balanzaConectada && (
@@ -3335,7 +3982,7 @@ const Ingresos = () => {
                 </CBadge>
               )}</CModalTitle>
             </CModalHeader>
-            <CModalBody>
+            <CModalBody >
               {formErrors.api && (
                 <CAlert color="danger" className="mb-3">
                   {formErrors.api}
@@ -3346,9 +3993,14 @@ const Ingresos = () => {
               <CRow className="mb-4">
                 <CCol md={6}>
                   <CCard className="h-100">
-                    <CCardHeader>
-                      <strong>Selección de Socio y Orden</strong>
-                    </CCardHeader>
+                    <CFormLabel htmlFor="orden_pesaje">
+                      Orden Pendiente:
+                      {camposBloqueados && (
+                        <CBadge color="warning" className="ms-2" size="sm">
+                          Bloqueado - Hay pesajes registrados
+                        </CBadge>
+                      )}
+                    </CFormLabel>
                     <CCardBody>
                       <div className="mb-3">
                         <CFormLabel htmlFor="orden_pesaje">Orden Pendiente:</CFormLabel>
@@ -3379,10 +4031,13 @@ const Ingresos = () => {
                             placeholder={
                               cargandoOrdenes
                                 ? 'Cargando órdenes...'
-                                : 'Buscar y seleccionar orden pendiente...'
+                                : camposBloqueados
+                                  ? 'No se puede modificar - Hay pesajes registrados'
+                                  : 'Buscar y seleccionar orden pendiente...'
                             }
-                            isClearable
-                            isSearchable
+                            isClearable={!camposBloqueados}
+                            isSearchable={!camposBloqueados}
+                            isDisabled={camposBloqueados}
                             isLoading={cargandoOrdenes}
                             filterOption={() => true} // Desactivar el filtrado local ya que se hace en el backend
                             onInputChange={(inputValue, { action }) => {
@@ -3398,13 +4053,23 @@ const Ingresos = () => {
                                 ...provided,
                                 borderColor: formErrors.orden_id ? '#dc3545' : (state.isFocused ? '#321fdb' : provided.borderColor),
                                 boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(50, 31, 219, 0.25)' : provided.boxShadow,
+                                backgroundColor: camposBloqueados ? '#f8f9fa' : provided.backgroundColor,
+                                cursor: camposBloqueados ? 'not-allowed' : 'default',
                                 '&:hover': {
-                                  borderColor: '#321fdb'
+                                  borderColor: camposBloqueados ? provided.borderColor : '#321fdb'
                                 }
                               }),
                               container: (provided) => ({
                                 ...provided,
                                 flex: 1
+                              }),
+                              placeholder: (provided) => ({
+                                ...provided,
+                                color: camposBloqueados ? '#6c757d' : provided.color
+                              }),
+                              singleValue: (provided) => ({
+                                ...provided,
+                                color: camposBloqueados ? '#6c757d' : provided.color
                               })
                             }}
                             noOptionsMessage={({ inputValue }) =>
@@ -3431,8 +4096,12 @@ const Ingresos = () => {
                           </small>
                         )}
                         <small className="text-muted d-block">
-                          Busque por código de lote, número de orden o razón social del cliente
+                          {camposBloqueados
+                            ? 'No se puede modificar mientras hay pesajes registrados'
+                            : 'Busque por código de lote, número de orden o razón social del cliente'
+                          }
                         </small>
+
                       </div>
 
                       <div className="mb-3">
@@ -3515,7 +4184,7 @@ const Ingresos = () => {
                               style={camposBloqueados ? { cursor: 'not-allowed' } : {}}
                             />
                             <small className="text-muted">
-                              {camposBloqueados 
+                              {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
                                 : 'Peso estándar de cada jaba vacía'
                               }
@@ -3580,7 +4249,7 @@ const Ingresos = () => {
                               style={camposBloqueados ? { cursor: 'not-allowed' } : {}}
                             />
                             <small className="text-muted">
-                              {camposBloqueados 
+                              {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
                                 : 'Precio por kilogramo de producto'
                               }
@@ -3600,8 +4269,9 @@ const Ingresos = () => {
                             <CFormInput
                               type="number"
                               id="impuesto"
-                              value={porcentajeImpuesto}
-                              onChange={(e) => setPorcentajeImpuesto(parseFloat(e.target.value) || 0)}
+                              name="impuesto"
+                              value={currentIngreso.impuesto || 0}
+                              onChange={handleInputChange}
                               step="0.1"
                               min="0"
                               max="100"
@@ -3611,9 +4281,78 @@ const Ingresos = () => {
                               style={camposBloqueados ? { cursor: 'not-allowed' } : {}}
                             />
                             <small className="text-muted">
-                              {camposBloqueados 
+                              {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
                                 : 'Porcentaje de impuesto aplicable'
+                              }
+                            </small>
+                          </div>
+                        </CCol>
+                        <CCol md={6}>
+                          <div className="mb-3">
+                            <CFormLabel htmlFor="descuento_merma">
+                              Dscto Merma (Kg)
+                              <CBadge color="info" className="ms-2" size="sm">
+                                Auto-calculado
+                              </CBadge>
+                            </CFormLabel>
+                            <div className="input-group">
+                              <CFormInput
+                                type="number"
+                                id="descuento_merma"
+                                name="descuento_merma"
+                                value={currentIngreso.descuento_merma || 0}
+                                readOnly
+                                min="0"
+                                step="0.001"
+                                placeholder="0.000"
+                                className={`${formErrors.descuento_merma ? 'is-invalid' : ''} bg-light`}
+                                style={{
+                                  cursor: 'not-allowed',
+                                  backgroundColor: '#f8f9fa'
+                                }}
+                              />
+
+                              {formErrors.descuento_merma && (
+                                <div className="invalid-feedback">{formErrors.descuento_merma}</div>
+                              )}
+                            </div>
+                            <small className="text-muted">
+                              Se actualiza automáticamente al aplicar pesajes con descuento de merma
+                            </small>
+                          </div>
+                        </CCol>
+                        <CCol md={6}>
+                          <div className="mb-3">
+                            <CFormLabel htmlFor="pago_transporte">
+                              Pago de Transporte (%)
+                              {camposBloqueados && (
+                                <CBadge color="warning" className="ms-2" size="sm">
+                                  Bloqueado - Hay pesajes registrados
+                                </CBadge>
+                              )}
+                            </CFormLabel>
+                            <CFormInput
+                              type="number"
+                              id="pago_transporte"
+                              name="pago_transporte"
+                              value={currentIngreso.pago_transporte || 0}
+                              onChange={handleInputChange}
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="5.0"
+                              disabled={camposBloqueados}
+                              className={`${formErrors.pago_transporte ? 'is-invalid' : ''} ${camposBloqueados ? 'bg-light' : ''}`}
+                              style={camposBloqueados ? { cursor: 'not-allowed' } : {}}
+                            />
+                            {formErrors.pago_transporte && (
+                              <div className="invalid-feedback">{formErrors.pago_transporte}</div>
+                            )}
+                            <small className="text-muted">
+                              {camposBloqueados
+                                ? 'No se puede modificar mientras hay pesajes registrados'
+                                : 'Porcentaje del peso neto que se destinará al pago de transporte'
                               }
                             </small>
                           </div>
@@ -3633,35 +4372,129 @@ const Ingresos = () => {
 
                 {/* Monitor en Tiempo Real */}
                 <CCol md={6}>
-                  <CCard className="mb-3">
-                    <CCardHeader className="d-flex justify-content-between align-items-center">
-                      <h6 className="mb-0">Resumen del Ingreso Actual</h6>
+                  {/* Resumen del Ingreso Actual */}
+                  <CCard className="mb-4">
+                    <CCardHeader className="bg-info text-white">
+                      <h6 className="mb-0">
+                        <CIcon icon={cilInfo} className="me-2" />
+                        Resumen del Ingreso Actual
+                      </h6>
                     </CCardHeader>
                     <CCardBody>
-                      <CRow>
+                      <CRow className="g-3">
                         <CCol md={4}>
-                          <div className="text-center">
-                            <div className="fs-4 fw-bold text-primary">
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Peso Bruto</div>
+                            <div className="h5 mb-0 text-primary">
+                              {parseFloat(currentIngreso.peso_bruto || 0).toFixed(3)} kg
+                            </div>
+                          </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Jabas</div>
+                            <div className="h5 mb-0">
                               {currentIngreso.num_jabas || 0}
                             </div>
-                            <small className="text-muted">Jabas Acumuladas</small>
                           </div>
                         </CCol>
                         <CCol md={4}>
-                          <div className="text-center">
-                            <div className="fs-4 fw-bold text-success">
-                              {currentIngreso.peso_bruto || '0.000'} kg
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Peso Jabas</div>
+                            <div className="h5 mb-0">
+                              {parseFloat(currentIngreso.peso_total_jabas || 0).toFixed(3)} kg
                             </div>
-                            <small className="text-muted">Peso Bruto Total</small>
                           </div>
                         </CCol>
                         <CCol md={4}>
-                          <div className="text-center">
-                            <div className="fs-4 fw-bold text-info">
-                              {pesoJaba ? ((currentIngreso.num_jabas || 0) * pesoJaba).toFixed(3) : '0.000'} kg
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Descuento Merma</div>
+                            <div className="h5 mb-0 text-danger">
+                              -{parseFloat(currentIngreso.descuento_merma || 0).toFixed(3)} kg
                             </div>
-                            <small className="text-muted">Peso Estimado Jabas</small>
                           </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Peso Neto</div>
+                            <div className="h5 mb-0 text-success">
+                              {parseFloat(currentIngreso.peso_neto || 0).toFixed(3)} kg
+                            </div>
+                          </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Subtotal</div>
+                            <div className="h5 mb-0 text-info">
+                              S/ {parseFloat(currentIngreso.total || 0).toFixed(2)}
+                            </div>
+                          </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Pago Transporte</div>
+                            <div className="h5 mb-0 text-danger">
+                              S/ {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
+                                const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+                                return (pesoNeto * porcentajeTransporte).toFixed(2);
+                              })()}
+                            </div>
+                          </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Ingreso Cooperativa</div>
+                            <div className="h5 mb-0 text-primary">
+                              S/ {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
+                                const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+                                return (pesoNeto * porcentajeImpuesto).toFixed(2);
+                              })()}
+                            </div>
+                          </div>
+                        </CCol>
+                        <CCol md={4}>
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="text-muted small">Pago al Socio</div>
+                            <div className="h5 mb-0 text-success">
+                              S/ {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
+                                const precioKg = parseFloat(precioVentaKg || 0);
+                                const subtotal = pesoNeto * precioKg;
+                                const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+                                const pagoTransporte = pesoNeto * porcentajeTransporte;
+                                const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+                                const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+                                const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
+                                return pagoSocio.toFixed(2);
+                              })()}
+                            </div>
+                          </div>
+                        </CCol>
+                      </CRow>
+
+                      {/* Información adicional */}
+                      <CRow className="mt-3">
+                        <CCol md={3}>
+                          <small className="text-muted">
+                            <strong>Precio por kg:</strong> S/ {parseFloat(precioVentaKg || 0).toFixed(2)}
+                          </small>
+                        </CCol>
+                        <CCol md={3}>
+                          <small className="text-muted">
+                            <strong>Peso por jaba:</strong> {pesoJaba.toFixed(3)} kg
+                          </small>
+                        </CCol>
+                        <CCol md={3}>
+                          <small className="text-muted">
+                            <strong>Pesajes registrados:</strong> {pesajesTemporales.length}
+                          </small>
+                        </CCol>
+                        <CCol md={3}>
+                          <small className="text-muted">
+                            <strong>Pago transporte:</strong> {parseFloat(currentIngreso.pago_transporte || 0).toFixed(1)}%
+                          </small>
                         </CCol>
                       </CRow>
                     </CCardBody>
@@ -3886,12 +4719,10 @@ const Ingresos = () => {
                                   </thead>
                                   <tbody>
                                     {productosOrden.map((producto) => {
-                                      const cantidadPendiente = cantidadPendientePorProducto[producto.id] || 0;
-                                      // Corregir el cálculo del progreso
-                                      const cantidadIngresada = producto.cantidad_ingresada || 0;
-                                      const cantidadTotal = producto.cantidad || 0;
-                                      const progreso = cantidadTotal > 0 ? (cantidadIngresada / cantidadTotal) * 100 : 0;
-                                      const isCompleto = cantidadPendiente <= 0;
+                                      // Usar las nuevas funciones para calcular valores actualizados
+                                      const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(producto);
+                                      const progresoActualizado = calcularProgresoActualizado(producto);
+                                      const isCompleto = cantidadPendienteActualizada <= 0;
 
                                       return (
                                         <tr
@@ -3905,25 +4736,30 @@ const Ingresos = () => {
                                             <span className="badge bg-info">{producto.tipo_fruta_nombre}</span>
                                           </td>
                                           <td>
-                                            <span className="fw-bold">{cantidadTotal.toFixed(2)} kg</span>
+                                            <span className="fw-bold">{(producto.cantidad || 0).toFixed(2)} kg</span>
                                           </td>
                                           <td>
                                             <span className={`fw-bold ${isCompleto ? 'text-success' : 'text-warning'}`}>
-                                              {cantidadPendiente.toFixed(2)} kg
+                                              {calcularCantidadPendienteActualizada(producto).toFixed(2)} kg
                                             </span>
+                                            {isCompleto && (
+                                              <CBadge color="success" className="ms-2" size="sm">
+                                                COMPLETO
+                                              </CBadge>
+                                            )}
                                           </td>
                                           <td>
-                                            <div className="progress" style={{ height: '20px' }}>
-                                              <div
-                                                className={`progress-bar ${isCompleto ? 'bg-success' : 'bg-primary'}`}
-                                                role="progressbar"
-                                                style={{ width: `${Math.min(progreso, 100)}%` }}
-                                                aria-valuenow={progreso}
-                                                aria-valuemin="0"
-                                                aria-valuemax="100"
-                                              >
-                                                {progreso.toFixed(0)}%
+                                            <div className="d-flex align-items-center">
+                                              <div className="flex-grow-1 me-2">
+                                                <CProgress
+                                                  value={calcularProgresoActualizado(producto)}
+                                                  color={isCompleto ? 'success' : 'primary'}
+                                                  className="mb-1"
+                                                />
                                               </div>
+                                              <small className="text-muted">
+                                                {calcularProgresoActualizado(producto).toFixed(1)}%
+                                              </small>
                                             </div>
                                           </td>
                                           <td>
@@ -3970,7 +4806,8 @@ const Ingresos = () => {
                                 <div className="mt-3 p-3 bg-primary bg-opacity-10 border border-primary rounded">
                                   {(() => {
                                     const productoActual = productosOrden.find(p => p.id === productoSeleccionadoPesaje);
-                                    const cantidadPendiente = cantidadPendientePorProducto[productoSeleccionadoPesaje] || 0;
+                                    const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(productoActual);
+                                    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(productoSeleccionadoPesaje);
 
                                     return (
                                       <div>
@@ -3986,8 +4823,15 @@ const Ingresos = () => {
                                           <div className="col-md-6">
                                             <strong>Cantidad Pendiente:</strong>
                                             <span className="text-warning fw-bold ms-1">
-                                              {cantidadPendiente.toFixed(2)} kg
+                                              {cantidadPendienteActualizada.toFixed(2)} kg
                                             </span>
+                                            {pesoNetoIngresado > 0 && (
+                                              <div>
+                                                <small className="text-info">
+                                                  <strong>Peso neto ingresado:</strong> {pesoNetoIngresado.toFixed(2)} kg
+                                                </small>
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -4109,31 +4953,6 @@ const Ingresos = () => {
                       </h6>
                       <div>
                         <CButton
-                          color="info"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            // Sincronizar pesos - recalcular totales
-                            const pesoBrutoTotal = pesajesTemporales.reduce((total, p) => total + p.peso_bruto, 0);
-                            const jabasTotales = pesajesTemporales.reduce((total, p) => total + p.num_jabas, 0);
-                            const pesoTotalJabas = pesajesTemporales.reduce((total, p) => total + p.peso_total_jabas, 0);
-
-                            setCurrentIngreso(prev => ({
-                              ...prev,
-                              peso_bruto: pesoBrutoTotal.toFixed(3),
-                              num_jabas: jabasTotales,
-                              peso_total_jabas: pesoTotalJabas.toFixed(3)
-                            }));
-
-                            toast.success(`Pesos sincronizados: ${pesoBrutoTotal.toFixed(3)} kg bruto total`);
-                          }}
-                          disabled={submitting}
-                          className="me-2"
-                        >
-                          <CIcon icon={cilSync} className="me-1" />
-                          Sincronizar
-                        </CButton>
-                        <CButton
                           color="danger"
                           variant="outline"
                           size="sm"
@@ -4148,8 +4967,8 @@ const Ingresos = () => {
                   </CCardHeader>
                   <CCardBody>
                     <div className="table-responsive">
-                      
-                    <CTable hover size="sm">
+
+                      <CTable hover size="sm">
                         <CTableHead>
                           <CTableRow>
                             <CTableHeaderCell>#</CTableHeaderCell>
@@ -4157,9 +4976,13 @@ const Ingresos = () => {
                             <CTableHeaderCell>Peso Bruto</CTableHeaderCell>
                             <CTableHeaderCell>Jabas</CTableHeaderCell>
                             <CTableHeaderCell>Peso Jabas</CTableHeaderCell>
+                            <CTableHeaderCell>Descuento Merma</CTableHeaderCell>
                             <CTableHeaderCell>Peso Neto</CTableHeaderCell>
                             <CTableHeaderCell>Precio/kg</CTableHeaderCell>
                             <CTableHeaderCell>Subtotal</CTableHeaderCell>
+                            <CTableHeaderCell>Pago Transporte</CTableHeaderCell>
+                            <CTableHeaderCell>Ingreso Cooperativa</CTableHeaderCell>
+                            <CTableHeaderCell>Pago al Socio</CTableHeaderCell>
                             <CTableHeaderCell>Fecha/Hora</CTableHeaderCell>
                             <CTableHeaderCell>Observación</CTableHeaderCell>
                             <CTableHeaderCell>Acciones</CTableHeaderCell>
@@ -4167,10 +4990,21 @@ const Ingresos = () => {
                         </CTableHead>
                         <CTableBody>
                           {pesajesTemporales.map((pesaje, index) => {
-                            const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0);
-                            const precioKg = parseFloat(pesaje.precio_venta || 0);
+
+                            const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
+                            const precioKg = parseFloat(precioVentaKg || 0);
                             const subtotal = pesoNeto * precioKg;
-                            
+
+                            // Calcular pagos basados en porcentajes
+                            const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+                            const pagoTransporte = (pesoNeto * porcentajeTransporte);
+
+                            // El ingreso a la cooperativa es el peso neto * el porcentaje de impuesto
+                            const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+                            const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+
+                            const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
+
                             return (
                               <CTableRow key={pesaje.id}>
                                 <CTableDataCell>
@@ -4201,6 +5035,21 @@ const Ingresos = () => {
                                   </small>
                                 </CTableDataCell>
                                 <CTableDataCell>
+                                  {pesaje.descuento_merma ? (
+                                    <>
+                                      <span className="text-danger">
+                                        -{parseFloat(pesaje.descuento_merma).toFixed(3)} kg
+                                      </span>
+                                      <br />
+                                      <small className="text-muted">
+                                        ({((parseFloat(pesaje.descuento_merma) / parseFloat(pesaje.peso_bruto)) * 100).toFixed(1)}%)
+                                      </small>
+                                    </>
+                                  ) : (
+                                    <span className="text-muted">-</span>
+                                  )}
+                                </CTableDataCell>
+                                <CTableDataCell>
                                   <strong className="text-success">
                                     {pesoNeto.toFixed(3)} kg
                                   </strong>
@@ -4213,6 +5062,31 @@ const Ingresos = () => {
                                 <CTableDataCell>
                                   <strong className="text-info">
                                     S/ {subtotal.toFixed(2)}
+                                  </strong>
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  <div className="text-center">
+                                    <span className="text-danger">
+                                      S/ {pagoTransporte.toFixed(2)}
+                                    </span>
+                                    <br />
+                                    <small className="text-muted">
+                                      ({porcentajeTransporte}% del peso neto)
+                                    </small>
+                                  </div>
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  <strong className="text-primary">
+                                    S/ {ingresoCooperativa.toFixed(2)}
+                                  </strong>
+                                  <br />
+                                  <small className="text-muted">
+                                    ({porcentajeImpuesto}% del peso neto)
+                                  </small>
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  <strong className="text-success">
+                                    S/ {pagoSocio.toFixed(2)}
                                   </strong>
                                 </CTableDataCell>
                                 <CTableDataCell>
@@ -4238,26 +5112,124 @@ const Ingresos = () => {
                                         Swal.fire({
                                           title: 'Editar Pesaje',
                                           html: `
-                                            <div class="mb-3">
-                                              <label class="form-label">Peso Bruto (kg):</label>
-                                              <input type="number" id="edit-peso" class="form-control" value="${pesaje.peso_bruto}" step="0.001" min="0">
-                                            </div>
-                                            <div class="mb-3">
-                                              <label class="form-label">Número de Jabas:</label>
-                                              <input type="number" id="edit-jabas" class="form-control" value="${pesaje.num_jabas}" min="1" max="50">
-                                            </div>
-                                            <div class="mb-3">
-                                              <label class="form-label">Observación:</label>
-                                              <textarea id="edit-observacion" class="form-control" rows="2">${pesaje.observacion || ''}</textarea>
+                                            <div class="container-fluid">
+                                              <div class="row g-3">
+                                                <div class="col-12 col-md-6">
+                                                  <label class="form-label fw-semibold">
+                                                    <i class="fas fa-weight me-1"></i>
+                                                    Peso Bruto (kg):
+                                                  </label>
+                                                  <input type="number" id="edit-peso" class="form-control" 
+                                                         value="${pesaje.peso_bruto}" step="0.001" min="0"
+                                                         placeholder="0.000">
+                                                </div>
+                                                <div class="col-12 col-md-6">
+                                                  <label class="form-label fw-semibold">
+                                                    <i class="fas fa-box me-1"></i>
+                                                    Número de Jabas:
+                                                  </label>
+                                                  <input type="number" id="edit-jabas" class="form-control" 
+                                                         value="${pesaje.num_jabas}" min="1" max="50"
+                                                         placeholder="1">
+                                                </div>
+                                                <div class="col-12">
+                                                  <label class="form-label fw-semibold">
+                                                    <i class="fas fa-minus-circle me-1"></i>
+                                                    Descuento por Merma (kg):
+                                                  </label>
+                                                  <input type="number" id="edit-merma" class="form-control" 
+                                                         value="${pesaje.descuento_merma || 0}" step="0.001" min="0"
+                                                         placeholder="0.000">
+                                                  <small class="form-text text-muted">
+                                                    Peso a descontar por productos en mal estado o pérdidas
+                                                  </small>
+                                                </div>
+                                                <div class="col-12">
+                                                  <label class="form-label fw-semibold">
+                                                    <i class="fas fa-comment me-1"></i>
+                                                    Observación:
+                                                  </label>
+                                                  <textarea id="edit-observacion" class="form-control" rows="2"
+                                                            placeholder="Observaciones adicionales (opcional)">${pesaje.observacion || ''}</textarea>
+                                                </div>
+                                              </div>
+                                              
+                                              <div class="row mt-3">
+                                                <div class="col-12">
+                                                  <div class="card border-info">
+                                                    <div class="card-header bg-info text-white py-2">
+                                                      <h6 class="mb-0">
+                                                        <i class="fas fa-calculator me-2"></i>
+                                                        Vista Previa de Cálculos
+                                                      </h6>
+                                                    </div>
+                                                    <div class="card-body py-2">
+                                                      <div class="row g-2 text-center">
+                                                        <div class="col-6 col-sm-3">
+                                                          <small class="text-muted d-block">Peso Jabas:</small>
+                                                          <strong class="text-info" id="preview-peso-jabas">${(pesaje.num_jabas * pesoJaba).toFixed(3)} kg</strong>
+                                                        </div>
+                                                        <div class="col-6 col-sm-3">
+                                                          <small class="text-muted d-block">Merma:</small>
+                                                          <strong class="text-danger" id="preview-merma">${(pesaje.descuento_merma || 0).toFixed(3)} kg</strong>
+                                                        </div>
+                                                        <div class="col-6 col-sm-3">
+                                                          <small class="text-muted d-block">Peso Neto:</small>
+                                                          <strong class="text-success" id="preview-peso-neto">${(parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas * pesoJaba) - (pesaje.descuento_merma || 0)).toFixed(3)} kg</strong>
+                                                        </div>
+                                                        <div class="col-6 col-sm-3">
+                                                          <small class="text-muted d-block">Subtotal:</small>
+                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2)}</strong>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
                                             </div>
                                           `,
                                           showCancelButton: true,
                                           confirmButtonText: 'Guardar',
                                           cancelButtonText: 'Cancelar',
                                           confirmButtonColor: '#321fdb',
+                                          didOpen: () => {
+                                            // OBTENER REFERENCIAS A LOS ELEMENTOS
+                                            const pesoInput = document.getElementById('edit-peso');
+                                            const jabasInput = document.getElementById('edit-jabas');
+                                            const mermaInput = document.getElementById('edit-merma');
+                                            const previewPesoJabas = document.getElementById('preview-peso-jabas');
+                                            const previewMerma = document.getElementById('preview-merma');
+                                            const previewPesoNeto = document.getElementById('preview-peso-neto');
+                                            const previewSubtotal = document.getElementById('preview-subtotal');
+
+                                            // FUNCIÓN PARA ACTUALIZAR LA VISTA PREVIA
+                                            const updatePreview = () => {
+                                              const peso = parseFloat(pesoInput.value) || 0;
+                                              const jabas = parseInt(jabasInput.value) || 0;
+                                              const merma = parseFloat(mermaInput.value) || 0;
+                                              const pesoJabas = jabas * pesoJaba; // Sin ${} aquí
+                                              const pesoNeto = Math.max(0, peso - pesoJabas - merma);
+                                              const subtotal = pesoNeto * parseFloat(precioVentaKg || 0); // Sin ${} aquí
+
+                                              // ACTUALIZAR LOS ELEMENTOS DE VISTA PREVIA
+                                              previewPesoJabas.textContent = pesoJabas.toFixed(3) + ' kg';
+                                              previewMerma.textContent = merma.toFixed(3) + ' kg';
+                                              previewPesoNeto.textContent = pesoNeto.toFixed(3) + ' kg';
+                                              previewSubtotal.textContent = 'S/ ' + subtotal.toFixed(2);
+                                            };
+
+                                            // AGREGAR EVENT LISTENERS PARA ACTUALIZACIÓN EN TIEMPO REAL
+                                            pesoInput.addEventListener('input', updatePreview);
+                                            jabasInput.addEventListener('input', updatePreview);
+                                            mermaInput.addEventListener('input', updatePreview);
+
+                                            // CALCULAR VALORES INICIALES
+                                            updatePreview();
+                                          },
                                           preConfirm: () => {
                                             const peso = parseFloat(document.getElementById('edit-peso').value);
                                             const jabas = parseInt(document.getElementById('edit-jabas').value);
+                                            const merma = parseFloat(document.getElementById('edit-merma').value) || 0;
                                             const observacion = document.getElementById('edit-observacion').value;
 
                                             if (!peso || peso <= 0) {
@@ -4269,26 +5241,58 @@ const Ingresos = () => {
                                               return false;
                                             }
 
-                                            return { peso, jabas, observacion };
+                                            return { peso, jabas, merma, observacion };
                                           }
                                         }).then((result) => {
                                           if (result.isConfirmed) {
-                                            const { peso, jabas, observacion } = result.value;
+                                            const { peso, jabas, merma, observacion } = result.value;
 
                                             // Actualizar el pesaje temporal
-                                            setPesajesTemporales(prev => prev.map(p =>
-                                              p.id === pesaje.id
-                                                ? {
-                                                  ...p,
-                                                  peso_bruto: peso,
-                                                  num_jabas: jabas,
-                                                  peso_total_jabas: jabas * pesoJaba,
-                                                  observacion: observacion
-                                                }
-                                                : p
-                                            ));
+                                            setPesajesTemporales(prev => {
+                                              const updatedPesajes = prev.map(p =>
+                                                p.id === pesaje.id
+                                                  ? {
+                                                    ...p,
+                                                    peso_bruto: peso,
+                                                    num_jabas: jabas,
+                                                    peso_total_jabas: jabas * pesoJaba,
+                                                    descuento_merma: merma,
+                                                    peso_neto: Math.max(0, peso - (jabas * pesoJaba) - merma), // Calcular peso neto
+                                                    observacion: observacion
+                                                  }
+                                                  : p
+                                              );
 
-                                            toast.success('Pesaje actualizado correctamente');
+                                              // SINCRONIZAR TOTALES DEL INGRESO DESPUÉS DE LA EDICIÓN
+                                              const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
+                                              const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
+                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+                                              const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
+                                              const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+
+                                              // Actualizar el currentIngreso con los nuevos totales
+                                              setCurrentIngreso(prev => ({
+                                                ...prev,
+                                                peso_bruto: totalPesoBruto.toFixed(3),
+                                                num_jabas: totalJabas,
+                                                peso_total_jabas: totalPesoJabas.toFixed(3),
+                                                descuento_merma: totalDescuentoMerma.toFixed(3),
+                                                peso_neto: totalPesoNeto.toFixed(3),
+                                                // Recalcular el total basado en el nuevo peso neto
+                                                total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
+                                              }));
+
+                                              return updatedPesajes;
+                                            });
+
+                                            Swal.fire({
+                                              icon: 'success',
+                                              title: '¡Actualizado!',
+                                              text: 'El pesaje ha sido actualizado correctamente.',
+                                              confirmButtonColor: '#321fdb',
+                                              timer: 1500,
+                                              timerProgressBar: true
+                                            });
                                           }
                                         });
                                       }}
@@ -4333,9 +5337,14 @@ const Ingresos = () => {
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
+                              <strong className="text-danger">
+                                -{pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0).toFixed(3)} kg
+                              </strong>
+                            </CTableHeaderCell>
+                            <CTableHeaderCell>
                               <strong className="text-success">
                                 {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
                                   return sum + pesoNeto;
                                 }, 0).toFixed(3)} kg
                               </strong>
@@ -4344,29 +5353,53 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-info">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0);
-                                  const precio = parseFloat(p.precio_venta || 0);
-                                  return sum + (pesoNeto * precio);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const precioKg = parseFloat(precioVentaKg || 0);
+                                  return sum + (pesoNeto * precioKg);
                                 }, 0).toFixed(2)}
                               </strong>
                             </CTableHeaderCell>
-                            <CTableHeaderCell colSpan={3}></CTableHeaderCell>
+                            <CTableHeaderCell>
+                              <strong className="text-danger">
+                                S/ {pesajesTemporales.reduce((sum, p) => {
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+                                  return sum + (pesoNeto * porcentajeTransporte);
+                                }, 0).toFixed(2)}
+                              </strong>
+                            </CTableHeaderCell>
+                            <CTableHeaderCell>
+                              <strong className="text-primary">
+                                S/ {pesajesTemporales.reduce((sum, p) => {
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+                                  return sum + (pesoNeto * porcentajeImpuesto);
+                                }, 0).toFixed(2)}
+                              </strong>
+                            </CTableHeaderCell>
+                            <CTableHeaderCell>
+                              <strong className="text-success">
+                                S/ {pesajesTemporales.reduce((sum, p) => {
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const precioKg = parseFloat(precioVentaKg || 0);
+                                  const subtotal = pesoNeto * precioKg;
+                                  const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+                                  const pagoTransporte = pesoNeto * porcentajeTransporte;
+                                  const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+                                  const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+                                  const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
+                                  return sum + pagoSocio;
+                                }, 0).toFixed(2)}
+                              </strong>
+                            </CTableHeaderCell>
+                            <CTableHeaderCell colSpan={3}>-</CTableHeaderCell>
                           </CTableRow>
                         </CTableHead>
                       </CTable>
                     </div>
                     {/* Botones de acción para pesajes temporales */}
-                    <div className="mt-3 d-flex gap-2">
-                      <CButton
-                        color="warning"
-                        variant="outline"
-                        size="sm"
-                        onClick={limpiarPesajesTemporales}
-                        disabled={pesajesTemporales.length === 0}
-                      >
-                        <CIcon icon={cilBrushAlt} className="me-1" />
-                        Limpiar Todo
-                      </CButton>
+                    {/* <div className="mt-3 d-flex gap-2">
+                      
                       <CButton
                         color="success"
                         size="sm"
@@ -4376,7 +5409,7 @@ const Ingresos = () => {
                         <CIcon icon={cilCheckCircle} className="me-1" />
                         Confirmar Pesajes ({pesajesTemporales.length})
                       </CButton>
-                    </div>
+                    </div> */}
                   </CCardBody>
                 </CCard>
               )}
@@ -4389,18 +5422,23 @@ const Ingresos = () => {
               >
                 Cancelar
               </CButton>
+
               <CButton
                 color="primary"
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || submitting}
+                className="me-2"
               >
-                {loading ? (
+                {loading || submitting ? (
                   <>
                     <CSpinner size="sm" className="me-2" />
-                    Guardando...
+                    {editingId ? 'Actualizando...' : 'Creando...'}
                   </>
                 ) : (
-                  editingId ? 'Actualizar' : 'Crear'
+                  <>
+                    <CIcon icon={cilSave} className="me-2" />
+                    {editingId ? 'Actualizar' : 'Crear'} Ingreso
+                  </>
                 )}
               </CButton>
             </CModalFooter>
