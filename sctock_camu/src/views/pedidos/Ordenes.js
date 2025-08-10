@@ -290,6 +290,8 @@ const fetchDetalles = async () => {
         setCurrentOrden({
             numero_orden: '',
             cliente_id: '',
+            tipo_lote: '', 
+            tipo_pago: '', 
             fecha_emision: '',
             fecha_entrega: '',
             lugar_entrega: '',
@@ -997,7 +999,7 @@ const OrdenModal = ({ visible, onClose, title, orden, errors, submitting, onChan
                                 <CCol lg={6}>
                                     <div className="mb-3">
                                         <label className="form-label fw-semibold">
-                                            Número de Orden <span className="text-danger">*</span>
+                                            Número de Orden 
                                         </label>
                                         <div style={customStyles.inputContainer}>
                                             <CFormInput
@@ -1011,6 +1013,28 @@ const OrdenModal = ({ visible, onClose, title, orden, errors, submitting, onChan
                                             />
                                             {errors.numero_orden && (
                                                 <div className="invalid-feedback">{errors.numero_orden}</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">
+                                            Tipo de Lote <span className="text-danger">*</span>
+                                        </label>
+                                        <div style={customStyles.selectContainer}>
+                                            <CFormSelect
+                                                name="tipo_lote"
+                                                value={orden.tipo_lote}
+                                                onChange={onChange}
+                                                className={`${errors.tipo_lote ? 'is-invalid' : ''}`}
+                                                disabled={title.includes('Editar')} // Solo lectura en modo edición
+                                            >
+                                                <option value="">Seleccionar tipo de lote</option>
+                                                <option value="convencional">Convencional</option>
+                                                <option value="organica">Orgánica</option>
+                                            </CFormSelect>
+                                            {errors.tipo_lote && (
+                                                <div className="invalid-feedback">{errors.tipo_lote}</div>
                                             )}
                                         </div>
                                     </div>
@@ -1077,6 +1101,27 @@ const OrdenModal = ({ visible, onClose, title, orden, errors, submitting, onChan
                                                 readOnly
                                                 style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-3">
+                                        <label className="form-label fw-semibold">
+                                            Tipo de Pago <span className="text-danger">*</span>
+                                        </label>
+                                        <div style={customStyles.selectContainer}>
+                                            <CFormSelect
+                                                name="tipo_pago"
+                                                value={orden.tipo_pago}
+                                                onChange={onChange}
+                                                className={`${errors.tipo_pago ? 'is-invalid' : ''}`}
+                                            >
+                                                <option value="">Seleccionar tipo de pago</option>
+                                                <option value="contado">Contado</option>
+                                                <option value="credito">Crédito</option>
+                                            </CFormSelect>
+                                            {errors.tipo_pago && (
+                                                <div className="invalid-feedback">{errors.tipo_pago}</div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1505,15 +1550,23 @@ const Ordenes = () => {
 
     const validateForm = () => {
         const errors = {};
-        if (!currentOrden.numero_orden || currentOrden.numero_orden.trim() === '') {
-            errors.numero_orden = 'El número de la orden es requerido';
-        }
+        
         if (!currentOrden.cliente_id) {
-            errors.cliente_id = 'El cliente es requerido';
+            errors.cliente_id = 'El cliente es obligatorio';
         }
+        
+        if (!currentOrden.tipo_lote) {
+            errors.tipo_lote = 'El tipo de lote es obligatorio';
+        }
+        
+        if (!currentOrden.tipo_pago) {
+            errors.tipo_pago = 'El tipo de pago es obligatorio';
+        }
+        
         if (!currentOrden.fecha_emision) {
-            errors.fecha_emision = 'La fecha de emisión es requerida';
+            errors.fecha_emision = 'La fecha de emisión es obligatoria';
         }
+        
         return errors;
     };
 

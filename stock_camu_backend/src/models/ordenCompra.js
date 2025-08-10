@@ -10,6 +10,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         unique: true
       },
+      tipo_lote: {
+        type: DataTypes.ENUM('organica', 'convencional'),
+        allowNull: false
+      },
+      tipo_pago: {
+        type: DataTypes.ENUM('contado', 'credito'),
+        allowNull: false
+      },
       cliente_id: {
         type: DataTypes.INTEGER,
         allowNull: false

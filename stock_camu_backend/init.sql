@@ -110,6 +110,8 @@ CREATE TABLE clientes (
 CREATE TABLE ordenes_compra (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo_lote VARCHAR(20) UNIQUE NOT NULL,
+    tipo_lote ENUM('organica', 'convencional') NOT NULL,
+    tipo_pago ENUM('contado', 'credito') NOT NULL,
     cliente_id INT NOT NULL,
     numero_orden VARCHAR(20),
     fecha_emision DATE NOT NULL,

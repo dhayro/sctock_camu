@@ -111,49 +111,99 @@ exports.getOrdenCompraById = async (req, res) => {
 // Crear una nueva orden de compra
 exports.createOrdenCompra = async (req, res) => {
   try {
-    const { cliente_id, numero_orden, fecha_emision, fecha_entrega, lugar_entrega, estado, observacion, forma_pago, usuario_creacion_id } = req.body;
+    const { tipo_lote, tipo_pago, cliente_id, numero_orden, fecha_emision, fecha_entrega, lugar_entrega, estado, observacion, forma_pago, usuario_creacion_id } = req.body;
     
     // Validaciones básicas
-    if (!cliente_id || !fecha_emision || !usuario_creacion_id) {
+    if (!tipo_lote || !tipo_pago || !cliente_id || !fecha_emision || !usuario_creacion_id) {
       return res.status(400).json({ 
-        message: 'Datos incompletos. Cliente, fecha de emisión y usuario de creación son obligatorios' 
+        message: 'Datos incompletos. Tipo de lote, tipo de pago, cliente, fecha de emisión y usuario de creación son obligatorios' 
       });
     }
 
-    // Obtener el último codigo_lote
-    const lastOrder = await OrdenCompra.findOne({
-      order: [['id', 'DESC']]
-    });
+    // Validar que tipo_lote sea válido
+    if (!['organica', 'convencional'].includes(tipo_lote)) {
+      return res.status(400).json({ 
+        message: 'Tipo de lote debe ser "organica" o "convencional"' 
+      });
+    }
+
+    // Validar que tipo_pago sea válido
+    if (!['contado', 'credito'].includes(tipo_pago)) {
+      return res.status(400).json({ 
+        message: 'Tipo de pago debe ser "contado" o "credito"' 
+      });
+    }
 
     let newCodigoLote;
     const year = new Date().getFullYear().toString().slice(-2); // Obtener los últimos dos dígitos del año actual
 
-    if (lastOrder && lastOrder.codigo_lote) {
-      const lastCodigoLote = lastOrder.codigo_lote;
-      const match = lastCodigoLote.match(/COOPAY(\d{2})-S(\d+)/);
+    if (tipo_lote === 'organica') {
+      // Lógica para código orgánico: COOPAY${year}0001, COOPAY${year}002, etc.
+      const lastOrganicOrder = await OrdenCompra.findOne({
+        where: { tipo_lote: 'organica' },
+        order: [['id', 'DESC']]
+      });
 
-      if (match) {
-        const lastYear = match[1];
-        const sequenceNumber = parseInt(match[2], 10);
+      if (lastOrganicOrder && lastOrganicOrder.codigo_lote) {
+        const lastCodigoLote = lastOrganicOrder.codigo_lote;
+        const match = lastCodigoLote.match(/COOPAY(\d{2})(\d{3})/);
 
-        if (lastYear === year) {
-          // Incrementar el número de secuencia si el año es el mismo
-          newCodigoLote = `COOPAY${year}-S${sequenceNumber + 1}`;
+        if (match) {
+          const lastYear = match[1];
+          const sequenceNumber = parseInt(match[2], 10);
+
+          if (lastYear === year) {
+            // Incrementar el número de secuencia si el año es el mismo
+            const nextSequence = (sequenceNumber + 1).toString().padStart(4, '0');
+            newCodigoLote = `COOPAY${year}${nextSequence}`;
+          } else {
+            // Reiniciar el conteo si el año ha cambiado
+            newCodigoLote = `COOPAY${year}0001`;
+          }
         } else {
-          // Reiniciar el conteo si el año ha cambiado
+          // Caso de error en el formato del último código, iniciar nuevo
+          newCodigoLote = `COOPAY${year}0001`;
+        }
+      } else {
+        // Si no hay órdenes orgánicas previas, iniciar nuevo
+        newCodigoLote = `COOPAY${year}0001`;
+      }
+    } else {
+      // Lógica para código convencional: COOPAY${year}-S1, COOPAY${year}-S2, etc.
+      const lastConventionalOrder = await OrdenCompra.findOne({
+        where: { tipo_lote: 'convencional' },
+        order: [['id', 'DESC']]
+      });
+
+      if (lastConventionalOrder && lastConventionalOrder.codigo_lote) {
+        const lastCodigoLote = lastConventionalOrder.codigo_lote;
+        const match = lastCodigoLote.match(/COOPAY(\d{2})-S(\d+)/);
+
+        if (match) {
+          const lastYear = match[1];
+          const sequenceNumber = parseInt(match[2], 10);
+
+          if (lastYear === year) {
+            // Incrementar el número de secuencia si el año es el mismo
+            newCodigoLote = `COOPAY${year}-S${sequenceNumber + 1}`;
+          } else {
+            // Reiniciar el conteo si el año ha cambiado
+            newCodigoLote = `COOPAY${year}-S1`;
+          }
+        } else {
+          // Caso de error en el formato del último código, iniciar nuevo
           newCodigoLote = `COOPAY${year}-S1`;
         }
       } else {
-        // Caso de error en el formato del último código, iniciar nuevo
+        // Si no hay órdenes convencionales previas, iniciar nuevo
         newCodigoLote = `COOPAY${year}-S1`;
       }
-    } else {
-      // Si no hay órdenes previas, iniciar nuevo
-      newCodigoLote = `COOPAY${year}-S1`;
     }
 
     const nuevaOrdenCompra = await OrdenCompra.create({
       codigo_lote: newCodigoLote,
+      tipo_lote,
+      tipo_pago,
       cliente_id,
       numero_orden,
       fecha_emision,
@@ -185,16 +235,32 @@ exports.createOrdenCompra = async (req, res) => {
 // Actualizar una orden de compra existente
 exports.updateOrdenCompra = async (req, res) => {
   try {
-    const { codigo_lote, cliente_id, numero_orden, fecha_emision, fecha_entrega, lugar_entrega, estado, observacion, forma_pago, usuario_modificacion_id } = req.body;
+    const { codigo_lote, tipo_lote, tipo_pago, cliente_id, numero_orden, fecha_emision, fecha_entrega, lugar_entrega, estado, observacion, forma_pago, usuario_modificacion_id } = req.body;
     
     const ordenCompra = await OrdenCompra.findByPk(req.params.id);
     
     if (!ordenCompra) {
       return res.status(404).json({ message: 'Orden de compra no encontrada' });
     }
+
+    // Validar tipo_pago si se proporciona
+    if (tipo_pago && !['contado', 'credito'].includes(tipo_pago)) {
+      return res.status(400).json({ 
+        message: 'Tipo de pago debe ser "contado" o "credito"' 
+      });
+    }
+
+    // Validar tipo_lote si se proporciona
+    if (tipo_lote && !['organica', 'convencional'].includes(tipo_lote)) {
+      return res.status(400).json({ 
+        message: 'Tipo de lote debe ser "organica" o "convencional"' 
+      });
+    }
     
     await ordenCompra.update({
       codigo_lote: codigo_lote || ordenCompra.codigo_lote,
+      tipo_lote: tipo_lote || ordenCompra.tipo_lote,
+      tipo_pago: tipo_pago || ordenCompra.tipo_pago,
       cliente_id: cliente_id || ordenCompra.cliente_id,
       numero_orden: numero_orden || ordenCompra.numero_orden,
       fecha_emision: fecha_emision || ordenCompra.fecha_emision,
@@ -222,6 +288,7 @@ exports.updateOrdenCompra = async (req, res) => {
     console.error('Error al actualizar orden de compra:', error);
     res.status(500).json({ message: 'Error al actualizar orden de compra' });
   }
+
 };
 
 // Eliminar una orden de compra
