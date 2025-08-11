@@ -40,71 +40,9 @@ async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
   }
 }
 
-// Función auxiliar para calcular totales del ingreso
-const calcularTotalesIngreso = async (ingresoId, transaction = null) => {
-  try {
-    const ingreso = await Ingreso.findByPk(ingresoId, {
-      include: [
-        {
-          model: DetallePesaje,
-          as: 'pesajes',
-          where: { estado: true },
-          required: false
-        }
-      ],
-      transaction
-    });
-
-    if (!ingreso) return;
-
-    const pesajes = ingreso.pesajes || [];
-    
-    // Calcular totales de pesajes
-    const totalPesoBruto = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso_bruto || 0), 0);
-    const totalPesoJabas = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso_jaba || 0), 0);
-    const totalDescuentoMerma = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.descuento_merma_pesaje || 0), 0);
-    const numJabas = pesajes.length;
-    
-    // Calcular peso neto
-    const pesoNeto = totalPesoBruto - totalPesoJabas - totalDescuentoMerma;
-    
-    // Calcular montos financieros
-    const precioVentaKg = parseFloat(ingreso.precio_venta_kg || 0);
-    const subtotal = pesoNeto * precioVentaKg;
-    const porcentajeImpuesto = parseFloat(ingreso.impuesto || 0);
-    const montoImpuesto = subtotal * (porcentajeImpuesto / 100);
-    const total = subtotal + montoImpuesto;
-    
-    const porcentajeTransporte = parseFloat(ingreso.pago_transporte || 0);
-    const montoTransporte = total * (porcentajeTransporte / 100);
-    const ingresoCooperativa = total - montoTransporte;
-    const pagoSocio = ingresoCooperativa;
-    
-    // Actualizar el ingreso con los totales calculados
-    await ingreso.update({
-      peso_bruto: totalPesoBruto,
-      peso_total_jabas: totalPesoJabas,
-      num_jabas: numJabas,
-      peso_neto: pesoNeto,
-      dscto_merma: totalDescuentoMerma,
-      dscto_jaba: totalPesoJabas,
-      subtotal: subtotal,
-      monto_impuesto: montoImpuesto,
-      total: total,
-      monto_transporte: montoTransporte,
-      ingreso_cooperativa: ingresoCooperativa,
-      pago_socio: pagoSocio,
-      pago_con_descuento: pagoSocio,
-    }, { transaction });
-
-    return ingreso;
-  } catch (error) {
-    console.error('Error al calcular totales del ingreso:', error);
-    throw error;
-  }
-};
 
 // Obtener todos los ingresos con paginación y filtros
+
 exports.getAllIngresos = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -119,6 +57,19 @@ exports.getAllIngresos = async (req, res) => {
         { numero_ingreso: { [Op.like]: `%${req.query.search}%` } },
         { '$socio.nombres$': { [Op.like]: `%${req.query.search}%` } },
         { '$socio.apellidos$': { [Op.like]: `%${req.query.search}%` } }
+      ];
+    }
+
+    // Filtro específico por número de ingreso
+    if (req.query.numero_ingreso) {
+      filters.numero_ingreso = { [Op.like]: `%${req.query.numero_ingreso}%` };
+    }
+
+    // Filtro específico por nombre del socio
+    if (req.query.socio_nombre) {
+      filters[Op.or] = [
+        { '$socio.nombres$': { [Op.like]: `%${req.query.socio_nombre}%` } },
+        { '$socio.apellidos$': { [Op.like]: `%${req.query.socio_nombre}%` } }
       ];
     }
 
@@ -156,50 +107,7 @@ exports.getAllIngresos = async (req, res) => {
           as: 'socio',
           attributes: ['id', 'nombres', 'apellidos', 'dni']
         },
-        {
-          model: DetalleOrdenCompra,
-          as: 'detalle_orden',
-          include: [
-            {
-              model: OrdenCompra,
-              as: 'orden_compra',
-              include: [
-                {
-                  model: Cliente,
-                  as: 'cliente',
-                  attributes: ['id', 'razon_social', 'ruc']
-                }
-              ]
-            },
-            {
-              model: Producto,
-              as: 'producto',
-              attributes: ['id', 'nombre']
-            },
-            {
-              model: TipoFruta,
-              as: 'tipo_fruta',
-              attributes: ['id', 'nombre']
-            }
-          ]
-        },
-        {
-          model: DetallePesaje,
-          as: 'pesajes',
-          where: { estado: true },
-          required: false,
-          attributes: ['id', 'numero_pesaje', 'peso_bruto', 'peso_jaba', 'descuento_merma_pesaje', 'fecha_pesaje']
-        },
-        {
-          model: Usuario,
-          as: 'usuario_creacion',
-          attributes: ['id', 'usuario']
-        },
-        {
-          model: Usuario,
-          as: 'usuario_modificacion',
-          attributes: ['id', 'usuario']
-        }
+        // ... otras inclusiones
       ],
       limit,
       offset,
@@ -455,26 +363,24 @@ exports.createIngreso = async (req, res) => {
       fecha: req.body.fecha || new Date(),
       socio_id: parseInt(req.body.socio_id),
       detalle_orden_id: parseInt(req.body.detalle_orden_id),
-      num_jabas: parseInt(req.body.num_jabas) || 0,
       peso_bruto: parseFloat(req.body.peso_bruto) || 0,
       peso_total_jabas: parseFloat(req.body.peso_total_jabas) || 0,
-      dscto_merma: parseFloat(req.body.descuento_merma) || 0,
-      dscto_jaba: parseFloat(req.body.dscto_jaba) || 0,
+      num_jabas: parseInt(req.body.num_jabas) || 0,
       peso_neto: parseFloat(req.body.peso_neto) || 0,
+      dscto_merma: parseFloat(req.body.dscto_merma) || 0,
+      aplicarPrecioJaba: req.body.aplicarPrecioJaba || false,
       precio_venta_kg: parseFloat(req.body.precio_venta_kg) || 0,
-      subtotal: parseFloat(req.body.subtotal) || 0,
+      precio_jaba: parseFloat(req.body.precio_jaba) || 0,
       impuesto: parseFloat(req.body.impuesto) || 0,
-      monto_impuesto: parseFloat(req.body.monto_impuesto) || 0,
-      total: parseFloat(req.body.total) || 0,
       pago_transporte: parseFloat(req.body.pago_transporte) || 0,
       monto_transporte: parseFloat(req.body.monto_transporte) || 0,
       ingreso_cooperativa: parseFloat(req.body.ingreso_cooperativa) || 0,
       pago_socio: parseFloat(req.body.pago_socio) || 0,
-      pago_con_descuento: parseFloat(req.body.pago_con_descuento) || 0,
+      subtotal: parseFloat(req.body.subtotal) || 0,
+      num_pesajes: parseInt(req.body.num_pesajes) || 0,
       observacion: req.body.observacion || '',
       estado: req.body.estado !== undefined ? req.body.estado : true,
-      usuario_creacion_id: req.user?.id || req.usuario?.id,
-      aplicarPrecioJaba: req.body.aplicarPrecioJaba || false
+      usuario_creacion_id: req.user?.id || req.usuario?.id
     };
     
     console.log('Datos del ingreso a crear:', datosIngreso);
@@ -585,9 +491,6 @@ exports.updateIngreso = async (req, res) => {
       aplicarPrecioJaba: req.body.aplicarPrecioJaba || ingreso.aplicarPrecioJaba
     }, { transaction });
     
-    // Calcular totales del ingreso
-    await calcularTotalesIngreso(ingreso.id, transaction);
-    
     await transaction.commit();
     
     // Obtener el ingreso actualizado con sus relaciones
@@ -608,10 +511,7 @@ exports.updateIngreso = async (req, res) => {
     res.status(500).json({ error: 'Error al actualizar ingreso', details: error.message });
   }
 };
-
 // Eliminar un ingreso
-
-
 exports.deleteIngreso = async (req, res) => {
   const transaction = await sequelize.transaction();
 
@@ -650,7 +550,6 @@ exports.deleteIngreso = async (req, res) => {
     res.status(500).json({ message: 'Error al eliminar ingreso', details: error.message });
   }
 };
-
 // Cambiar estado de un ingreso (activar/desactivar)
 exports.cambiarEstadoIngreso = async (req, res) => {
   try {

@@ -56,7 +56,7 @@ import {
   cilCheckCircle,
   cilMediaPlay,
   cilArrowBottom,
-  cilSync, cilSave, cilCloudDownload, cilMediaStop, cilArrowCircleBottom, cilLocationPin,cilSpreadsheet ,
+  cilSync, cilSave, cilCloudDownload, cilMediaStop, cilArrowCircleBottom, cilLocationPin, cilSpreadsheet,cilFilter,cilFilterX,
   cilSettings,
   cilBrushAlt,
   cilHistory,
@@ -88,8 +88,11 @@ const modalStyles = {
 };
 
 const Ingresos = () => {
+  const [expandedRow, setExpandedRow] = useState(null);
   const { user } = useContext(UserContext); // Obtener el usuario del contexto
-
+  const toggleRow = (id) => {
+    setExpandedRow(expandedRow === id ? null : id);
+  };
 
   // Estados principales
   const [ingresos, setIngresos] = useState([])
@@ -139,6 +142,66 @@ const Ingresos = () => {
   const [socioFilter, setSocioFilter] = useState('')
   const [fechaFilter, setFechaFilter] = useState('')
   const [historialPesajes, setHistorialPesajes] = useState([]);
+
+  const [clienteFilter, setClienteFilter] = useState('');
+  const [activeFilter, setActiveFilter] = useState(null);
+  const [isFilterActive, setIsFilterActive] = useState(false);
+
+  const [error, setError] = useState(null);
+
+  const filterInputRef = useRef(null);
+
+    useEffect(() => {
+        if (activeFilter && filterInputRef.current) {
+            filterInputRef.current.focus();
+        }
+    }, [activeFilter]);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (filterInputRef.current && !filterInputRef.current.contains(event.target)) {
+                setActiveFilter(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    fetchIngresos(newPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
+  };
+
+  useEffect(() => {
+    // Llama a fetchIngresos cuando cambien los filtros o la página
+    fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
+  }, [currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter]);
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handleSearch = () => {
+    fetchIngresos(1, itemsPerPage, searchTerm, numeroFilter, socioFilter);
+  };
+  
+  const clearFilters = () => {
+    setSearchTerm('');
+    setNumeroFilter('');
+    setSocioFilter('');
+    fetchIngresos(1, itemsPerPage, '', '', '');
+  };
+  
+  const handleFilterInputChange = (setter) => (e) => {
+    const value = e.target.value;
+    setter(value);
+  };
+
+  
 
 
   // Estados para pestañas y balanza
@@ -756,6 +819,25 @@ const Ingresos = () => {
     }
   };
 
+   // Debounce para la búsqueda de órdenes
+   const debouncedCargarSocios = useRef(
+    debounce((searchTerm) => {
+      cargarSocios(searchTerm);
+    }, 300)
+  ).current;
+
+  // useEffect para cargar órdenes al inicio
+  useEffect(() => {
+    cargarSocios(); // Cargar órdenes pendientes al inicio
+  }, []);
+
+  // useEffect para búsqueda dinámica de órdenes
+  useEffect(() => {
+    if (searchTermSocios !== undefined) {
+      debouncedCargarSocios(searchTermSocios);
+    }
+  }, [searchTermSocios, debouncedCargarSocios]);
+
   // Debounce para la búsqueda de órdenes
   const debouncedCargarOrdenes = useRef(
     debounce((searchTerm) => {
@@ -969,114 +1051,43 @@ const Ingresos = () => {
 
   // Funciones de carga de datos
 
-  const fetchIngresos = async () => {
+  const fetchIngresos = async (page = 1, itemsPerPage = 10, searchTerm = '', numero = '', socio = '') => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true)
-      const response = await ingresoService.getAll()
+      const response = await ingresoService.getAll({
+        page,
+        itemsPerPage,
+        search: searchTerm,
+        numero_ingreso: numero,
+        socio_nombre: socio,
+      });
+      console.log('API Response:', response);
 
-      console.log('Respuesta completa del servicio:', response) // Para debug
-
-      // Manejar diferentes formatos de respuesta
-      let allIngresos = []
-
-      if (response) {
-        // Caso 1: response.data.ingresos
-        if (response.data && Array.isArray(response.data.ingresos)) {
-          allIngresos = response.data.ingresos
-        }
-        // Caso 2: response.data es directamente un array
-        else if (response.data && Array.isArray(response.data)) {
-          allIngresos = response.data
-        }
-        // Caso 3: response.ingresos
-        else if (Array.isArray(response.ingresos)) {
-          allIngresos = response.ingresos
-        }
-        // Caso 4: response es directamente un array
-        else if (Array.isArray(response)) {
-          allIngresos = response
-        }
-        // Caso 5: buscar cualquier propiedad que sea un array
-        else if (response.data && typeof response.data === 'object') {
-          const possibleArrays = Object.values(response.data).filter(Array.isArray)
-          if (possibleArrays.length > 0) {
-            allIngresos = possibleArrays[0]
-          }
-        }
-        // Caso 6: buscar en el nivel superior del response
-        else if (typeof response === 'object') {
-          const possibleArrays = Object.values(response).filter(Array.isArray)
-          if (possibleArrays.length > 0) {
-            allIngresos = possibleArrays[0]
-          }
-        }
+      if (response && Array.isArray(response.ingresos)) {
+        setIngresos(response.ingresos);
+        setTotalPages(response.totalPages || 1);
+        setTotalItems(response.total || 0);
+        setCurrentPage(response.currentPage || 1);
+      } else {
+        console.error('Unexpected response format:', response);
+        setError('Unexpected response format. Please contact the administrator.');
       }
-
-      // Si aún no tenemos un array válido, usar array vacío
-      if (!Array.isArray(allIngresos)) {
-        console.warn('Formato de respuesta inesperado:', response)
-        allIngresos = []
-      }
-
-      console.log('Ingresos procesados:', allIngresos) // Para debug
-
-      // Aplicar filtros localmente
-      let filteredIngresos = [...allIngresos]
-
-      if (searchTerm) {
-        filteredIngresos = filteredIngresos.filter(ingreso =>
-          ingreso.numero_ingreso?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          ingreso.socio?.nombres?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          ingreso.socio?.apellidos?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          ingreso.observacion?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      }
-
-      if (numeroFilter) {
-        filteredIngresos = filteredIngresos.filter(ingreso =>
-          ingreso.numero_ingreso?.toLowerCase().includes(numeroFilter.toLowerCase())
-        )
-      }
-
-      if (socioFilter) {
-        filteredIngresos = filteredIngresos.filter(ingreso =>
-          ingreso.socio_id?.toString() === socioFilter
-        )
-      }
-
-      if (fechaFilter) {
-        filteredIngresos = filteredIngresos.filter(ingreso =>
-          ingreso.fecha?.startsWith(fechaFilter)
-        )
-      }
-
-      // Paginación local
-      const startIndex = (currentPage - 1) * itemsPerPage
-      const endIndex = startIndex + itemsPerPage
-      const paginatedIngresos = filteredIngresos.slice(startIndex, endIndex)
-
-      setIngresos(paginatedIngresos)
-      setTotalItems(filteredIngresos.length)
-      setTotalPages(Math.ceil(filteredIngresos.length / itemsPerPage))
-    } catch (error) {
-      console.error('Error al obtener ingresos:', error)
-      console.error('Detalles del error:', error.response) // Para debug
-
-      // Establecer valores por defecto en caso de error
-      setIngresos([])
-      setTotalItems(0)
-      setTotalPages(1)
+    } catch (err) {
+      console.error('Error fetching ingresos:', err);
+      setError('Error loading ingresos. Please try again.');
 
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.response?.data?.error || 'Error al cargar los ingresos',
-        confirmButtonColor: '#321fdb'
-      })
+        text: 'Could not load ingresos. Please try again.',
+        confirmButtonColor: '#321fdb',
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+  
 
   const fetchDatosRelacionados = async () => {
     try {
@@ -1375,8 +1386,12 @@ const Ingresos = () => {
   const [aplicarPrecioJaba, setAplicarPrecioJaba] = useState(false);
 
   // Función para manejar el cambio del checkbox
-  const handleCheckboxChange = (e) => {
-    setAplicarPrecioJaba(e.target.checked);
+  const handleCheckboxChange = (event) => {
+    const { checked } = event.target;
+    setCurrentIngreso((prev) => ({
+      ...prev,
+      aplicarPrecioJaba: checked
+    }));
   };
 
 
@@ -1441,8 +1456,8 @@ const Ingresos = () => {
       }, 0);
   };
 
- 
-const calcularCantidadPendienteActualizada = (producto) => {
+
+  const calcularCantidadPendienteActualizada = (producto) => {
     const cantidadTotal = producto.cantidad || 0;
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
@@ -1450,7 +1465,7 @@ const calcularCantidadPendienteActualizada = (producto) => {
 
     // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
     return Math.max(0, cantidadTotal - cantidadIngresadaTotal);
-};
+  };
 
   const calcularProgresoActualizado = (producto) => {
     const cantidadTotal = producto.cantidad || 0;
@@ -2738,18 +2753,26 @@ const calcularCantidadPendienteActualizada = (producto) => {
 
     try {
       const ingresoData = {
-        ...currentIngreso,
+        socio_id: parseInt(socioSeleccionado),
+        detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+        peso_bruto: parseFloat(currentIngreso.peso_bruto) || 0,
+        peso_total_jabas: parseFloat(currentIngreso.peso_total_jabas) || 0,
         num_jabas: parseInt(currentIngreso.num_jabas) || 0,
-        descuento_merma: parseFloat(currentIngreso.descuento_merma) || 0,
-        dscto_jaba: parseFloat(currentIngreso.dscto_jaba) || 0,
         peso_neto: parseFloat(currentIngreso.peso_neto) || 0,
+        dscto_merma: parseFloat(currentIngreso.descuento_merma) || 0,
+        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
         precio_venta_kg: parseFloat(currentIngreso.precio_venta_kg) || 0,
-        total: parseFloat(currentIngreso.total) || 0,
+        precio_jaba: parseFloat(currentIngreso.dscto_jaba) || 0,
+        impuesto: parseFloat(currentIngreso.impuesto) || 0,
         pago_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
+        monto_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
         ingreso_cooperativa: parseFloat(currentIngreso.ingreso_cooperativa) || 0,
         pago_socio: parseFloat(currentIngreso.pago_socio) || 0,
-        pago_con_descuento: parseFloat(currentIngreso.pago_con_descuento) || 0,
-        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false
+        subtotal: parseFloat(currentIngreso.total) || 0,
+        num_pesajes: pesajesTemporales.length,
+        observacion: currentIngreso.observacion || '',
+        estado: currentIngreso.estado !== undefined ? currentIngreso.estado : true,
+        usuario_creacion_id: user?.id
       }
 
       let savedIngresoaplicarPrecioJaba
@@ -2936,28 +2959,28 @@ const calcularCantidadPendienteActualizada = (producto) => {
     }
   };
 
-  
-const exportarPesajesExcel = () => {
-  const datosNumericos = pesajesTemporales.map(pesaje => ({
-    'Número': pesaje.numero,
-    'Peso Bruto (kg)': parseFloat(pesaje.peso_bruto || 0).toFixed(3),
-    'Jabas': pesaje.num_jabas || 0,
-    'Peso Jabas (kg)': parseFloat(pesaje.peso_total_jabas || 0).toFixed(3),
-    'Descuento Merma (kg)': parseFloat(pesaje.descuento_merma || 0).toFixed(3),
-    'Peso Neto (kg)': (parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)).toFixed(3),
-    'Precio/kg': parseFloat(precioVentaKg || 0).toFixed(2),
-    'Subtotal': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2),
-    'Pago Transporte': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)).toFixed(2),
-    'Ingreso Cooperativa': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2),
-    'Pago al Socio': (((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)) - ((pesaje.num_jabas || 0) * 1.00)).toFixed(2)
-  }));
 
-  const worksheet = XLSX.utils.json_to_sheet(datosNumericos);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Pesajes Temporales');
+  const exportarPesajesExcel = () => {
+    const datosNumericos = pesajesTemporales.map(pesaje => ({
+      'Número': pesaje.numero,
+      'Peso Bruto (kg)': parseFloat(pesaje.peso_bruto || 0).toFixed(3),
+      'Jabas': pesaje.num_jabas || 0,
+      'Peso Jabas (kg)': parseFloat(pesaje.peso_total_jabas || 0).toFixed(3),
+      'Descuento Merma (kg)': parseFloat(pesaje.descuento_merma || 0).toFixed(3),
+      'Peso Neto (kg)': (parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)).toFixed(3),
+      'Precio/kg': parseFloat(precioVentaKg || 0).toFixed(2),
+      'Subtotal': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2),
+      'Pago Transporte': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)).toFixed(2),
+      'Ingreso Cooperativa': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2),
+      'Pago al Socio': (((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)) - ((pesaje.num_jabas || 0) * 1.00)).toFixed(2)
+    }));
 
-  XLSX.writeFile(workbook, 'Pesajes_Temporales.xlsx');
-};
+    const worksheet = XLSX.utils.json_to_sheet(datosNumericos);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pesajes Temporales');
+
+    XLSX.writeFile(workbook, 'Pesajes_Temporales.xlsx');
+  };
 
 
   // Reemplaza la función cargarPuertosBalanza existente con esta versión corregida:
@@ -3293,36 +3316,36 @@ const exportarPesajesExcel = () => {
       const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
       const ingresoCooperativa = pesoNetoTotal * porcentajeImpuesto;
 
-      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
+      // Calculate price per jaba if applicable
+      const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (numJabasTotal * 1.00) : 0;
+
+      // Calculate payment to the partner
+      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
 
       const pesoTotalJabas = numJabasTotal * pesoJaba;
 
       // Preparar datos del ingreso consolidado
       const ingresoData = {
-        numero_ingreso: currentIngreso.numero_ingreso || `ING-${Date.now()}`,
-        fecha: currentIngreso.fecha || new Date().toISOString().split('T')[0],
         socio_id: parseInt(socioSeleccionado),
-        producto_id: productoSeleccionado.producto_id,
         detalle_orden_id: parseInt(productoSeleccionadoPesaje),
-        unidad_medida_id: currentIngreso.unidad_medida_id || null,
-        tipo_fruta_id: productoSeleccionado.tipo_fruta_id || null,
-        num_jabas: numJabasTotal,
-        descuento_merma: descuentoMermaTotal,
-        dscto_jaba: parseFloat(pesoJaba || 0),
         peso_bruto: pesoBrutoTotal,
+        peso_total_jabas: pesoTotalJabas,
+        num_jabas: numJabasTotal,
         peso_neto: pesoNetoTotal,
-        peso_total_jabas: pesoTotalJabas, // Ensure this is set correctly
-        impuesto: parseFloat(porcentajeImpuesto * 100),
+        dscto_merma: descuentoMermaTotal,
+        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
         precio_venta_kg: parseFloat(precioVentaKg || 0),
-        total: subtotal,
-        pago_transporte: pagoTransporte,
-        monto_transporte: parseFloat(currentIngreso.pago_transporte || 0),
+        precio_jaba: parseFloat(pesoJaba || 0),
+        impuesto: parseFloat(porcentajeImpuesto * 100),
+        pago_transporte: parseFloat(currentIngreso.pago_transporte || 0),
+        monto_transporte: parseFloat(pagoTransporte || 0),
         ingreso_cooperativa: ingresoCooperativa,
         pago_socio: pagoSocio,
-        pago_con_descuento: pagoSocio,
+        subtotal: subtotal,
+        num_pesajes: pesajesTemporales.length,
         observacion: currentIngreso.observacion || '',
-        usuario_creacion_id: user?.id,
-        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false
+        estado: currentIngreso.estado !== undefined ? currentIngreso.estado : true,
+        usuario_creacion_id: user?.id
       };
 
       console.log('Datos del ingreso consolidado a enviar:', ingresoData);
@@ -3580,54 +3603,36 @@ const exportarPesajesExcel = () => {
               <CCardBody>
                 {/* Filtros */}
                 <CRow className="mb-3">
-                  <CCol md={3}>
+                  <CCol md={4}>
                     <CInputGroup>
-                      <CInputGroupText>
-                        <CIcon icon={cilSearch} />
-                      </CInputGroupText>
                       <CFormInput
-                        placeholder="Buscar..."
+                        placeholder="Buscar ingresos..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={handleSearchChange}
                       />
+                      <CButton color="primary" variant="outline" onClick={handleSearch}>
+                        <CIcon icon={cilSearch} />
+                      </CButton>
+                      {isFilterActive && (
+                        <CButton color="danger" variant="outline" onClick={clearFilters}>
+                          <CIcon icon={cilFilterX} />
+                        </CButton>
+                      )}
                     </CInputGroup>
                   </CCol>
-                  <CCol md={2}>
-                    <CFormInput
-                      placeholder="Número ingreso"
-                      value={numeroFilter}
-                      onChange={(e) => setNumeroFilter(e.target.value)}
-                    />
-                  </CCol>
-                  <CCol md={3}>
-                    <CFormSelect
-                      value={socioFilter}
-                      onChange={(e) => setSocioFilter(e.target.value)}
-                    >
-                      <option value="">Todos los socios</option>
-                      {socios.map(socio => (
-                        <option key={socio.id} value={socio.id}>
-                          {socio.codigo} - {socio.nombre} {socio.apellido}
-                        </option>
-                      ))}
-                    </CFormSelect>
-                  </CCol>
-                  <CCol md={2}>
-                    <CFormInput
-                      type="date"
-                      value={fechaFilter}
-                      onChange={(e) => setFechaFilter(e.target.value)}
-                    />
-                  </CCol>
-                  <CCol md={2}>
-                    <CButton
-                      color="secondary"
-                      variant="outline"
-                      onClick={resetFilters}
-                      className="w-100"
-                    >
-                      Limpiar
-                    </CButton>
+                  <CCol md={8}>
+                    <CInputGroup>
+                      {activeFilter && (
+                        <CFormInput
+                          ref={filterInputRef}
+                          placeholder={`Filtrar por ${activeFilter}...`}
+                          value={activeFilter === 'numero' ? numeroFilter : clienteFilter}
+                          onChange={handleFilterInputChange(
+                            activeFilter === 'numero' ? setNumeroFilter : setClienteFilter
+                          )}
+                        />
+                      )}
+                    </CInputGroup>
                   </CCol>
                 </CRow>
 
@@ -3668,14 +3673,40 @@ const exportarPesajesExcel = () => {
                     <CTable hover responsive striped>
                       <CTableHead>
                         <CTableRow>
-                          <CTableHeaderCell>Número</CTableHeaderCell>
-                          <CTableHeaderCell>Fecha</CTableHeaderCell>
-                          <CTableHeaderCell>Socio</CTableHeaderCell>
-                          <CTableHeaderCell>Producto</CTableHeaderCell>
-                          <CTableHeaderCell>Jabas</CTableHeaderCell>
+                          <CTableHeaderCell>#</CTableHeaderCell>
+                          <CTableHeaderCell>
+                            Número
+                            <CButton
+                              color="link"
+                              onClick={() => setActiveFilter(activeFilter === 'numero' ? null : 'numero')}
+                            >
+                              <CIcon icon={cilFilter} />
+                            </CButton>
+                          </CTableHeaderCell>
+                          <CTableHeaderCell>
+                            Fecha
+                            <CButton
+                              color="link"
+                              onClick={() => setActiveFilter(activeFilter === 'fecha' ? null : 'fecha')}
+                            >
+                              <CIcon icon={cilFilter} />
+                            </CButton>
+                          </CTableHeaderCell>
+                          <CTableHeaderCell>
+                            Socio
+                            <CButton
+                              color="link"
+                              onClick={() => setActiveFilter(activeFilter === 'socio' ? null : 'socio')}
+                            >
+                              <CIcon icon={cilFilter} />
+                            </CButton>
+                          </CTableHeaderCell>
                           <CTableHeaderCell>Peso Neto</CTableHeaderCell>
-                          <CTableHeaderCell>Total</CTableHeaderCell>
-                          <CTableHeaderCell>Estado</CTableHeaderCell>
+                          <CTableHeaderCell>Número de Jabas</CTableHeaderCell>
+                          <CTableHeaderCell>Pago Transporte</CTableHeaderCell>
+                          <CTableHeaderCell>Ingreso Cooperativa</CTableHeaderCell>
+                          <CTableHeaderCell>Pago al Socio</CTableHeaderCell>
+                          <CTableHeaderCell>Subtotal</CTableHeaderCell>
                           <CTableHeaderCell>Acciones</CTableHeaderCell>
                         </CTableRow>
                       </CTableHead>
@@ -3690,71 +3721,122 @@ const exportarPesajesExcel = () => {
                             </CTableDataCell>
                           </CTableRow>
                         ) : (
-                          ingresos.map((ingreso) => (
-                            <CTableRow key={ingreso.id}>
-                              <CTableDataCell>
-                                <strong>{ingreso.numero_ingreso}</strong>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                {formatDateForDisplay(ingreso.fecha)}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <div>
-                                  <strong>{ingreso.socio?.codigo}</strong>
-                                  <br />
-                                  <small className="text-muted">
-                                    {ingreso.socio?.nombre} {ingreso.socio?.apellido}
-                                  </small>
-                                </div>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                {ingreso.producto?.nombre}
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CBadge color="info">
-                                  {ingreso.num_jabas}
-                                </CBadge>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <strong>{ingreso.peso_neto} kg</strong>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <strong className="text-success">
-                                  {formatCurrency(ingreso.total)}
-                                </strong>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CBadge color={ingreso.estado ? 'success' : 'danger'}>
-                                  {ingreso.estado ? 'Activo' : 'Inactivo'}
-                                </CBadge>
-                              </CTableDataCell>
-                              <CTableDataCell>
-                                <CButtonGroup size="sm">
-                                  <CButton
-                                    color="info"
-                                    variant="outline"
-                                    onClick={() => handleEdit(ingreso)}
-                                    title="Editar"
-                                  >
-                                    <CIcon icon={cilPencil} />
-                                  </CButton>
-                                  <CButton
-                                    color="danger"
-                                    variant="outline"
-                                    onClick={() => handleDelete(ingreso)}
-                                    title="Eliminar"
-                                  >
-                                    <CIcon icon={cilTrash} />
-                                  </CButton>
-                                </CButtonGroup>
-                              </CTableDataCell>
-                            </CTableRow>
+                          ingresos.map((ingreso, index) => (
+                            <React.Fragment key={ingreso.id}>
+                              <CTableRow onClick={() => toggleRow(ingreso.id)}>
+                                <CTableDataCell>{index + 1}</CTableDataCell>
+                                <CTableDataCell>{ingreso.numero_ingreso}</CTableDataCell>
+                                <CTableDataCell>{new Date(ingreso.fecha).toLocaleDateString()}</CTableDataCell>
+                                <CTableDataCell>{ingreso.socio.nombres} {ingreso.socio.apellidos}</CTableDataCell>
+                                <CTableDataCell>{(parseFloat(ingreso.peso_neto) || 0).toFixed(3)} kg</CTableDataCell>
+                                <CTableDataCell>{ingreso.num_jabas}</CTableDataCell>
+                                <CTableDataCell>S/ {(parseFloat(ingreso.pago_transporte) || 0).toFixed(2)}</CTableDataCell>
+                                <CTableDataCell>S/ {(parseFloat(ingreso.ingreso_cooperativa) || 0).toFixed(2)}</CTableDataCell>
+                                <CTableDataCell>S/ {(parseFloat(ingreso.pago_socio) || 0).toFixed(2)}</CTableDataCell>
+                                <CTableDataCell>S/ {(parseFloat(ingreso.subtotal) || 0).toFixed(2)}</CTableDataCell>
+                                <CTableDataCell>
+                                  <CButtonGroup size="sm">
+                                    <CButton
+                                      color="info"
+                                      variant="outline"
+                                      onClick={() => handleEdit(ingreso)}
+                                      title="Editar"
+                                    >
+                                      <CIcon icon={cilPencil} />
+                                    </CButton>
+                                    <CButton
+                                      color="danger"
+                                      variant="outline"
+                                      onClick={() => handleDelete(ingreso)}
+                                      title="Eliminar"
+                                    >
+                                      <CIcon icon={cilTrash} />
+                                    </CButton>
+                                  </CButtonGroup>
+                                </CTableDataCell>
+                              </CTableRow>
+                              {expandedRow === ingreso.id && (
+                                <CTableRow>
+                                  <CTableDataCell colSpan={10}>
+                                    <div className="p-3 bg-light border rounded">
+                                      <div className="row">
+                                        <div className="col-md-6">
+                                          <div className="mb-2">
+                                            <strong>Orden:</strong> {ingreso.detalle_orden.orden_compra.numero_orden}
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Producto:</strong> {ingreso.detalle_orden.producto.nombre} - {ingreso.detalle_orden.tipo_fruta.nombre}
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Pesajes Registrados:</strong> {ingreso.num_pesajes}
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Peso Bruto:</strong> {(parseFloat(ingreso.peso_bruto) || 0).toFixed(3)} kg
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Peso Jabas:</strong> {(parseFloat(ingreso.peso_total_jabas) || 0).toFixed(3)} kg
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Descuento Merma:</strong> {(parseFloat(ingreso.dscto_merma) || 0).toFixed(3)} kg
+                                          </div>
+                                        </div>
+                                        <div className="col-md-6">
+                                          <div className="mb-2">
+                                            <strong>Precio Venta por kg:</strong> S/ {(parseFloat(ingreso.precio_venta_kg) || 0).toFixed(2)}
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Precio por Jaba:</strong> S/ {(parseFloat(ingreso.precio_jaba) || 0).toFixed(2)}
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Ingreso Cooperativa:</strong> {ingreso.impuesto}%
+                                          </div>
+                                          <div className="mb-2">
+                                            <strong>Pago Transporte:</strong> {ingreso.pago_transporte}%
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CTableDataCell>
+                                </CTableRow>
+                              )}
+                            </React.Fragment>
                           ))
                         )}
                       </CTableBody>
                     </CTable>
 
+                    <div className="d-flex justify-content-center mt-3">
+                      <CPagination aria-label="Navegación de páginas">
+                        <CPaginationItem
+                          aria-label="Anterior"
+                          disabled={currentPage === 1}
+                          onClick={() => handlePageChange(currentPage - 1)}
+                        >
+                          &laquo;
+                        </CPaginationItem>
+
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                          <CPaginationItem
+                            key={page}
+                            active={page === currentPage}
+                            onClick={() => handlePageChange(page)}
+                          >
+                            {page}
+                          </CPaginationItem>
+                        ))}
+
+                        <CPaginationItem
+                          aria-label="Siguiente"
+                          disabled={currentPage === totalPages}
+                          onClick={() => handlePageChange(currentPage + 1)}
+                        >
+                          &raquo;
+                        </CPaginationItem>
+                      </CPagination>
+                    </div>
+
                     {/* Paginación */}
+
                     {totalPages > 1 && (
                       <div className="d-flex justify-content-center mt-3">
                         <CPagination>
@@ -4174,7 +4256,7 @@ const exportarPesajesExcel = () => {
                           onInputChange={(inputValue, { action }) => {
                             // Solo actualizar el searchTerm si el usuario está escribiendo
                             if (action === 'input-change') {
-                              setSearchTerm(inputValue);
+                              setSearchTermSocios(inputValue);
                             }
                           }}
                           className={`basic-single ${formErrors.socio_id ? 'is-invalid' : ''}`}
@@ -4414,11 +4496,10 @@ const exportarPesajesExcel = () => {
                             </CFormLabel>
                             <CFormCheck
                               id="aplicar_precio_jaba"
-                              checked={aplicarPrecioJaba}
+                              checked={currentIngreso.aplicarPrecioJaba}
                               onChange={handleCheckboxChange}
                               label="Aplicar S/ 1.00 por jaba"
-                              disabled={camposBloqueados} // Deshabilitar el checkbox si los campos están bloqueados
-
+                              disabled={camposBloqueados}
                             />
                           </div>
                         </CCol>
@@ -4531,7 +4612,7 @@ const exportarPesajesExcel = () => {
                                 const pagoTransporte = pesoNeto * porcentajeTransporte;
                                 const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                                 const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
-                                const precioPorJaba = aplicarPrecioJaba ? (currentIngreso.num_jabas || 0) * 1.00 : 0;
+                                const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (currentIngreso.num_jabas || 0) * 1.00 : 0;
                                 const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
                                 return pagoSocio.toFixed(2);
                               })()}
@@ -5079,7 +5160,7 @@ const exportarPesajesExcel = () => {
                             const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                             const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
-                            const precioPorJaba = aplicarPrecioJaba ? (pesaje.num_jabas || 0) * 1.00 : 0;
+                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas || 0) * 1.00 : 0;
 
                             // Ajustar el pago al socio
                             const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
@@ -5166,15 +5247,15 @@ const exportarPesajesExcel = () => {
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <strong
-                                    className={`text-success ${aplicarPrecioJaba ? 'bg-warning' : ''}`}
+                                    className={`text-success ${currentIngreso.aplicarPrecioJaba ? 'bg-warning' : ''}`}
                                     style={{
-                                      backgroundColor: aplicarPrecioJaba ? '#fff3cd' : 'transparent',
+                                      backgroundColor: currentIngreso.aplicarPrecioJaba ? '#fff3cd' : 'transparent',
                                       transition: 'background-color 0.3s ease'
                                     }}
                                   >
                                     S/ {pagoSocio.toFixed(2)}
                                   </strong>
-                                  {aplicarPrecioJaba && (
+                                  {currentIngreso.aplicarPrecioJaba && (
                                     <small className="text-muted">
                                       (Descuento aplicado por jabas: S/ {precioPorJaba.toFixed(2)})
                                     </small>
@@ -5362,7 +5443,7 @@ const exportarPesajesExcel = () => {
                                               const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
                                               // Calcular el precio por jaba y el pago al socio
-                                              const precioPorJaba = aplicarPrecioJaba ? (totalJabas || 0) * 1.00 : 0;
+                                              const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (totalJabas || 0) * 1.00 : 0;
                                               const subtotal = totalPesoNeto * parseFloat(precioVentaKg || 0);
                                               const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                               const pagoTransporte = totalPesoNeto * porcentajeTransporte;
@@ -5490,7 +5571,7 @@ const exportarPesajesExcel = () => {
                                   const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
                                   // Calcular el precio por jaba
-                                  const precioPorJaba = aplicarPrecioJaba ? (p.num_jabas || 0) * 1.00 : 0;
+                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas || 0) * 1.00 : 0;
 
                                   // Ajustar el pago al socio
                                   const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;

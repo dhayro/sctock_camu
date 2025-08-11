@@ -161,24 +161,23 @@ CREATE TABLE ingresos (
     peso_total_jabas DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Peso total de las jabas vacías',
     num_jabas INT DEFAULT 0 COMMENT 'Número total de jabas',
     peso_neto DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Peso neto del producto (bruto - jabas - merma)',
-    peso_jaba_unitario DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de cada jaba vacía',
     
     -- Campos de descuentos
     dscto_merma DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por merma en kg',
-    dscto_jaba DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por peso de jabas',
     aplicarPrecioJaba BOOLEAN DEFAULT FALSE COMMENT 'Indica si se aplica el precio de jaba',
     
     -- Campos financieros
     precio_venta_kg DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Precio por kilogramo',
+    precio_jaba DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Precio por jaba',
     impuesto DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Porcentaje de impuesto',
-    subtotal DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Subtotal sin impuesto',
-    monto_impuesto DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto del impuesto calculado',
-    total DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Total con impuesto',
     pago_transporte DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Porcentaje para pago de transporte',
     monto_transporte DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto calculado para transporte',
     ingreso_cooperativa DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto que ingresa a la cooperativa',
     pago_socio DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Monto a pagar al socio',
-    pago_con_descuento DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Pago final con descuentos aplicados',
+    subtotal DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Subtotal calculado',
+    
+    -- Campos adicionales
+    num_pesajes INT DEFAULT 0 COMMENT 'Número de pesajes registrados',
     
     -- Campos de control
     observacion TEXT,

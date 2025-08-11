@@ -55,24 +55,12 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0.000,
       comment: 'Peso neto del producto (bruto - jabas - merma)'
     },
-    peso_jaba_unitario: {
-      type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
-      defaultValue: 2.000,
-      comment: 'Peso de cada jaba vacía'
-    },
     // Campos de descuentos
     dscto_merma: {
       type: DataTypes.DECIMAL(10, 3),
       allowNull: true,
       defaultValue: 0.000,
       comment: 'Descuento por merma en kg'
-    },
-    dscto_jaba: {
-      type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
-      defaultValue: 0.000,
-      comment: 'Descuento por peso de jabas'
     },
     aplicarPrecioJaba: { 
       type: DataTypes.BOOLEAN,
@@ -87,29 +75,17 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0.00,
       comment: 'Precio por kilogramo'
     },
+    precio_jaba: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.00,
+      comment: 'Precio por jaba'
+    },
     impuesto: {
       type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
       defaultValue: 0.00,
       comment: 'Porcentaje de impuesto'
-    },
-    subtotal: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      defaultValue: 0.00,
-      comment: 'Subtotal sin impuesto'
-    },
-    monto_impuesto: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      defaultValue: 0.00,
-      comment: 'Monto del impuesto calculado'
-    },
-    total: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      defaultValue: 0.00,
-      comment: 'Total con impuesto'
     },
     pago_transporte: {
       type: DataTypes.DECIMAL(5, 2),
@@ -135,11 +111,18 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0.00,
       comment: 'Monto a pagar al socio'
     },
-    pago_con_descuento: {
+    subtotal: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true,
       defaultValue: 0.00,
-      comment: 'Pago final con descuentos aplicados'
+      comment: 'Subtotal calculado'
+    },
+    // Campos adicionales
+    num_pesajes: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      comment: 'Número de pesajes registrados'
     },
     // Campos de control
     observacion: {
