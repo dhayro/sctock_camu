@@ -1,3 +1,5 @@
+// const { actualizarTotalesIngreso } = require('../utils/ingresoUtils');
+
 module.exports = (sequelize, DataTypes) => {
   const DetallePesaje = sequelize.define('DetallePesaje', {
     id: {
@@ -18,30 +20,30 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       comment: 'Número secuencial del pesaje dentro del ingreso'
     },
-    peso: {
+    peso_bruto: {
       type: DataTypes.DECIMAL(10, 3),
       allowNull: false,
-      comment: 'Peso registrado en kg con 3 decimales'
+      comment: 'peso_bruto registrado en kg con 3 decimales'
     },
     peso_jaba: {
       type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
+      allowNull: false,
       defaultValue: 2.000,
       comment: 'Peso de la jaba para este pesaje'
     },
     descuento_merma_pesaje: {
       type: DataTypes.DECIMAL(10, 3),
-      allowNull: true,
+      allowNull: false,
       defaultValue: 0.000,
       comment: 'Descuento de merma aplicado a este pesaje'
     },
     peso_neto_pesaje: {
       type: DataTypes.VIRTUAL,
       get() {
-        const peso = parseFloat(this.getDataValue('peso')) || 0;
-        const pesoJaba = parseFloat(this.getDataValue('peso_jaba')) || 0;
-        const descuentoMerma = parseFloat(this.getDataValue('descuento_merma_pesaje')) || 0;
-        return peso - pesoJaba - descuentoMerma;
+        const pesoBruto = parseFloat(this.getDataValue('peso_bruto') || 0);
+        const pesoJaba = parseFloat(this.getDataValue('peso_jaba') || 0);
+        const descuentoMerma = parseFloat(this.getDataValue('descuento_merma_pesaje') || 0);
+        return pesoBruto - pesoJaba - descuentoMerma;
       },
       comment: 'Peso neto calculado automáticamente'
     },
@@ -91,25 +93,25 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false,
     freezeTableName: true,
     indexes: [
-      {
-        unique: true,
-        fields: ['ingreso_id', 'numero_pesaje'],
-        name: 'unique_pesaje_por_ingreso'
-      },
-      {
-        fields: ['ingreso_id']
-      },
-      {
-        fields: ['fecha_pesaje']
-      },
-      {
-        fields: ['estado']
-      }
+      // {
+      //   unique: true,
+      //   fields: ['ingreso_id', 'numero_pesaje'],
+      //   name: 'unique_pesaje_por_ingreso'
+      // },
+      // {
+      //   fields: ['ingreso_id']
+      // },
+      // {
+      //   fields: ['fecha_pesaje']
+      // },
+      // {
+      //   fields: ['estado']
+      // }
     ],
     hooks: {
       // Hook para actualizar totales del ingreso después de crear un pesaje
       afterCreate: async (detallePesaje, options) => {
-        await actualizarTotalesIngreso(detallePesaje.ingreso_id, options.transaction);
+        // await actualizarTotalesIngreso(detallePesaje.ingreso_id, options.transaction);
       }
     }
   });

@@ -208,7 +208,7 @@ CREATE TABLE detalle_pesajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ingreso_id INT NOT NULL,
     numero_pesaje INT NOT NULL,
-    peso DECIMAL(10,3) NOT NULL COMMENT 'Peso registrado en kg con 3 decimales',
+    peso_bruto DECIMAL(10,3) NOT NULL COMMENT 'peso_bruto registrado en kg con 3 decimales',
     peso_jaba DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de la jaba para este pesaje',
     descuento_merma_pesaje DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento de merma aplicado a este pesaje',
     peso_neto_pesaje DECIMAL(10,3) GENERATED ALWAYS AS (peso - peso_jaba - descuento_merma_pesaje) STORED COMMENT 'Peso neto calculado automáticamente',

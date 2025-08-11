@@ -1,49 +1,4 @@
-const { DetallePesaje, Ingreso, Usuario, sequelize } = require('../models');
-
-// Función auxiliar para actualizar totales del ingreso
-const actualizarTotalesIngreso = async (ingresoId, transaction = null) => {
-  try {
-    const ingreso = await Ingreso.findByPk(ingresoId, {
-      include: [
-        {
-          model: DetallePesaje,
-          as: 'pesajes',
-          where: { estado: true },
-          required: false
-        }
-      ],
-      transaction
-    });
-
-    if (!ingreso) return;
-
-    const pesajes = ingreso.pesajes || [];
-    
-    // Calcular totales de pesajes
-    const totalPesoBruto = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso || 0), 0);
-    const totalPesoJabas = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso_jaba || 0), 0);
-    const totalDescuentoMerma = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.descuento_merma_pesaje || 0), 0);
-    const numJabas = pesajes.length;
-    
-    // Calcular peso neto
-    const pesoNeto = totalPesoBruto - totalPesoJabas - totalDescuentoMerma;
-    
-    // Actualizar el ingreso con los totales calculados
-    await ingreso.update({
-      peso_bruto: totalPesoBruto,
-      peso_total_jabas: totalPesoJabas,
-      num_jabas: numJabas,
-      peso_neto: pesoNeto,
-      dscto_merma: totalDescuentoMerma,
-      dscto_jaba: totalPesoJabas
-    }, { transaction });
-
-    return ingreso;
-  } catch (error) {
-    console.error('Error al actualizar totales del ingreso:', error);
-    throw error;
-  }
-};
+const { DetallePesaje, Ingreso, DetalleOrdenCompra, Usuario, sequelize } = require('../models');
 
 // Obtener todos los detalles de pesaje
 exports.getAllDetallesPesaje = async (req, res) => {
@@ -75,12 +30,12 @@ exports.getAllDetallesPesaje = async (req, res) => {
         {
           model: Usuario,
           as: 'usuario_creacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         },
         {
           model: Usuario,
           as: 'usuario_modificacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         }
       ],
       limit,
@@ -113,20 +68,20 @@ exports.getDetallePesajeById = async (req, res) => {
         {
           model: Usuario,
           as: 'usuario_creacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         },
         {
           model: Usuario,
           as: 'usuario_modificacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         }
       ]
     });
-    
+
     if (!detallePesaje) {
       return res.status(404).json({ error: 'Detalle de pesaje no encontrado' });
     }
-    
+
     res.json(detallePesaje);
   } catch (error) {
     console.error('Error al obtener detalle de pesaje:', error);
@@ -138,16 +93,16 @@ exports.getDetallePesajeById = async (req, res) => {
 exports.getDetallesPesajeByIngresoId = async (req, res) => {
   try {
     const { ingresoId } = req.params;
-    
+
     // Verificar si el ingreso existe
     const ingresoExiste = await Ingreso.findByPk(ingresoId);
     if (!ingresoExiste) {
       return res.status(404).json({ error: 'Ingreso no encontrado' });
     }
-    
+
     // Obtener los detalles de pesaje
     const detallesPesaje = await DetallePesaje.findAll({
-      where: { 
+      where: {
         ingreso_id: ingresoId,
         estado: true
       },
@@ -155,17 +110,17 @@ exports.getDetallesPesajeByIngresoId = async (req, res) => {
         {
           model: Usuario,
           as: 'usuario_creacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         },
         {
           model: Usuario,
           as: 'usuario_modificacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         }
       ],
       order: [['numero_pesaje', 'ASC']]
     });
-    
+
     res.json(detallesPesaje);
   } catch (error) {
     console.error('Error al obtener detalles de pesaje:', error);
@@ -173,35 +128,61 @@ exports.getDetallesPesajeByIngresoId = async (req, res) => {
   }
 };
 
+// Función para recalcular y actualizar la cantidad ingresada
+async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
+  // Obtener todos los DetallePesaje activos asociados al mismo detalle_orden_id
+  const ingresosRelacionados = await Ingreso.findAll({
+    where: { detalle_orden_id: detalleOrdenId },
+    include: [
+      {
+        model: DetallePesaje,
+        as: 'pesajes',
+        where: { estado: true },
+        required: false
+      }
+    ],
+    transaction
+  });
+
+  // Recalcular la cantidad ingresada sumando todos los pesos netos de los pesajes activos
+  const totalPesoNeto = ingresosRelacionados.reduce((sum, ingresoRelacionado) => {
+    return sum + ingresoRelacionado.pesajes.reduce((pesajeSum, pesaje) => {
+      return pesajeSum + parseFloat(pesaje.peso_neto_pesaje || 0);
+    }, 0);
+  }, 0);
+
+  // Actualizar la cantidad ingresada en el detalle de orden
+  const detalleOrden = await DetalleOrdenCompra.findByPk(detalleOrdenId, { transaction });
+  if (detalleOrden) {
+    await detalleOrden.update({ cantidad_ingresada: totalPesoNeto }, { transaction });
+  }
+}
+
 // Crear un nuevo detalle de pesaje
 exports.createDetallePesaje = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
-    const { 
-      ingreso_id, 
-      numero_pesaje, 
-      peso, 
-      peso_jaba, 
-      descuento_merma_pesaje, 
-      observacion_pesaje 
+    const {
+      ingreso_id,
+      numero_pesaje,
+      peso_bruto,
+      peso_jaba,
+      descuento_merma_pesaje,
+      observacion_pesaje
     } = req.body;
-    
+
     // Validar campos obligatorios
-    if (!ingreso_id || !numero_pesaje || !peso) {
-      await transaction.rollback();
-      return res.status(400).json({ 
-        error: 'Los campos ingreso_id, numero_pesaje y peso son obligatorios' 
-      });
+    if (!ingreso_id || !numero_pesaje || !peso_bruto) {
+      throw new Error('Los campos ingreso_id, numero_pesaje y peso_bruto son obligatorios');
     }
-    
+
     // Verificar si el ingreso existe
     const ingresoExiste = await Ingreso.findByPk(ingreso_id);
     if (!ingresoExiste) {
-      await transaction.rollback();
-      return res.status(404).json({ error: 'Ingreso no encontrado' });
+      throw new Error('Ingreso no encontrado');
     }
-    
+
     // Verificar que no exista ya un pesaje con el mismo número para este ingreso
     const pesajeExistente = await DetallePesaje.findOne({
       where: {
@@ -209,19 +190,16 @@ exports.createDetallePesaje = async (req, res) => {
         numero_pesaje
       }
     });
-    
+
     if (pesajeExistente) {
-      await transaction.rollback();
-      return res.status(400).json({ 
-        error: `Ya existe un pesaje con el número ${numero_pesaje} para este ingreso` 
-      });
+      throw new Error(`Ya existe un pesaje con el número ${numero_pesaje} para este ingreso`);
     }
-    
+
     // Crear el detalle de pesaje
     const detallePesaje = await DetallePesaje.create({
       ingreso_id,
       numero_pesaje,
-      peso: parseFloat(peso),
+      peso_bruto: parseFloat(peso_bruto),
       peso_jaba: peso_jaba ? parseFloat(peso_jaba) : 2.000,
       descuento_merma_pesaje: descuento_merma_pesaje ? parseFloat(descuento_merma_pesaje) : 0.000,
       observacion_pesaje,
@@ -230,12 +208,12 @@ exports.createDetallePesaje = async (req, res) => {
       usuario_creacion_id: req.usuario.id,
       fecha_creacion: new Date()
     }, { transaction });
-    
-    // Actualizar totales del ingreso
-    await actualizarTotalesIngreso(ingreso_id, transaction);
-    
+
+    // Actualizar cantidad_ingresada en DetalleOrdenCompra
+    await actualizarCantidadIngresada(ingresoExiste.detalle_orden_id, transaction);
+
     await transaction.commit();
-    
+
     // Obtener el detalle creado con sus relaciones
     const detallePesajeCompleto = await DetallePesaje.findByPk(detallePesaje.id, {
       include: [
@@ -247,22 +225,17 @@ exports.createDetallePesaje = async (req, res) => {
         {
           model: Usuario,
           as: 'usuario_creacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         }
       ]
     });
-    
+
     res.status(201).json(detallePesajeCompleto);
   } catch (error) {
-    await transaction.rollback();
-    console.error('Error al crear detalle de pesaje:', error);
-    
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ 
-        error: 'Ya existe un pesaje con este número para el ingreso especificado' 
-      });
+    if (transaction.finished !== 'commit') {
+      await transaction.rollback();
     }
-    
+    console.error('Error al crear detalle de pesaje:', error);
     res.status(500).json({ error: 'Error al crear detalle de pesaje', details: error.message });
   }
 };
@@ -270,27 +243,27 @@ exports.createDetallePesaje = async (req, res) => {
 // Actualizar un detalle de pesaje existente
 exports.updateDetallePesaje = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { id } = req.params;
-    const { 
-      peso, 
-      peso_jaba, 
-      descuento_merma_pesaje, 
-      observacion_pesaje, 
-      estado 
+    const {
+      peso_bruto,
+      peso_jaba,
+      descuento_merma_pesaje,
+      observacion_pesaje,
+      estado
     } = req.body;
-    
+
     // Verificar si el detalle de pesaje existe
     const detallePesaje = await DetallePesaje.findByPk(id);
     if (!detallePesaje) {
       await transaction.rollback();
       return res.status(404).json({ error: 'Detalle de pesaje no encontrado' });
     }
-    
+
     // Actualizar el detalle de pesaje
     await detallePesaje.update({
-      peso: peso !== undefined ? parseFloat(peso) : detallePesaje.peso,
+      peso_bruto: peso_bruto !== undefined ? parseFloat(peso_bruto) : detallePesaje.peso_bruto,
       peso_jaba: peso_jaba !== undefined ? parseFloat(peso_jaba) : detallePesaje.peso_jaba,
       descuento_merma_pesaje: descuento_merma_pesaje !== undefined ? parseFloat(descuento_merma_pesaje) : detallePesaje.descuento_merma_pesaje,
       observacion_pesaje: observacion_pesaje !== undefined ? observacion_pesaje : detallePesaje.observacion_pesaje,
@@ -298,12 +271,16 @@ exports.updateDetallePesaje = async (req, res) => {
       usuario_modificacion_id: req.usuario.id,
       fecha_modificacion: new Date()
     }, { transaction });
-    
-    // Actualizar totales del ingreso
-    await actualizarTotalesIngreso(detallePesaje.ingreso_id, transaction);
-    
+
+    // Obtener el ingreso relacionado
+    const ingreso = await Ingreso.findByPk(detallePesaje.ingreso_id, { transaction });
+    if (ingreso) {
+      // Actualizar cantidad_ingresada en DetalleOrdenCompra
+      await actualizarCantidadIngresada(ingreso.detalle_orden_id, transaction);
+    }
+
     await transaction.commit();
-    
+
     // Obtener el detalle actualizado con sus relaciones
     const detallePesajeActualizado = await DetallePesaje.findByPk(detallePesaje.id, {
       include: [
@@ -315,16 +292,16 @@ exports.updateDetallePesaje = async (req, res) => {
         {
           model: Usuario,
           as: 'usuario_creacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         },
         {
           model: Usuario,
           as: 'usuario_modificacion',
-          attributes: ['id', 'usuario', 'nombre', 'apellido']
+          attributes: ['id', 'usuario']
         }
       ]
     });
-    
+
     res.json(detallePesajeActualizado);
   } catch (error) {
     await transaction.rollback();
@@ -337,16 +314,16 @@ exports.updateDetallePesaje = async (req, res) => {
 exports.deleteDetallePesaje = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Verificar si el detalle de pesaje existe
     const detallePesaje = await DetallePesaje.findByPk(id);
     if (!detallePesaje) {
       return res.status(404).json({ error: 'Detalle de pesaje no encontrado' });
     }
-    
+
     // Eliminar el detalle de pesaje
     await detallePesaje.destroy();
-    
+
     res.json({ message: 'Detalle de pesaje eliminado correctamente' });
   } catch (error) {
     console.error('Error al eliminar detalle de pesaje:', error);
@@ -358,25 +335,25 @@ exports.deleteDetallePesaje = async (req, res) => {
 exports.createBulkDetallesPesaje = async (req, res) => {
   try {
     const { ingreso_id, pesajes } = req.body;
-    
+
     // Validar datos de entrada
     if (!ingreso_id || !Array.isArray(pesajes) || pesajes.length === 0) {
-      return res.status(400).json({ 
-        error: 'Se requiere un ID de ingreso válido y un array de pesajes' 
+      return res.status(400).json({
+        error: 'Se requiere un ID de ingreso válido y un array de pesajes'
       });
     }
-    
+
     // Verificar si el ingreso existe
     const ingresoExiste = await Ingreso.findByPk(ingreso_id);
     if (!ingresoExiste) {
       return res.status(404).json({ error: 'Ingreso no encontrado' });
     }
-    
+
     // Preparar los datos para la inserción masiva
     const detallesPesajeData = pesajes.map(pesaje => ({
       ingreso_id,
       numero_pesaje: pesaje.numero_pesaje,
-      peso: pesaje.peso,
+      peso_bruto: pesaje.peso_bruto,
       peso_jaba: pesaje.peso_jaba ? parseFloat(pesaje.peso_jaba) : 2.000,
       descuento_merma_pesaje: pesaje.descuento_merma_pesaje ? parseFloat(pesaje.descuento_merma_pesaje) : 0.000,
       observacion_pesaje: pesaje.observacion_pesaje,
@@ -385,22 +362,22 @@ exports.createBulkDetallesPesaje = async (req, res) => {
       usuario_creacion_id: req.usuario.id,
       fecha_creacion: new Date()
     }));
-    
+
     // Crear los detalles de pesaje en masa
     const detallesCreados = await DetallePesaje.bulkCreate(detallesPesajeData);
-    
+
     // Actualizar totales del ingreso
-    await actualizarTotalesIngreso(ingreso_id);
-    
+    // await actualizarTotalesIngreso(ingreso_id);
+
     res.status(201).json({
       message: 'Detalles de pesaje creados correctamente',
       detalles: detallesCreados
     });
   } catch (error) {
     console.error('Error al crear detalles de pesaje en masa:', error);
-    res.status(500).json({ 
-      error: 'Error al crear detalles de pesaje en masa', 
-      details: error.message 
+    res.status(500).json({
+      error: 'Error al crear detalles de pesaje en masa',
+      details: error.message
     });
   }
 };

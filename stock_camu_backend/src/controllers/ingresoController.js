@@ -14,6 +14,32 @@ const {
 // Importar Op por separado desde Sequelize
 const { Op } = require('sequelize');
 
+async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
+  const ingresosRelacionados = await Ingreso.findAll({
+    where: { detalle_orden_id: detalleOrdenId },
+    include: [
+      {
+        model: DetallePesaje,
+        as: 'pesajes',
+        where: { estado: true },
+        required: false
+      }
+    ],
+    transaction
+  });
+
+  const totalPesoNeto = ingresosRelacionados.reduce((sum, ingresoRelacionado) => {
+    return sum + ingresoRelacionado.pesajes.reduce((pesajeSum, pesaje) => {
+      return pesajeSum + parseFloat(pesaje.peso_neto_pesaje || 0);
+    }, 0);
+  }, 0);
+
+  const detalleOrden = await DetalleOrdenCompra.findByPk(detalleOrdenId, { transaction });
+  if (detalleOrden) {
+    await detalleOrden.update({ cantidad_ingresada: totalPesoNeto }, { transaction });
+  }
+}
+
 // Función auxiliar para calcular totales del ingreso
 const calcularTotalesIngreso = async (ingresoId, transaction = null) => {
   try {
@@ -34,7 +60,7 @@ const calcularTotalesIngreso = async (ingresoId, transaction = null) => {
     const pesajes = ingreso.pesajes || [];
     
     // Calcular totales de pesajes
-    const totalPesoBruto = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso || 0), 0);
+    const totalPesoBruto = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso_bruto || 0), 0);
     const totalPesoJabas = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.peso_jaba || 0), 0);
     const totalDescuentoMerma = pesajes.reduce((sum, pesaje) => sum + parseFloat(pesaje.descuento_merma_pesaje || 0), 0);
     const numJabas = pesajes.length;
@@ -162,7 +188,7 @@ exports.getAllIngresos = async (req, res) => {
           as: 'pesajes',
           where: { estado: true },
           required: false,
-          attributes: ['id', 'numero_pesaje', 'peso', 'peso_jaba', 'descuento_merma_pesaje', 'fecha_pesaje']
+          attributes: ['id', 'numero_pesaje', 'peso_bruto', 'peso_jaba', 'descuento_merma_pesaje', 'fecha_pesaje']
         },
         {
           model: Usuario,
@@ -582,19 +608,44 @@ exports.updateIngreso = async (req, res) => {
 };
 
 // Eliminar un ingreso
+
+
 exports.deleteIngreso = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
-    const ingreso = await Ingreso.findByPk(req.params.id);
-    
+    const ingreso = await Ingreso.findByPk(req.params.id, {
+      include: [
+        {
+          model: DetallePesaje,
+          as: 'pesajes',
+          where: { estado: true },
+          required: false
+        }
+      ],
+      transaction
+    });
+
     if (!ingreso) {
+      await transaction.rollback();
       return res.status(404).json({ message: 'Ingreso no encontrado' });
     }
-    
-    await ingreso.destroy();
+
+    // Obtener el detalle de orden asociado
+    const detalleOrdenId = ingreso.detalle_orden_id;
+
+    // Eliminar el ingreso
+    await ingreso.destroy({ transaction });
+
+    // Actualizar cantidad ingresada
+    await actualizarCantidadIngresada(detalleOrdenId, transaction);
+
+    await transaction.commit();
     res.json({ message: 'Ingreso eliminado exitosamente' });
   } catch (error) {
+    await transaction.rollback();
     console.error('Error al eliminar ingreso:', error);
-    res.status(500).json({ message: 'Error al eliminar ingreso' });
+    res.status(500).json({ message: 'Error al eliminar ingreso', details: error.message });
   }
 };
 
