@@ -74,6 +74,12 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0.000,
       comment: 'Descuento por peso de jabas'
     },
+    aplicarPrecioJaba: { 
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+      comment: 'Indica si se aplica el precio de jaba'
+    },
     // Campos financieros
     precio_venta_kg: {
       type: DataTypes.DECIMAL(10, 2),

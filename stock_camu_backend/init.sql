@@ -166,6 +166,7 @@ CREATE TABLE ingresos (
     -- Campos de descuentos
     dscto_merma DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por merma en kg',
     dscto_jaba DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento por peso de jabas',
+    aplicarPrecioJaba BOOLEAN DEFAULT FALSE COMMENT 'Indica si se aplica el precio de jaba',
     
     -- Campos financieros
     precio_venta_kg DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Precio por kilogramo',
@@ -211,7 +212,7 @@ CREATE TABLE detalle_pesajes (
     peso_bruto DECIMAL(10,3) NOT NULL COMMENT 'peso_bruto registrado en kg con 3 decimales',
     peso_jaba DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de la jaba para este pesaje',
     descuento_merma_pesaje DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento de merma aplicado a este pesaje',
-    peso_neto_pesaje DECIMAL(10,3) GENERATED ALWAYS AS (peso - peso_jaba - descuento_merma_pesaje) STORED COMMENT 'Peso neto calculado automáticamente',
+    peso_neto_pesaje DECIMAL(10,3) GENERATED ALWAYS AS (peso_bruto - peso_jaba - descuento_merma_pesaje) STORED COMMENT 'Peso neto calculado automáticamente',
     observacion_pesaje TEXT COMMENT 'Observaciones específicas del pesaje',
     fecha_pesaje DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp del pesaje',
     

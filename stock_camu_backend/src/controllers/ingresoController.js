@@ -473,7 +473,8 @@ exports.createIngreso = async (req, res) => {
       pago_con_descuento: parseFloat(req.body.pago_con_descuento) || 0,
       observacion: req.body.observacion || '',
       estado: req.body.estado !== undefined ? req.body.estado : true,
-      usuario_creacion_id: req.user?.id || req.usuario?.id
+      usuario_creacion_id: req.user?.id || req.usuario?.id,
+      aplicarPrecioJaba: req.body.aplicarPrecioJaba || false
     };
     
     console.log('Datos del ingreso a crear:', datosIngreso);
@@ -580,7 +581,8 @@ exports.updateIngreso = async (req, res) => {
     // Actualizar el ingreso
     await ingreso.update({
       ...req.body,
-      usuario_modificacion_id: req.user.id
+      usuario_modificacion_id: req.user.id,
+      aplicarPrecioJaba: req.body.aplicarPrecioJaba || ingreso.aplicarPrecioJaba
     }, { transaction });
     
     // Calcular totales del ingreso

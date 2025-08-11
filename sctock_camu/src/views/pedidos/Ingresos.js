@@ -116,7 +116,8 @@ const Ingresos = () => {
     ingreso_cooperativa: 0,
     pago_socio: 0,
     pago_con_descuento: 0,
-    observacion: ''
+    observacion: '',
+    aplicarPrecioJaba: false
   })
   const [formErrors, setFormErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -546,7 +547,8 @@ const Ingresos = () => {
       ingreso_cooperativa: 0,
       pago_socio: 0,
       pago_con_descuento: 0,
-      observacion: ''
+      observacion: '',
+      aplicarPrecioJaba: false
     });
 
     detenerMonitoreoRealTime();
@@ -662,7 +664,8 @@ const Ingresos = () => {
         ingreso_cooperativa: 0,
         pago_socio: 0,
         pago_con_descuento: 0,
-        observacion: ''
+        observacion: '',
+        aplicarPrecioJaba: false
       });
     }
   }, [ordenSeleccionada]);
@@ -2745,10 +2748,11 @@ const calcularCantidadPendienteActualizada = (producto) => {
         pago_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
         ingreso_cooperativa: parseFloat(currentIngreso.ingreso_cooperativa) || 0,
         pago_socio: parseFloat(currentIngreso.pago_socio) || 0,
-        pago_con_descuento: parseFloat(currentIngreso.pago_con_descuento) || 0
+        pago_con_descuento: parseFloat(currentIngreso.pago_con_descuento) || 0,
+        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false
       }
 
-      let savedIngreso
+      let savedIngresoaplicarPrecioJaba
       if (currentIngreso.id) {
         savedIngreso = await ingresoService.update(currentIngreso.id, ingresoData)
       } else {
@@ -3291,6 +3295,8 @@ const exportarPesajesExcel = () => {
 
       const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa;
 
+      const pesoTotalJabas = numJabasTotal * pesoJaba;
+
       // Preparar datos del ingreso consolidado
       const ingresoData = {
         numero_ingreso: currentIngreso.numero_ingreso || `ING-${Date.now()}`,
@@ -3305,15 +3311,18 @@ const exportarPesajesExcel = () => {
         dscto_jaba: parseFloat(pesoJaba || 0),
         peso_bruto: pesoBrutoTotal,
         peso_neto: pesoNetoTotal,
+        peso_total_jabas: pesoTotalJabas, // Ensure this is set correctly
         impuesto: parseFloat(porcentajeImpuesto * 100),
         precio_venta_kg: parseFloat(precioVentaKg || 0),
         total: subtotal,
         pago_transporte: pagoTransporte,
+        monto_transporte: parseFloat(currentIngreso.pago_transporte || 0),
         ingreso_cooperativa: ingresoCooperativa,
         pago_socio: pagoSocio,
         pago_con_descuento: pagoSocio,
         observacion: currentIngreso.observacion || '',
-        usuario_creacion_id: user?.id
+        usuario_creacion_id: user?.id,
+        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false
       };
 
       console.log('Datos del ingreso consolidado a enviar:', ingresoData);
