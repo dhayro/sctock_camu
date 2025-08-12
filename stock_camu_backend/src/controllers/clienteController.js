@@ -1,4 +1,6 @@
-const { Cliente, PedidoLote, Salida, Op } = require('../models');
+
+const { Cliente, PedidoLote, Salida } = require('../models');
+const { Op } = require('sequelize');
 
 // Obtener todos los clientes con paginación y filtros
 exports.getAllClientes = async (req, res) => {

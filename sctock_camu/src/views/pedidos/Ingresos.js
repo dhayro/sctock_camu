@@ -56,11 +56,11 @@ import {
   cilCheckCircle,
   cilMediaPlay,
   cilArrowBottom,
-  cilSync, cilSave, cilCloudDownload, cilMediaStop, cilArrowCircleBottom, cilLocationPin, cilSpreadsheet,cilFilter,cilFilterX,
+  cilSync, cilSave, cilCloudDownload, cilMediaStop, cilArrowCircleBottom, cilLocationPin, cilSpreadsheet, cilFilter, cilFilterX,
   cilSettings,
   cilBrushAlt,
   cilHistory,
-  cilList,
+  cilList, cilClock,
   cilX
 } from '@coreui/icons'
 import Swal from 'sweetalert2'
@@ -125,6 +125,8 @@ const Ingresos = () => {
   const [formErrors, setFormErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
+  const [editingId, setEditingId] = useState(null);
+
   // Estados para datos relacionados
   const [socios, setSocios] = useState([])
   const [productos, setProductos] = useState([])
@@ -151,24 +153,30 @@ const Ingresos = () => {
 
   const filterInputRef = useRef(null);
 
-    useEffect(() => {
-        if (activeFilter && filterInputRef.current) {
-            filterInputRef.current.focus();
-        }
-    }, [activeFilter]);
 
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (filterInputRef.current && !filterInputRef.current.contains(event.target)) {
-                setActiveFilter(null);
-            }
-        };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
+  const handleSearchChange = (e) => {
+    setSearchTermIngresos(e.target.value);
+  };
+
+  useEffect(() => {
+    if (activeFilter && filterInputRef.current) {
+      filterInputRef.current.focus();
+    }
+  }, [activeFilter]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (filterInputRef.current && !filterInputRef.current.contains(event.target)) {
+        setActiveFilter(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages) return;
@@ -181,27 +189,27 @@ const Ingresos = () => {
     fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
   }, [currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter]);
 
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
+  // const handleSearchChange = (e) => {
+  //   setSearchTerm(e.target.value);
+  // };
 
   const handleSearch = () => {
     fetchIngresos(1, itemsPerPage, searchTerm, numeroFilter, socioFilter);
   };
-  
+
   const clearFilters = () => {
     setSearchTerm('');
     setNumeroFilter('');
     setSocioFilter('');
     fetchIngresos(1, itemsPerPage, '', '', '');
   };
-  
-  const handleFilterInputChange = (setter) => (e) => {
-    const value = e.target.value;
-    setter(value);
-  };
 
-  
+  // const handleFilterInputChange = (setter) => (e) => {
+  //   const value = e.target.value;
+  //   setter(value);
+  // };
+
+
 
 
   // Estados para pestañas y balanza
@@ -584,6 +592,8 @@ const Ingresos = () => {
   const [searchTermOrdenes, setSearchTermOrdenes] = useState('');
   const [cargandoOrdenes, setCargandoOrdenes] = useState(false);
   const [searchTermSocios, setSearchTermSocios] = useState('');
+  const [searchTermIngresos, setSearchTermIngresos] = useState('');
+
 
 
 
@@ -669,6 +679,8 @@ const Ingresos = () => {
     console.log('Modal limpiado completamente');
   };
 
+    
+
   // Modificar la función para cerrar el modal
   const cerrarModal = () => {
     limpiarModal();
@@ -676,15 +688,59 @@ const Ingresos = () => {
   };
 
   // También agregar una función para abrir el modal que cargue los datos iniciales
-  const abrirModal = (titulo, ingreso = null) => {
+  const abrirModal = async (titulo, ingreso = null) => {
     setModalTitle(titulo);
 
     if (ingreso) {
       // Modo edición
       setCurrentIngreso(ingreso);
+      setEditingId(ingreso.id); // Establecer el ID del ingreso que se está editando
+
+      // Cargar pesajes temporales para el ingreso en edición
+      try {
+        const pesajes = await obtenerPesajesTemporales(ingreso.id);
+        setPesajesTemporales(pesajes);
+
+        if (ingreso.detalle_orden.producto_id) {
+          setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id);
+        }
+
+  console.log('Producto seleccionado actualizado:', productoSeleccionadoPesaje);
+
+
+        setPesajesTemporales(prev => {
+          const nuevosTemporales = [...prev];
+
+          // Calcular los totales de los pesajes temporales
+          const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
+          const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
+          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+          const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
+          const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+
+          // Actualizar el estado del ingreso actual con los nuevos totales
+          setCurrentIngreso(prev => ({
+            ...prev,
+            peso_bruto: totalPesoBruto.toFixed(3),
+            num_jabas: totalJabas,
+            peso_total_jabas: totalPesoJabas.toFixed(3),
+            descuento_merma: totalDescuentoMerma.toFixed(3),
+            peso_neto: totalPesoNeto.toFixed(3),
+            // Recalcular el total basado en el nuevo peso neto
+            total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
+          }));
+
+          return nuevosTemporales;
+        });
+      } catch (error) {
+        console.error('Error al cargar pesajes temporales:', error);
+        setPesajesTemporales([]);
+      }
     } else {
       // Modo creación - limpiar todo primero
       limpiarModal();
+      setEditingId(null); // No hay ingreso en edición
+      setPesajesTemporales([]); // Limpiar pesajes temporales
 
       // Luego cargar datos iniciales
       cargarSocios('');
@@ -696,62 +752,73 @@ const Ingresos = () => {
 
 
 
+  const obtenerPesajesTemporales = async (ingresoId) => {
+    // Implementa la lógica para obtener los pesajes temporales desde el backend o el estado
+    // Aquí se asume que hay un servicio que devuelve los pesajes temporales para un ingreso dado
+    const response = await detallePesajeService.getByIngresoId(ingresoId);
+    return response || [];
+  };
+
+
+
 
   // Busca el useEffect que maneja el cambio de orden seleccionada y agrega el reset del producto seleccionado
   useEffect(() => {
     if (ordenSeleccionada) {
       // Reset del producto seleccionado para pesaje cuando cambia la orden
-      setProductoSeleccionadoPesaje('');
+      // setProductoSeleccionadoPesaje('');
 
       // Cargar productos de la orden
       cargarProductosDeOrden(ordenSeleccionada); // Pasar el ID de la orden
 
-      // Limpiar datos del ingreso actual con valores por defecto
-      setCurrentIngreso({
-        numero_ingreso: '',
-        fecha: new Date().toISOString().split('T')[0],
-        socio_id: '',
-        producto_id: '',
-        detalle_orden_id: '',
-        unidad_medida_id: '',
-        tipo_fruta_id: '',
-        num_jabas: 0,
-        descuento_merma: 0,
-        dscto_jaba: 0,
-        peso_bruto: 0,
-        peso_neto: 0,
-        impuesto: 40,
-        precio_venta_kg: 0,
-        total: 0,
-        pago_transporte: 0,
-        ingreso_cooperativa: 0,
-        pago_socio: 0,
-        pago_con_descuento: 0,
-        observacion: '',
-        aplicarPrecioJaba: false
-      });
-    }
-  }, [ordenSeleccionada]);
-
-  // También agregar el reset cuando se cambia de orden en el selector
-  const handleOrdenChange = (e) => {
-    const ordenId = e.target.value;
-    setOrdenSeleccionada(ordenId);
-
-    // Reset adicional del producto seleccionado
-    setProductoSeleccionadoPesaje('');
-
-    // Limpiar otros estados relacionados si es necesario
-    setPesajes([]);
-    setHistorialPesajes([]);
-
-    if (ordenId) {
-      const orden = ordenes.find(o => o.id === parseInt(ordenId));
-      if (orden) {
-        // Lógica adicional si es necesaria
+      // Limpiar datos del ingreso actual con valores por defecto solo si no estás editando
+      if (!editingId) {
+        setCurrentIngreso({
+          numero_ingreso: '',
+          fecha: new Date().toISOString().split('T')[0],
+          socio_id: '',
+          producto_id: '',
+          detalle_orden_id: '',
+          unidad_medida_id: '',
+          tipo_fruta_id: '',
+          num_jabas: 0,
+          descuento_merma: 0,
+          dscto_jaba: 0,
+          peso_bruto: 0,
+          peso_neto: 0,
+          impuesto: 40,
+          precio_venta_kg: 0,
+          total: 0,
+          pago_transporte: 0,
+          ingreso_cooperativa: 0,
+          pago_socio: 0,
+          pago_con_descuento: 0,
+          observacion: '',
+          aplicarPrecioJaba: false
+        });
       }
     }
-  };
+  }, [ordenSeleccionada, editingId]);
+
+  // También agregar el reset cuando se cambia de orden en el selector
+  // const handleOrdenChange = (e) => {
+  //   const ordenId = e.target.value;
+  //   setOrdenSeleccionada(ordenId);
+
+  //   // Reset adicional del producto seleccionado
+  // //   setProductoSeleccionadoPesaje('');
+
+  //   // Limpiar otros estados relacionados si es necesario
+  //   setPesajes([]);
+  //   setHistorialPesajes([]);
+
+  //   if (ordenId) {
+  //     const orden = ordenes.find(o => o.id === parseInt(ordenId));
+  //     if (orden) {
+  //       // Lógica adicional si es necesaria
+  //     }
+  //   }
+  // };
 
 
   // Also, fix the socio display format in the select options. Replace this part:
@@ -819,8 +886,8 @@ const Ingresos = () => {
     }
   };
 
-   // Debounce para la búsqueda de órdenes
-   const debouncedCargarSocios = useRef(
+  // Debounce para la búsqueda de órdenes
+  const debouncedCargarSocios = useRef(
     debounce((searchTerm) => {
       cargarSocios(searchTerm);
     }, 300)
@@ -837,6 +904,25 @@ const Ingresos = () => {
       debouncedCargarSocios(searchTermSocios);
     }
   }, [searchTermSocios, debouncedCargarSocios]);
+
+  // Debounce para la búsqueda de órdenes
+  const debouncedCargarIngresos = useRef(
+    debounce((searchTerm) => {
+      fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
+    }, 300)
+  ).current;
+
+  // useEffect para cargar órdenes al inicio
+  useEffect(() => {
+    fetchIngresos(); // Cargar órdenes pendientes al inicio
+  }, []);
+
+  // useEffect para búsqueda dinámica de órdenes
+  useEffect(() => {
+    if (searchTermIngresos !== undefined) {
+      debouncedCargarIngresos(searchTermIngresos);
+    }
+  }, [searchTermIngresos, debouncedCargarIngresos]);
 
   // Debounce para la búsqueda de órdenes
   const debouncedCargarOrdenes = useRef(
@@ -1041,13 +1127,6 @@ const Ingresos = () => {
     }
   }
 
-  // Efectos
-  useEffect(() => {
-    fetchIngresos()
-    fetchDatosRelacionados()
-    checkBalanzaStatus()
-    cargarPuertosBalanza() // Agregar esta línea
-  }, [currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter, fechaFilter])
 
   // Funciones de carga de datos
 
@@ -1087,7 +1166,7 @@ const Ingresos = () => {
       setLoading(false);
     }
   };
-  
+
 
   const fetchDatosRelacionados = async () => {
     try {
@@ -2512,7 +2591,7 @@ const Ingresos = () => {
     setContadorPesajes(1);
     setCantidadPendientePorProducto({});
     setPesajes([]);
-    setProductoSeleccionadoPesaje('');
+    // setProductoSeleccionadoPesaje('');
   };
 
   // Llamar esta función cuando se selecciona un nuevo ingreso
@@ -2688,19 +2767,57 @@ const Ingresos = () => {
   //   setShowModal(true)
   // }
 
-  const handleEdit = (ingreso) => {
-    setCurrentIngreso({
-      ...ingreso,
-      fecha: ingreso.fecha ? ingreso.fecha.split('T')[0] : ''
-    })
-    setFormErrors({})
-    setActiveTab('general')
-    if (ingreso.id) {
-      fetchPesajes(ingreso.id)
+
+
+
+  const handleEdit = async (ingreso) => {
+    try {
+      // Cargar los detalles del ingreso desde el servicio
+      const ingresoDetalles = await ingresoService.getById(ingreso.id);
+
+
+
+      // Asegúrate de que los datos de socios y órdenes estén cargados
+      if (socios.length === 0) {
+        await cargarSocios();
+      }
+      if (ordenesPendientes.length === 0) {
+        await cargarOrdenesPendientes();
+      }
+
+      // Establecer el estado con los detalles del ingreso
+      setCurrentIngreso({
+        ...ingresoDetalles,
+        fecha: ingresoDetalles.fecha ? ingresoDetalles.fecha.split('T')[0] : '',
+        socio_id: ingresoDetalles.socio_id || '',
+        detalle_orden_id: ingresoDetalles.detalle_orden_id || '',
+        orden_compra_id: ingresoDetalles.detalle_orden.orden_compra_id || '',
+        aplicarPrecioJaba: ingresoDetalles.aplicarPrecioJaba || false,
+      });
+
+
+
+      // Establecer los valores seleccionados para los selectores
+      setSocioSeleccionado(ingresoDetalles.socio_id);
+      setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id);
+
+      // Limpiar errores del formulario
+      setFormErrors({});
+      setActiveTab('general');
+
+      // Establecer el título del modal y mostrarlo
+      setModalTitle('Editar Ingreso');
+      abrirModal('Editar Ingreso', ingresoDetalles);
+    } catch (error) {
+      console.error('Error al cargar detalles del ingreso:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudieron cargar los detalles del ingreso',
+        confirmButtonColor: '#321fdb'
+      });
     }
-    setModalTitle('Editar Ingreso')
-    setShowModal(true)
-  }
+  };
 
   const handleDelete = async (ingreso) => {
     const result = await Swal.fire({
@@ -3148,11 +3265,11 @@ const Ingresos = () => {
   }
 
   const calcularPesoNeto = () => {
-    const pesoBruto = parseFloat(currentIngreso.peso_bruto) || 0
-    const numJabas = parseInt(currentIngreso.num_jabas) || 0
-    const pesoTotalJabas = numJabas * pesoJaba
-    const pesoNeto = pesoBruto - pesoTotalJabas
-    return pesoNeto > 0 ? pesoNeto.toFixed(2) : '0.00'
+    const pesoBruto = parseFloat(currentIngreso.peso_bruto) || 0;
+    const numJabas = parseInt(currentIngreso.num_jabas) || 0;
+    const pesoTotalJabas = numJabas * pesoJaba;
+    const pesoNeto = pesoBruto - pesoTotalJabas;
+    return pesoNeto > 0 ? parseFloat(pesoNeto) : 0;
   }
 
   const calcularPesoNetoAutomatico = () => {
@@ -3223,7 +3340,6 @@ const Ingresos = () => {
   // También asegúrate de que tienes el estado para leyendoPeso:
   // Agrega esto en la sección de estados si no existe:
   const [leyendoPeso, setLeyendoPeso] = useState(false)
-  const [editingId, setEditingId] = useState(null)
 
 
 
@@ -3553,6 +3669,16 @@ const Ingresos = () => {
     }
   };
 
+  useEffect(() => {
+    setIsFilterActive(
+      searchTerm.trim() !== '' || numeroFilter.trim() !== '' || socioFilter.trim() !== ''
+    );
+  }, [searchTerm, numeroFilter, socioFilter]);
+
+  const handleFilterInputChange = (setter) => (e) => {
+    setter(e.target.value);
+  };
+
 
 
   return (
@@ -3607,7 +3733,7 @@ const Ingresos = () => {
                     <CInputGroup>
                       <CFormInput
                         placeholder="Buscar ingresos..."
-                        value={searchTerm}
+                        value={searchTermIngresos}
                         onChange={handleSearchChange}
                       />
                       <CButton color="primary" variant="outline" onClick={handleSearch}>
@@ -3626,9 +3752,15 @@ const Ingresos = () => {
                         <CFormInput
                           ref={filterInputRef}
                           placeholder={`Filtrar por ${activeFilter}...`}
-                          value={activeFilter === 'numero' ? numeroFilter : clienteFilter}
+                          value={
+                            activeFilter === 'numero' ? numeroFilter :
+                              activeFilter === 'cliente' ? clienteFilter :
+                                socioFilter
+                          }
                           onChange={handleFilterInputChange(
-                            activeFilter === 'numero' ? setNumeroFilter : setClienteFilter
+                            activeFilter === 'numero' ? setNumeroFilter :
+                              activeFilter === 'cliente' ? setClienteFilter :
+                                setSocioFilter
                           )}
                         />
                       )}
@@ -4143,13 +4275,15 @@ const Ingresos = () => {
                               const ordenId = selectedOption ? selectedOption.value : '';
                               setOrdenSeleccionada(ordenId);
 
-                              // Cargar productos de la orden seleccionada
-                              if (ordenId) {
-                                cargarProductosDeOrden(ordenId);
-                              } else {
-                                setProductosOrden([]);
-                                setCantidadPendientePorProducto({});
-                                setProductoSeleccionadoPesaje('');
+                              // Si no estás editando, o si cambias de orden, carga los productos de la nueva orden
+                              if (!editingId || ordenId !== currentIngreso.detalle_orden_id) {
+                                if (ordenId) {
+                                  cargarProductosDeOrden(ordenId);
+                                } else {
+                                  setProductosOrden([]);
+                                  setCantidadPendientePorProducto({});
+                                  setProductoSeleccionadoPesaje('');
+                                }
                               }
                             }}
                             options={ordenesPendientes.map(orden => ({
@@ -5014,7 +5148,7 @@ const Ingresos = () => {
                             <div className="border-start border-primary border-4 ps-3">
                               <h6 className="text-muted mb-1">Peso Bruto Total</h6>
                               <h4 className="mb-0 text-primary">
-                                {currentIngreso.peso_bruto?.toFixed(3) || '0.000'} kg
+                                {currentIngreso.peso_bruto || 0 ?.toFixed(3) || '0.000'} kg
                               </h4>
                             </div>
                           </CCol>

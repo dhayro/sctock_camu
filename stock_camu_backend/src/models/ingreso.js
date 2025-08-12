@@ -182,11 +182,10 @@ module.exports = (sequelize, DataTypes) => {
     ]
   });
 
-  Ingreso.associate = function(models) {
-    // Relación con Socio
+  Ingreso.associate = (models) => {
     Ingreso.belongsTo(models.Socio, {
-      foreignKey: 'socio_id',
-      as: 'socio'
+      as: 'socio',
+      foreignKey: 'socio_id'
     });
 
     // Relación con DetalleOrdenCompra

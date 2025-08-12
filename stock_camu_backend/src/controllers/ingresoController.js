@@ -7,8 +7,7 @@ const {
   Cliente,
   Producto,
   TipoFruta,
-  DetallePesaje,
-  sequelize
+  DetallePesaje,sequelize 
 } = require('../models');
 
 // Importar Op por separado desde Sequelize
@@ -85,6 +84,7 @@ exports.getAllIngresos = async (req, res) => {
       };
     }
 
+
     // Hacer el conteo por separado
     const count = await Ingreso.count({
       where: filters,
@@ -107,7 +107,50 @@ exports.getAllIngresos = async (req, res) => {
           as: 'socio',
           attributes: ['id', 'nombres', 'apellidos', 'dni']
         },
-        // ... otras inclusiones
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalle_orden',
+          include: [
+            {
+              model: OrdenCompra,
+              as: 'orden_compra',
+              include: [
+                {
+                  model: Cliente,
+                  as: 'cliente',
+                  attributes: ['id', 'razon_social', 'ruc']
+                }
+              ]
+            },
+            {
+              model: Producto,
+              as: 'producto',
+              attributes: ['id', 'nombre']
+            },
+            {
+              model: TipoFruta,
+              as: 'tipo_fruta',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        },
+        // {
+        //   model: DetallePesaje,
+        //   as: 'pesajes',
+        //   where: { estado: true },
+        //   required: false,
+        //   attributes: ['id', 'numero_pesaje', 'peso_bruto', 'peso_jaba', 'descuento_merma_pesaje', 'fecha_pesaje']
+        // },
+        {
+          model: Usuario,
+          as: 'usuario_creacion',
+          attributes: ['id', 'usuario']
+        },
+        {
+          model: Usuario,
+          as: 'usuario_modificacion',
+          attributes: ['id', 'usuario']
+        }
       ],
       limit,
       offset,

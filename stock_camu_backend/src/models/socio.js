@@ -50,11 +50,12 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false
   });
 
-  Socio.associate = function(models) {
+  Socio.associate = (models) => {
     Socio.hasMany(models.Ingreso, {
-      foreignKey: 'socio_id',
-      as: 'ingresos'
+      as: 'ingresos',
+      foreignKey: 'socio_id'
     });
+    // ... otras asociaciones
   };
 
   return Socio;
