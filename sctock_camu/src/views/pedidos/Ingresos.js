@@ -290,6 +290,8 @@ const Ingresos = () => {
   const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({});
   const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false);
 
+  const [pesajesTemporales, setPesajesTemporales] = useState([]); // Lista de pesajes temporales del producto activo
+
 
 
 
@@ -632,10 +634,10 @@ const Ingresos = () => {
     setCantidadPendientePorProducto({});
     setProductoSeleccionadoPesaje('');
 
-    // Limpiar pesajes temporales
-    if (typeof setPesajesTemporales !== 'undefined') {
-      setPesajesTemporales([]);
-    }
+    // // Limpiar pesajes temporales
+    // if (typeof setPesajesTemporales !== 'undefined') {
+    //   setPesajesTemporales([]);
+    // }
 
     // Limpiar errores
     setFormErrors({});
@@ -687,6 +689,7 @@ const Ingresos = () => {
     setShowModal(false);
   };
 
+
   // También agregar una función para abrir el modal que cargue los datos iniciales
   const abrirModal = async (titulo, ingreso = null) => {
     setModalTitle(titulo);
@@ -704,8 +707,6 @@ const Ingresos = () => {
         if (ingreso.detalle_orden.producto_id) {
           setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id);
         }
-
-  console.log('Producto seleccionado actualizado:', productoSeleccionadoPesaje);
 
 
         setPesajesTemporales(prev => {
@@ -1477,7 +1478,7 @@ const Ingresos = () => {
   // Función para aplicar peso en tiempo real al formulario (corregida)
 
   // Agregar estos estados al inicio del componente (cerca de los otros useState)
-  const [pesajesTemporales, setPesajesTemporales] = useState([]); // Lista de pesajes temporales del producto activo
+  
   const [contadorPesajes, setContadorPesajes] = useState(1); // Contador para numerar los pesajes
 
   const [pesoJaba, setPesoJaba] = useState(2); // Peso configurable por jaba
@@ -2587,7 +2588,7 @@ const Ingresos = () => {
 
   // Función para resetear el estado cuando se cambia de ingreso
   const resetearEstadoPesajes = () => {
-    setPesajesTemporales([]);
+    // setPesajesTemporales([]);
     setContadorPesajes(1);
     setCantidadPendientePorProducto({});
     setPesajes([]);
@@ -2774,8 +2775,6 @@ const Ingresos = () => {
     try {
       // Cargar los detalles del ingreso desde el servicio
       const ingresoDetalles = await ingresoService.getById(ingreso.id);
-
-
 
       // Asegúrate de que los datos de socios y órdenes estén cargados
       if (socios.length === 0) {
@@ -3488,12 +3487,18 @@ const Ingresos = () => {
               numero_pesaje: pesaje.numero || (i + 1),
               peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
               peso_jaba: parseFloat(pesaje.peso_total_jabas) || 0,
-              descuento_merma_pesaje: parseFloat(pesaje.descuento_merma) || 0,
+              descuento_merma: parseFloat(pesaje.descuento_merma) || 0,
               peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_total_jabas) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
               num_jabas_pesaje: parseInt(pesaje.num_jabas) || 0,
               observacion_pesaje: pesaje.observacion || '',
               producto_id: productoSeleccionado.producto_id,
               tipo_fruta_id: productoSeleccionado.tipo_fruta_id,
+              detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+              rawData: (pesaje.rawData || '').toString(),
+              observacion: pesaje.observacion || '',
+              fecha_pesaje: pesaje.timestamp ,
+              producto_nombre: pesaje.producto_nombre ,
+              tipo_fruta_nombre: pesaje.tipo_fruta_nombre,
               fecha_pesaje: new Date().toISOString(),
               usuario_pesaje_id: user?.id
             };
@@ -5134,95 +5139,6 @@ const Ingresos = () => {
                 </CCol>
               </CRow>
 
-              {/* Resumen de Pesaje */}
-              {currentIngreso.id && (
-                <CRow>
-                  <CCol md={12}>
-                    <CCard>
-                      <CCardHeader>
-                        <strong>Resumen del Pesaje</strong>
-                      </CCardHeader>
-                      <CCardBody>
-                        <CRow>
-                          <CCol md={3}>
-                            <div className="border-start border-primary border-4 ps-3">
-                              <h6 className="text-muted mb-1">Peso Bruto Total</h6>
-                              <h4 className="mb-0 text-primary">
-                                {currentIngreso.peso_bruto || 0 ?.toFixed(3) || '0.000'} kg
-                              </h4>
-                            </div>
-                          </CCol>
-                          <CCol md={3}>
-                            <div className="border-start border-warning border-4 ps-3">
-                              <h6 className="text-muted mb-1">Peso de Jabas</h6>
-                              <h4 className="mb-0 text-warning">
-                                {(pesoJaba * (currentIngreso.num_jabas || 0)).toFixed(3)} kg
-                              </h4>
-                              <small className="text-muted">
-                                {currentIngreso.num_jabas || 0} jabas × {pesoJaba} kg
-                              </small>
-                            </div>
-                          </CCol>
-                          <CCol md={3}>
-                            <div className="border-start border-success border-4 ps-3">
-                              <h6 className="text-muted mb-1">Peso Neto</h6>
-                              <h4 className="mb-0 text-success">
-                                {calcularPesoNeto().toFixed(3)} kg
-                              </h4>
-                            </div>
-                          </CCol>
-                          <CCol md={3}>
-                            <div className="border-start border-info border-4 ps-3">
-                              <h6 className="text-muted mb-1">Total Pesajes</h6>
-                              <h4 className="mb-0 text-info">
-                                {historialPesajes.length}
-                              </h4>
-                              <small className="text-muted">
-                                {historialPesajes.filter(p => p.estable).length} estables
-                              </small>
-                            </div>
-                          </CCol>
-                        </CRow>
-
-                        <hr />
-
-                        <CRow>
-                          <CCol md={6}>
-                            <h6>Estado del Pesaje</h6>
-                            <div className="d-flex align-items-center">
-                              {historialPesajes.length > 0 ? (
-                                <>
-                                  <CIcon icon={cilCheckCircle} className="text-success me-2" />
-                                  <span className="text-success">Pesaje completado</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CIcon icon={cilClock} className="text-warning me-2" />
-                                  <span className="text-warning">Pendiente de pesaje</span>
-                                </>
-                              )}
-                            </div>
-                          </CCol>
-                          <CCol md={6}>
-                            <h6>Última Actualización</h6>
-                            <small className="text-muted">
-                              {historialPesajes.length > 0
-                                ? new Date(historialPesajes[0].fecha_pesaje).toLocaleString()
-                                : 'Sin pesajes registrados'
-                              }
-                            </small>
-                          </CCol>
-                        </CRow>
-                      </CCardBody>
-                    </CCard>
-                  </CCol>
-                </CRow>
-              )}
-
-
-
-
-
               {/* Tabla de Pesajes Temporales */}
               {pesajesTemporales.length > 0 && (
                 <CCard className="mt-3">
@@ -5294,7 +5210,7 @@ const Ingresos = () => {
                             const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                             const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
-                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas || 0) * 1.00 : 0;
+                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || 0) * 1.00 : 0;
 
                             // Ajustar el pago al socio
                             const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
@@ -5319,11 +5235,11 @@ const Ingresos = () => {
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <CBadge color="info">
-                                    {pesaje.num_jabas || 0} jabas
+                                    {pesaje.num_jabas_pesaje || 0} jabas
                                   </CBadge>
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  {parseFloat(pesaje.peso_total_jabas || 0).toFixed(3)} kg
+                                  {parseFloat(pesaje.peso_jaba || 0).toFixed(3)} kg
                                   <br />
                                   <small className="text-muted">
                                     ({pesoJaba} kg/jaba)
@@ -5435,7 +5351,7 @@ const Ingresos = () => {
                                                     Número de Jabas:
                                                   </label>
                                                   <input type="number" id="edit-jabas" class="form-control" 
-                                                         value="${pesaje.num_jabas}" min="1" max="50"
+                                                         value="${pesaje.num_jabas_pesaje}" min="1" max="50"
                                                          placeholder="1">
                                                 </div>
                                                 <div class="col-12">
@@ -5473,19 +5389,19 @@ const Ingresos = () => {
                                                       <div class="row g-2 text-center">
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Peso Jabas:</small>
-                                                          <strong class="text-info" id="preview-peso-jabas">${(pesaje.num_jabas * pesoJaba).toFixed(3)} kg</strong>
+                                                          <strong class="text-info" id="preview-peso-jabas">${(pesaje.num_jabas_pesaje * pesoJaba).toFixed(3)} kg</strong>
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Merma:</small>
-                                                          <strong class="text-danger" id="preview-merma">${(pesaje.descuento_merma || 0).toFixed(3)} kg</strong>
+                                                          <strong class="text-danger" id="preview-merma">${(parseFloat(pesaje.descuento_merma) || 0).toFixed(3)} kg</strong>
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Peso Neto:</small>
-                                                          <strong class="text-success" id="preview-peso-neto">${(parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas * pesoJaba) - (pesaje.descuento_merma || 0)).toFixed(3)} kg</strong>
+                                                          <strong class="text-success" id="preview-peso-neto">${(parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)).toFixed(3)} kg</strong>
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Subtotal:</small>
-                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2)}</strong>
+                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2)}</strong>
                                                         </div>
                                                       </div>
                                                     </div>
@@ -5560,8 +5476,8 @@ const Ingresos = () => {
                                                   ? {
                                                     ...p,
                                                     peso_bruto: peso,
-                                                    num_jabas: jabas,
-                                                    peso_total_jabas: jabas * pesoJaba,
+                                                    num_jabas_pesaje: jabas,
+                                                    peso_jaba: jabas * pesoJaba,
                                                     descuento_merma: merma,
                                                     peso_neto: Math.max(0, peso - (jabas * pesoJaba) - merma), // Calcular peso neto
                                                     observacion: observacion
@@ -5571,8 +5487,8 @@ const Ingresos = () => {
 
                                               // SINCRONIZAR TOTALES DEL INGRESO DESPUÉS DE LA EDICIÓN
                                               const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-                                              const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+                                              const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
+                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
                                               const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
                                               const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -5589,8 +5505,8 @@ const Ingresos = () => {
                                               setCurrentIngreso(prev => ({
                                                 ...prev,
                                                 peso_bruto: totalPesoBruto.toFixed(3),
-                                                num_jabas: totalJabas,
-                                                peso_total_jabas: totalPesoJabas.toFixed(3),
+                                                num_jabas_pesaje: totalJabas,
+                                                peso_jaba: totalPesoJabas.toFixed(3),
                                                 descuento_merma: totalDescuentoMerma.toFixed(3),
                                                 peso_neto: totalPesoNeto.toFixed(3),
                                                 total: subtotal.toFixed(2),
@@ -5643,12 +5559,12 @@ const Ingresos = () => {
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0)} jabas
+                                {pesajesTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0)} jabas
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0).toFixed(3)} kg
+                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0).toFixed(3)} kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
@@ -5659,7 +5575,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-success">
                                 {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
                                   return sum + pesoNeto;
                                 }, 0).toFixed(3)} kg
                               </strong>
@@ -5668,7 +5584,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-info">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
                                   const precioKg = parseFloat(precioVentaKg || 0);
                                   return sum + (pesoNeto * precioKg);
                                 }, 0).toFixed(2)}
@@ -5677,7 +5593,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-danger">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
                                   const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                   return sum + (pesoNeto * porcentajeTransporte);
                                 }, 0).toFixed(2)}
@@ -5686,7 +5602,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-primary">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
                                   const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                                   return sum + (pesoNeto * porcentajeImpuesto);
                                 }, 0).toFixed(2)}
@@ -5696,7 +5612,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-success">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
                                   const precioKg = parseFloat(precioVentaKg || 0);
                                   const subtotal = pesoNeto * precioKg;
                                   const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
@@ -5705,7 +5621,7 @@ const Ingresos = () => {
                                   const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
                                   // Calcular el precio por jaba
-                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas || 0) * 1.00 : 0;
+                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas_pesaje || 0) * 1.00 : 0;
 
                                   // Ajustar el pago al socio
                                   const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;

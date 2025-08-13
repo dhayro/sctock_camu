@@ -208,12 +208,19 @@ CREATE TABLE detalle_pesajes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     ingreso_id INT NOT NULL,
     numero_pesaje INT NOT NULL,
+    producto_id INT NOT NULL COMMENT 'ID del producto',
+    detalle_orden_id INT NOT NULL COMMENT 'ID del detalle de la orden',
+    producto_nombre VARCHAR(100) COMMENT 'Nombre del producto',
+    tipo_fruta_id INT NOT NULL COMMENT 'ID del tipo de fruta',
+    tipo_fruta_nombre VARCHAR(50) COMMENT 'Nombre del tipo de fruta',
     peso_bruto DECIMAL(10,3) NOT NULL COMMENT 'peso_bruto registrado en kg con 3 decimales',
-    peso_jaba DECIMAL(10,3) DEFAULT 2.000 COMMENT 'Peso de la jaba para este pesaje',
-    descuento_merma_pesaje DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento de merma aplicado a este pesaje',
-    peso_neto_pesaje DECIMAL(10,3) GENERATED ALWAYS AS (peso_bruto - peso_jaba - descuento_merma_pesaje) STORED COMMENT 'Peso neto calculado automáticamente',
-    observacion_pesaje TEXT COMMENT 'Observaciones específicas del pesaje',
+    num_jabas_pesaje INT NOT NULL COMMENT 'Número de jabas',
+    peso_jaba DECIMAL(10,3) NOT NULL COMMENT 'Peso total de las jabas',
+    descuento_merma DECIMAL(10,3) DEFAULT 0.000 COMMENT 'Descuento de merma aplicado a este pesaje',
+    peso_neto DECIMAL(10,3) GENERATED ALWAYS AS (peso_bruto - peso_jaba - descuento_merma) STORED COMMENT 'Peso neto calculado automáticamente',
     fecha_pesaje DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Timestamp del pesaje',
+    rawData VARCHAR(255) COMMENT 'Datos crudos del pesaje',
+    observacion TEXT COMMENT 'Observaciones específicas del pesaje',
     
     -- Campos de control
     estado BOOLEAN DEFAULT TRUE,
@@ -230,7 +237,7 @@ CREATE TABLE detalle_pesajes (
     -- Restricciones únicas e índices
     UNIQUE KEY unique_pesaje_por_ingreso (ingreso_id, numero_pesaje),
     INDEX idx_ingreso_id (ingreso_id),
-    INDEX idx_fecha_pesaje (fecha_pesaje),
+    INDEX idx_fecha_pesaje (timestamp),
     INDEX idx_estado (estado)
 );
 

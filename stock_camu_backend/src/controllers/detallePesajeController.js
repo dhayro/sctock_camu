@@ -147,7 +147,7 @@ async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
   // Recalcular la cantidad ingresada sumando todos los pesos netos de los pesajes activos
   const totalPesoNeto = ingresosRelacionados.reduce((sum, ingresoRelacionado) => {
     return sum + ingresoRelacionado.pesajes.reduce((pesajeSum, pesaje) => {
-      return pesajeSum + parseFloat(pesaje.peso_neto_pesaje || 0);
+      return pesajeSum + parseFloat(pesaje.peso_neto || 0);
     }, 0);
   }, 0);
 
@@ -167,14 +167,21 @@ exports.createDetallePesaje = async (req, res) => {
       ingreso_id,
       numero_pesaje,
       peso_bruto,
+      num_jabas_pesaje,
       peso_jaba,
-      descuento_merma_pesaje,
-      observacion_pesaje
+      descuento_merma,
+      rawData,
+      observacion,
+      producto_id,
+      detalle_orden_id,
+      tipo_fruta_id,
+      producto_nombre, 
+      tipo_fruta_nombre 
     } = req.body;
 
     // Validar campos obligatorios
-    if (!ingreso_id || !numero_pesaje || !peso_bruto) {
-      throw new Error('Los campos ingreso_id, numero_pesaje y peso_bruto son obligatorios');
+    if (!ingreso_id || !numero_pesaje || !peso_bruto || !num_jabas_pesaje || !peso_jaba || !producto_id || !detalle_orden_id || !tipo_fruta_id) {
+      throw new Error('Los campos ingreso_id, numero_pesaje, peso_bruto, num_jabas_pesaje, peso_jaba, producto_id, detalle_orden_id, y tipo_fruta_id son obligatorios');
     }
 
     // Verificar si el ingreso existe
@@ -200,9 +207,16 @@ exports.createDetallePesaje = async (req, res) => {
       ingreso_id,
       numero_pesaje,
       peso_bruto: parseFloat(peso_bruto),
-      peso_jaba: peso_jaba ? parseFloat(peso_jaba) : 2.000,
-      descuento_merma_pesaje: descuento_merma_pesaje ? parseFloat(descuento_merma_pesaje) : 0.000,
-      observacion_pesaje,
+      num_jabas_pesaje: parseInt(num_jabas_pesaje),
+      peso_jaba: parseFloat(peso_jaba),
+      descuento_merma: descuento_merma ? parseFloat(descuento_merma) : 0.000,
+      rawData,
+      observacion,
+      producto_id,
+      detalle_orden_id,
+      tipo_fruta_id,
+      producto_nombre,
+      tipo_fruta_nombre,
       fecha_pesaje: new Date(),
       estado: true,
       usuario_creacion_id: req.usuario.id,
@@ -248,9 +262,16 @@ exports.updateDetallePesaje = async (req, res) => {
     const { id } = req.params;
     const {
       peso_bruto,
+      num_jabas_pesaje,
       peso_jaba,
-      descuento_merma_pesaje,
-      observacion_pesaje,
+      descuento_merma,
+      rawData,
+      observacion,
+      producto_id,
+      detalle_orden_id,
+      tipo_fruta_id,
+      producto_nombre, 
+      tipo_fruta_nombre,
       estado
     } = req.body;
 
@@ -264,11 +285,18 @@ exports.updateDetallePesaje = async (req, res) => {
     // Actualizar el detalle de pesaje
     await detallePesaje.update({
       peso_bruto: peso_bruto !== undefined ? parseFloat(peso_bruto) : detallePesaje.peso_bruto,
+      num_jabas_pesaje: num_jabas_pesaje !== undefined ? parseInt(num_jabas_pesaje) : detallePesaje.num_jabas_pesaje,
       peso_jaba: peso_jaba !== undefined ? parseFloat(peso_jaba) : detallePesaje.peso_jaba,
-      descuento_merma_pesaje: descuento_merma_pesaje !== undefined ? parseFloat(descuento_merma_pesaje) : detallePesaje.descuento_merma_pesaje,
-      observacion_pesaje: observacion_pesaje !== undefined ? observacion_pesaje : detallePesaje.observacion_pesaje,
+      descuento_merma: descuento_merma !== undefined ? parseFloat(descuento_merma) : detallePesaje.descuento_merma,
+      rawData: rawData !== undefined ? rawData : detallePesaje.rawData,
+      observacion: observacion !== undefined ? observacion : detallePesaje.observacion,
+      producto_id: producto_id !== undefined ? producto_id : detallePesaje.producto_id,
+      detalle_orden_id: detalle_orden_id !== undefined ? detalle_orden_id : detallePesaje.detalle_orden_id,
+      tipo_fruta_id: tipo_fruta_id !== undefined ? tipo_fruta_id : detallePesaje.tipo_fruta_id,
       estado: estado !== undefined ? estado : detallePesaje.estado,
       usuario_modificacion_id: req.usuario.id,
+      producto_nombre: producto_nombre !== undefined ? producto_nombre : detallePesaje.producto_nombre, // Add this line
+      tipo_fruta_nombre: tipo_fruta_nombre !== undefined ? tipo_fruta_nombre : detallePesaje.tipo_fruta_nombre,
       fecha_modificacion: new Date()
     }, { transaction });
 
