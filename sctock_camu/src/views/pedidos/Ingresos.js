@@ -653,6 +653,7 @@ const Ingresos = () => {
     // Limpiar selecciones de socios y órdenes
     setSocioSeleccionado('');
     setOrdenSeleccionada('');
+    setContadorPesajes(1);
 
     // Resetear listas de datos
     // setSocios([]);
@@ -681,7 +682,7 @@ const Ingresos = () => {
     console.log('Modal limpiado completamente');
   };
 
-    
+
 
   // Modificar la función para cerrar el modal
   const cerrarModal = () => {
@@ -714,8 +715,8 @@ const Ingresos = () => {
 
           // Calcular los totales de los pesajes temporales
           const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-          const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+          const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
+          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
           const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
           const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -728,7 +729,7 @@ const Ingresos = () => {
             descuento_merma: totalDescuentoMerma.toFixed(3),
             peso_neto: totalPesoNeto.toFixed(3),
             // Recalcular el total basado en el nuevo peso neto
-            total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
+            total: (totalPesoNeto * parseFloat((prev.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)
           }));
 
           return nuevosTemporales;
@@ -1478,7 +1479,7 @@ const Ingresos = () => {
   // Función para aplicar peso en tiempo real al formulario (corregida)
 
   // Agregar estos estados al inicio del componente (cerca de los otros useState)
-  
+
   const [contadorPesajes, setContadorPesajes] = useState(1); // Contador para numerar los pesajes
 
   const [pesoJaba, setPesoJaba] = useState(2); // Peso configurable por jaba
@@ -1492,7 +1493,7 @@ const Ingresos = () => {
   const sincronizarTotalesIngreso = (pesajesActualizados) => {
     const totalPesoBruto = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
     const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_jabas) || 0), 0); //kong
 
     setCurrentIngreso(prev => ({
       ...prev,
@@ -1531,7 +1532,7 @@ const Ingresos = () => {
     return pesajesTemporales
       .filter(pesaje => pesaje.producto_id === productoId)
       .reduce((sum, pesaje) => {
-        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0);
+        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jabas || 0);
         return sum + pesoNeto;
       }, 0);
   };
@@ -1708,10 +1709,12 @@ const Ingresos = () => {
       return;
     }
 
+
+
     // Crear el pesaje temporal con TODA la información necesaria
     const nuevoPesaje = {
       id: Date.now(),
-      numero: contadorPesajes,
+      numero_pesaje: contadorPesajes,
       // Información del producto
       producto_id: parseInt(productoSeleccionadoPesaje),
       detalle_orden_id: productoOrden.id,
@@ -1741,8 +1744,8 @@ const Ingresos = () => {
       const nuevosTemporales = [...prev, nuevoPesaje];
 
       const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-      const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-      const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+      const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0), 0);
+      const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0);
       const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
       const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -1755,7 +1758,7 @@ const Ingresos = () => {
         descuento_merma: totalDescuentoMerma.toFixed(3),
         peso_neto: totalPesoNeto.toFixed(3),
         // Recalcular el total basado en el nuevo peso neto
-        total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2)
+        total: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)
       }));
 
 
@@ -2000,8 +2003,8 @@ const Ingresos = () => {
 
       // Recalcular todos los totales después de eliminar
       const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-      const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_total_jabas) || 0), 0);
+      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
+      const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
       const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
       const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -2014,10 +2017,10 @@ const Ingresos = () => {
         descuento_merma: totalDescuentoMerma.toFixed(3),
         peso_neto: totalPesoNeto.toFixed(3),
         // Recalcular el total basado en el nuevo peso neto
-        total: (totalPesoNeto * parseFloat(precioVentaKg || 0)).toFixed(2),
+        total: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2),
         // Recalcular el ingreso a la cooperativa y el pago al socio
         ingreso_cooperativa: (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0) / 100).toFixed(2),
-        pago_socio: (totalPesoNeto * parseFloat(precioVentaKg || 0) - totalDescuentoMerma - (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2)
+        pago_socio: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0) - totalDescuentoMerma - (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2)
       }));
 
       return updatedPesajes;
@@ -2113,28 +2116,28 @@ const Ingresos = () => {
     console.log('Aplicando peso al formulario:', peso);
 
     // Aplicar el peso al formulario
-    setCurrentIngreso(prev => {
-      const updated = { ...prev, peso_neto: peso.toFixed(3) };
+    // setCurrentIngreso(prev => {
+    //   const updated = { ...prev, peso_neto: peso.toFixed(3) };
 
-      // Recalcular totales automáticamente
-      const pesoNeto = parseFloat(updated.peso_neto) || 0;
-      const precioKg = parseFloat(updated.precio_venta_kg) || 0;
-      const descuentoMerma = parseFloat(updated.descuento_merma) || 0;
-      const descuentoJaba = parseFloat(updated.dscto_jaba) || 0;
-      const pagoTransporte = parseFloat(updated.pago_transporte) || 0;
+    //   // Recalcular totales automáticamente
+    //   const pesoNeto = parseFloat(updated.peso_neto) || 0;
+    //   const precioKg = parseFloat(updated.precio_venta_kg) || 0;
+    //   const descuentoMerma = parseFloat(updated.descuento_merma) || 0;
+    //   const descuentoJaba = parseFloat(updated.dscto_jaba) || 0;
+    //   const pagoTransporte = parseFloat(updated.pago_transporte) || 0;
 
-      const subtotal = pesoNeto * precioKg;
-      const totalDescuentos = descuentoMerma + descuentoJaba;
-      const total = subtotal - totalDescuentos;
-      const ingresoCooperativa = total * 0.1; // 10% para cooperativa
-      const pagoSocio = total - ingresoCooperativa - pagoTransporte;
+    //   const subtotal = pesoNeto * precioKg;
+    //   const totalDescuentos = descuentoMerma + descuentoJaba;
+    //   const total = subtotal - totalDescuentos;
+    //   const ingresoCooperativa = total * 0.1; // 10% para cooperativa
+    //   const pagoSocio = total - ingresoCooperativa - pagoTransporte;
 
-      updated.total = total.toFixed(2);
-      updated.ingreso_cooperativa = ingresoCooperativa.toFixed(2);
-      updated.pago_socio = pagoSocio.toFixed(2);
-      updated.pago_con_descuento = pagoSocio.toFixed(2);
-      return updated;
-    });
+    //   updated.total = total.toFixed(2);
+    //   updated.ingreso_cooperativa = ingresoCooperativa.toFixed(2);
+    //   updated.pago_socio = pagoSocio.toFixed(2);
+    //   updated.pago_con_descuento = pagoSocio.toFixed(2);
+    //   return updated;
+    // });
 
     // Limpiar error del campo peso_neto si existe
     if (formErrors.peso_neto) {
@@ -2589,7 +2592,7 @@ const Ingresos = () => {
   // Función para resetear el estado cuando se cambia de ingreso
   const resetearEstadoPesajes = () => {
     // setPesajesTemporales([]);
-    setContadorPesajes(1);
+    // setContadorPesajes(1);
     setCantidadPendientePorProducto({});
     setPesajes([]);
     // setProductoSeleccionadoPesaje('');
@@ -2784,6 +2787,8 @@ const Ingresos = () => {
         await cargarOrdenesPendientes();
       }
 
+
+
       // Establecer el estado con los detalles del ingreso
       setCurrentIngreso({
         ...ingresoDetalles,
@@ -2792,7 +2797,13 @@ const Ingresos = () => {
         detalle_orden_id: ingresoDetalles.detalle_orden_id || '',
         orden_compra_id: ingresoDetalles.detalle_orden.orden_compra_id || '',
         aplicarPrecioJaba: ingresoDetalles.aplicarPrecioJaba || false,
+        precio_venta_kg: ingresoDetalles.precio_venta_kg || precioVentaKg,
+        num_jabas: ingresoDetalles.num_jabas || 0,
+        peso_total_jabas: ingresoDetalles.peso_total_jabas || 0,
+        total: ingresoDetalles.peso_neto * ingresoDetalles.precio_venta_kg || 0, //kong
       });
+
+      setContadorPesajes(ingresoDetalles.num_pesajes + 1);
 
 
 
@@ -2856,76 +2867,76 @@ const Ingresos = () => {
     }
   }
 
-  const handleSave = async () => {
-    const errors = validateForm()
+  // const handleSave = async () => {
+  //   const errors = validateForm()
 
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
-      return
-    }
+  //   if (Object.keys(errors).length > 0) {
+  //     setFormErrors(errors)
+  //     return
+  //   }
 
-    setSubmitting(true)
-    setFormErrors({})
+  //   setSubmitting(true)
+  //   setFormErrors({})
 
-    try {
-      const ingresoData = {
-        socio_id: parseInt(socioSeleccionado),
-        detalle_orden_id: parseInt(productoSeleccionadoPesaje),
-        peso_bruto: parseFloat(currentIngreso.peso_bruto) || 0,
-        peso_total_jabas: parseFloat(currentIngreso.peso_total_jabas) || 0,
-        num_jabas: parseInt(currentIngreso.num_jabas) || 0,
-        peso_neto: parseFloat(currentIngreso.peso_neto) || 0,
-        dscto_merma: parseFloat(currentIngreso.descuento_merma) || 0,
-        aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
-        precio_venta_kg: parseFloat(currentIngreso.precio_venta_kg) || 0,
-        precio_jaba: parseFloat(currentIngreso.dscto_jaba) || 0,
-        impuesto: parseFloat(currentIngreso.impuesto) || 0,
-        pago_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
-        monto_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
-        ingreso_cooperativa: parseFloat(currentIngreso.ingreso_cooperativa) || 0,
-        pago_socio: parseFloat(currentIngreso.pago_socio) || 0,
-        subtotal: parseFloat(currentIngreso.total) || 0,
-        num_pesajes: pesajesTemporales.length,
-        observacion: currentIngreso.observacion || '',
-        estado: currentIngreso.estado !== undefined ? currentIngreso.estado : true,
-        usuario_creacion_id: user?.id
-      }
+  //   try {
+  //     const ingresoData = {
+  //       socio_id: parseInt(socioSeleccionado),
+  //       detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+  //       peso_bruto: parseFloat(currentIngreso.peso_bruto) || 0,
+  //       peso_total_jabas: parseFloat(currentIngreso.peso_total_jabas) || 0,
+  //       num_jabas: parseInt(currentIngreso.num_jabas) || 0,
+  //       peso_neto: parseFloat(currentIngreso.peso_neto) || 0,
+  //       dscto_merma: parseFloat(currentIngreso.descuento_merma) || 0,
+  //       aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
+  //       precio_venta_kg: parseFloat(currentIngreso.precio_venta_kg) || 0,
+  //       precio_jaba: parseFloat(currentIngreso.dscto_jaba) || 0,
+  //       impuesto: parseFloat(currentIngreso.impuesto) || 0,
+  //       pago_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
+  //       monto_transporte: parseFloat(currentIngreso.pago_transporte) || 0,
+  //       ingreso_cooperativa: parseFloat(currentIngreso.ingreso_cooperativa) || 0,
+  //       pago_socio: parseFloat(currentIngreso.pago_socio) || 0,
+  //       subtotal: parseFloat(currentIngreso.total) || 0,
+  //       num_pesajes: pesajesTemporales.length,
+  //       observacion: currentIngreso.observacion || '',
+  //       estado: currentIngreso.estado !== undefined ? currentIngreso.estado : true,
+  //       usuario_creacion_id: user?.id
+  //     }
 
-      let savedIngresoaplicarPrecioJaba
-      if (currentIngreso.id) {
-        savedIngreso = await ingresoService.update(currentIngreso.id, ingresoData)
-      } else {
-        savedIngreso = await ingresoService.create(ingresoData)
-      }
+  //     let savedIngresoaplicarPrecioJaba
+  //     if (currentIngreso.id) {
+  //       savedIngreso = await ingresoService.update(currentIngreso.id, ingresoData)
+  //     } else {
+  //       savedIngreso = await ingresoService.create(ingresoData)
+  //     }
 
-      Swal.fire({
-        icon: 'success',
-        title: currentIngreso.id ? '¡Actualizado!' : '¡Creado!',
-        text: `El ingreso "${currentIngreso.numero_ingreso}" ha sido ${currentIngreso.id ? 'actualizado' : 'creado'} correctamente.`,
-        confirmButtonColor: '#321fdb',
-        timer: 2000,
-        timerProgressBar: true
-      })
+  //     Swal.fire({
+  //       icon: 'success',
+  //       title: currentIngreso.id ? '¡Actualizado!' : '¡Creado!',
+  //       text: `El ingreso "${currentIngreso.numero_ingreso}" ha sido ${currentIngreso.id ? 'actualizado' : 'creado'} correctamente.`,
+  //       confirmButtonColor: '#321fdb',
+  //       timer: 2000,
+  //       timerProgressBar: true
+  //     })
 
-      await fetchIngresos()
-      setShowModal(false)
-    } catch (error) {
-      console.error('Error al guardar ingreso:', error)
+  //     await fetchIngresos()
+  //     setShowModal(false)
+  //   } catch (error) {
+  //     console.error('Error al guardar ingreso:', error)
 
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.response?.data?.error || 'Error al guardar el ingreso. Por favor, intente nuevamente.',
-        confirmButtonColor: '#321fdb'
-      })
+  //     Swal.fire({
+  //       icon: 'error',
+  //       title: 'Error',
+  //       text: error.response?.data?.error || 'Error al guardar el ingreso. Por favor, intente nuevamente.',
+  //       confirmButtonColor: '#321fdb'
+  //     })
 
-      setFormErrors({
-        api: error.response?.data?.error || 'Error al guardar el ingreso. Por favor, intente nuevamente.'
-      })
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  //     setFormErrors({
+  //       api: error.response?.data?.error || 'Error al guardar el ingreso. Por favor, intente nuevamente.'
+  //     })
+  //   } finally {
+  //     setSubmitting(false)
+  //   }
+  // }
 
   // Funciones de utilidad
   const formatDateForDisplay = (dateString) => {
@@ -3077,19 +3088,34 @@ const Ingresos = () => {
 
 
   const exportarPesajesExcel = () => {
-    const datosNumericos = pesajesTemporales.map(pesaje => ({
-      'Número': pesaje.numero,
-      'Peso Bruto (kg)': parseFloat(pesaje.peso_bruto || 0).toFixed(3),
-      'Jabas': pesaje.num_jabas || 0,
-      'Peso Jabas (kg)': parseFloat(pesaje.peso_total_jabas || 0).toFixed(3),
-      'Descuento Merma (kg)': parseFloat(pesaje.descuento_merma || 0).toFixed(3),
-      'Peso Neto (kg)': (parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)).toFixed(3),
-      'Precio/kg': parseFloat(precioVentaKg || 0).toFixed(2),
-      'Subtotal': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2),
-      'Pago Transporte': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)).toFixed(2),
-      'Ingreso Cooperativa': ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2),
-      'Pago al Socio': (((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.pago_transporte || 0) / 100)) - ((parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0)) * (parseFloat(currentIngreso.impuesto || 0) / 100)) - ((pesaje.num_jabas || 0) * 1.00)).toFixed(2)
-    }));
+    const datosNumericos = pesajesTemporales.map(pesaje => {
+      const pesoBruto = parseFloat(pesaje.peso_bruto || 0);
+      const pesoJaba = parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0);
+      const descuentoMerma = parseFloat(pesaje.descuento_merma || 0);
+      const pesoNeto = pesoBruto - pesoJaba - descuentoMerma;
+      const precioVentaKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
+      const subtotal = pesoNeto * precioVentaKg;
+      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
+      const pagoTransporte = pesoNeto * porcentajeTransporte;
+      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
+      const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+      const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || 0) * 1.00 : 0;
+      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
+
+      return {
+        'Número': { v: pesaje.numero_pesaje, t: 'n' },
+        'Peso Bruto (kg)': { v: pesoBruto.toFixed(3), t: 'n' },
+        'Jabas': { v: pesaje.num_jabas_pesaje || 0, t: 'n' },
+        'Peso Jabas (kg)': { v: pesoJaba.toFixed(3), t: 'n' },
+        'Descuento Merma (kg)': { v: descuentoMerma.toFixed(3), t: 'n' },
+        'Peso Neto (kg)': { v: pesoNeto.toFixed(3), t: 'n' },
+        'Precio/kg': { v: precioVentaKg.toFixed(2), t: 'n' },
+        'Subtotal': { v: subtotal.toFixed(2), t: 'n' },
+        'Pago Transporte': { v: pagoTransporte.toFixed(2), t: 'n' },
+        'Ingreso Cooperativa': { v: ingresoCooperativa.toFixed(2), t: 'n' },
+        'Pago al Socio': { v: pagoSocio.toFixed(2), t: 'n' }
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(datosNumericos);
     const workbook = XLSX.utils.book_new();
@@ -3370,7 +3396,7 @@ const Ingresos = () => {
         errors.peso_jaba = 'El peso por jaba debe ser mayor a 0';
       }
 
-      if (!precioVentaKg || precioVentaKg <= 0) {
+      if (!(currentIngreso.precio_venta_kg || precioVentaKg) || precioVentaKg <= 0) {
         errors.precio_venta = 'El precio de venta debe ser mayor a 0';
       }
 
@@ -3405,12 +3431,12 @@ const Ingresos = () => {
 
       // Crear un ingreso consolidado con todos los pesajes
       const pesoNetoTotal = pesajesTemporales.reduce((total, pesaje) => {
-        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
+        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
         return total + pesoNeto;
       }, 0);
 
       const numJabasTotal = pesajesTemporales.reduce((total, pesaje) => {
-        return total + parseInt(pesaje.num_jabas || 0);
+        return total + parseInt(pesaje.num_jabas_pesaje || 0);
       }, 0);
 
       const pesoBrutoTotal = pesajesTemporales.reduce((total, pesaje) => {
@@ -3422,7 +3448,7 @@ const Ingresos = () => {
       }, 0);
 
       // Calcular montos totales
-      const subtotal = pesoNetoTotal * precioVentaKg;
+      const subtotal = pesoNetoTotal * (currentIngreso.precio_venta_kg || precioVentaKg);
 
       // Calcular pagos basados en porcentajes
       const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
@@ -3449,7 +3475,7 @@ const Ingresos = () => {
         peso_neto: pesoNetoTotal,
         dscto_merma: descuentoMermaTotal,
         aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
-        precio_venta_kg: parseFloat(precioVentaKg || 0),
+        precio_venta_kg: parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0),
         precio_jaba: parseFloat(pesoJaba || 0),
         impuesto: parseFloat(porcentajeImpuesto * 100),
         pago_transporte: parseFloat(currentIngreso.pago_transporte || 0),
@@ -3465,11 +3491,18 @@ const Ingresos = () => {
 
       console.log('Datos del ingreso consolidado a enviar:', ingresoData);
 
-      // Crear el ingreso principal
-      const ingresoResponse = await ingresoService.create(ingresoData);
-      const ingresoCreado = ingresoResponse.data || ingresoResponse;
-
-      console.log('Ingreso creado:', ingresoCreado);
+      let ingresoCreado;
+      if (currentIngreso.id) {
+        // Update existing ingreso
+        const response = await ingresoService.update(currentIngreso.id, ingresoData);
+        // ingresoCreado = response.data || response;
+        console.log('Ingreso actualizado:', ingresoCreado);
+      } else {
+        // Create new ingreso
+        const response = await ingresoService.create(ingresoData);
+        ingresoCreado = response.data || response;
+        console.log('Ingreso creado:', ingresoCreado);
+      }
 
       // Guardar todos los detalles de pesaje asociados al ingreso
       if (pesajesTemporales.length > 0 && ingresoCreado.id) {
@@ -3484,11 +3517,11 @@ const Ingresos = () => {
           try {
             const detallePesajeData = {
               ingreso_id: ingresoCreado.id,
-              numero_pesaje: pesaje.numero || (i + 1),
+              numero_pesaje: pesaje.numero_pesaje || (i + 1),
               peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
-              peso_jaba: parseFloat(pesaje.peso_total_jabas) || 0,
+              peso_jaba: parseFloat(pesaje.peso_jaba) || 0,
               descuento_merma: parseFloat(pesaje.descuento_merma) || 0,
-              peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_total_jabas) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
+              peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_jaba) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
               num_jabas_pesaje: parseInt(pesaje.num_jabas) || 0,
               observacion_pesaje: pesaje.observacion || '',
               producto_id: productoSeleccionado.producto_id,
@@ -3496,10 +3529,9 @@ const Ingresos = () => {
               detalle_orden_id: parseInt(productoSeleccionadoPesaje),
               rawData: (pesaje.rawData || '').toString(),
               observacion: pesaje.observacion || '',
-              fecha_pesaje: pesaje.timestamp ,
-              producto_nombre: pesaje.producto_nombre ,
+              fecha_pesaje: pesaje.timestamp,
+              producto_nombre: pesaje.producto_nombre,
               tipo_fruta_nombre: pesaje.tipo_fruta_nombre,
-              fecha_pesaje: new Date().toISOString(),
               usuario_pesaje_id: user?.id
             };
 
@@ -4506,7 +4538,7 @@ const Ingresos = () => {
                               type="number"
                               id="precio_venta_kg"
                               name="precio_venta_kg"
-                              value={precioVentaKg}
+                              value={currentIngreso.precio_venta_kg || precioVentaKg}
                               onChange={(e) => setPrecioVentaKg(parseFloat(e.target.value) || 0)}
                               step="0.01"
                               min="0"
@@ -4745,7 +4777,7 @@ const Ingresos = () => {
                             <div className="h5 mb-0 text-success">
                               S/ {(() => {
                                 const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
-                                const precioKg = parseFloat(precioVentaKg || 0);
+                                const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
                                 const subtotal = pesoNeto * precioKg;
                                 const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                 const pagoTransporte = pesoNeto * porcentajeTransporte;
@@ -4764,7 +4796,7 @@ const Ingresos = () => {
                       <CRow className="mt-3">
                         <CCol md={3}>
                           <small className="text-muted">
-                            <strong>Precio por kg:</strong> S/ {parseFloat(precioVentaKg || 0).toFixed(2)}
+                            <strong>Precio por kg:</strong> S/ {parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0).toFixed(2)}
                           </small>
                         </CCol>
                         <CCol md={3}>
@@ -5198,8 +5230,8 @@ const Ingresos = () => {
                         <CTableBody>
                           {pesajesTemporales.map((pesaje, index) => {
 
-                            const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
-                            const precioKg = parseFloat(precioVentaKg || 0);
+                            const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
+                            const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
                             const subtotal = pesoNeto * precioKg;
 
                             // Calcular pagos basados en porcentajes
@@ -5210,7 +5242,7 @@ const Ingresos = () => {
                             const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                             const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
-                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || 0) * 1.00 : 0;
+                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || pesaje.num_jabas || 0) * 1.00 : 0;
 
                             // Ajustar el pago al socio
                             const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
@@ -5219,7 +5251,7 @@ const Ingresos = () => {
                             return (
                               <CTableRow key={pesaje.id}>
                                 <CTableDataCell>
-                                  <CBadge color="primary">{pesaje.numero}</CBadge>
+                                  <CBadge color="primary">{pesaje.numero_pesaje}</CBadge>
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <div>
@@ -5235,11 +5267,11 @@ const Ingresos = () => {
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <CBadge color="info">
-                                    {pesaje.num_jabas_pesaje || 0} jabas
+                                    {pesaje.num_jabas_pesaje || pesaje.num_jabas || 0} jabas
                                   </CBadge>
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  {parseFloat(pesaje.peso_jaba || 0).toFixed(3)} kg
+                                  {parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0).toFixed(3)} kg
                                   <br />
                                   <small className="text-muted">
                                     ({pesoJaba} kg/jaba)
@@ -5351,7 +5383,7 @@ const Ingresos = () => {
                                                     Número de Jabas:
                                                   </label>
                                                   <input type="number" id="edit-jabas" class="form-control" 
-                                                         value="${pesaje.num_jabas_pesaje}" min="1" max="50"
+                                                         value="${pesaje.num_jabas_pesaje || pesaje.num_jabas}" min="1" max="50"
                                                          placeholder="1">
                                                 </div>
                                                 <div class="col-12">
@@ -5401,7 +5433,7 @@ const Ingresos = () => {
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Subtotal:</small>
-                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat(precioVentaKg || 0)).toFixed(2)}</strong>
+                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)}</strong>
                                                         </div>
                                                       </div>
                                                     </div>
@@ -5431,7 +5463,7 @@ const Ingresos = () => {
                                               const merma = parseFloat(mermaInput.value) || 0;
                                               const pesoJabas = jabas * pesoJaba; // Sin ${} aquí
                                               const pesoNeto = Math.max(0, peso - pesoJabas - merma);
-                                              const subtotal = pesoNeto * parseFloat(precioVentaKg || 0); // Sin ${} aquí
+                                              const subtotal = pesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0); // Sin ${} aquí
 
                                               // ACTUALIZAR LOS ELEMENTOS DE VISTA PREVIA
                                               previewPesoJabas.textContent = pesoJabas.toFixed(3) + ' kg';
@@ -5476,6 +5508,7 @@ const Ingresos = () => {
                                                   ? {
                                                     ...p,
                                                     peso_bruto: peso,
+                                                    num_jabas: jabas,
                                                     num_jabas_pesaje: jabas,
                                                     peso_jaba: jabas * pesoJaba,
                                                     descuento_merma: merma,
@@ -5494,7 +5527,7 @@ const Ingresos = () => {
 
                                               // Calcular el precio por jaba y el pago al socio
                                               const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (totalJabas || 0) * 1.00 : 0;
-                                              const subtotal = totalPesoNeto * parseFloat(precioVentaKg || 0);
+                                              const subtotal = totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
                                               const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                               const pagoTransporte = totalPesoNeto * porcentajeTransporte;
                                               const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
@@ -5559,12 +5592,12 @@ const Ingresos = () => {
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0)} jabas
+                                {pesajesTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0), 0)} jabas
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0).toFixed(3)} kg
+                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0).toFixed(3)} kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
@@ -5575,7 +5608,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-success">
                                 {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
                                   return sum + pesoNeto;
                                 }, 0).toFixed(3)} kg
                               </strong>
@@ -5584,8 +5617,8 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-info">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
-                                  const precioKg = parseFloat(precioVentaKg || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
                                   return sum + (pesoNeto * precioKg);
                                 }, 0).toFixed(2)}
                               </strong>
@@ -5593,7 +5626,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-danger">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
                                   const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                   return sum + (pesoNeto * porcentajeTransporte);
                                 }, 0).toFixed(2)}
@@ -5602,7 +5635,7 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-primary">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
                                   const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
                                   return sum + (pesoNeto * porcentajeImpuesto);
                                 }, 0).toFixed(2)}
@@ -5612,8 +5645,8 @@ const Ingresos = () => {
                             <CTableHeaderCell>
                               <strong className="text-success">
                                 S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || 0) - parseFloat(p.descuento_merma || 0);
-                                  const precioKg = parseFloat(precioVentaKg || 0);
+                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
+                                  const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
                                   const subtotal = pesoNeto * precioKg;
                                   const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
                                   const pagoTransporte = pesoNeto * porcentajeTransporte;
@@ -5621,7 +5654,7 @@ const Ingresos = () => {
                                   const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
 
                                   // Calcular el precio por jaba
-                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas_pesaje || 0) * 1.00 : 0;
+                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas_pesaje || p.num_jabas || 0) * 1.00 : 0;
 
                                   // Ajustar el pago al socio
                                   const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;

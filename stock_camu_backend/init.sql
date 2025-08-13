@@ -237,7 +237,7 @@ CREATE TABLE detalle_pesajes (
     -- Restricciones únicas e índices
     UNIQUE KEY unique_pesaje_por_ingreso (ingreso_id, numero_pesaje),
     INDEX idx_ingreso_id (ingreso_id),
-    INDEX idx_fecha_pesaje (timestamp),
+    INDEX idx_fecha_pesaje (fecha_pesaje),
     INDEX idx_estado (estado)
 );
 
