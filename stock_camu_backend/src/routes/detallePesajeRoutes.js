@@ -477,4 +477,44 @@ router.delete('/:id', detallePesajeController.deleteDetallePesaje);
  */
 router.post('/bulk', detallePesajeController.createBulkDetallesPesaje);
 
+
+/**
+ * @swagger
+ * /api/detalles-pesaje/ingreso/{ingreso_id}:
+ *   delete:
+ *     summary: Elimina todos los detalles de pesaje asociados a un ingreso específico
+ *     tags: [DetallesPesaje]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: ingreso_id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: ID del ingreso cuyos detalles de pesaje se eliminarán
+ *     responses:
+ *       200:
+ *         description: Detalles de pesaje eliminados exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Detalles de pesaje eliminados correctamente
+ *                 count:
+ *                   type: integer
+ *                   description: Número de detalles eliminados
+ *       401:
+ *         description: No autorizado - Token no proporcionado o inválido
+ *       404:
+ *         description: Ingreso no encontrado
+ *       500:
+ *         description: Error del servidor
+ */
+router.delete('/ingreso/:ingreso_id', detallePesajeController.deleteDetallesPesajeByIngresoId);
+
+
 module.exports = router;

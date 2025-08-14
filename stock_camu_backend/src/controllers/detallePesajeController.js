@@ -359,6 +359,32 @@ exports.deleteDetallePesaje = async (req, res) => {
   }
 };
 
+exports.deleteDetallesPesajeByIngresoId = async (req, res) => {
+  try {
+    const { ingreso_id } = req.params;
+
+    // Verificar si el ingreso existe
+    const ingresoExiste = await Ingreso.findByPk(ingreso_id);
+    if (!ingresoExiste) {
+      return res.status(404).json({ error: 'Ingreso no encontrado' });
+    }
+
+    // Eliminar todos los detalles de pesaje asociados al ingreso_id
+    const deletedCount = await DetallePesaje.destroy({
+      where: { ingreso_id }
+    });
+
+    if (deletedCount === 0) {
+      return res.status(404).json({ error: 'No se encontraron detalles de pesaje para eliminar' });
+    }
+
+    res.json({ message: 'Detalles de pesaje eliminados correctamente', count: deletedCount });
+  } catch (error) {
+    console.error('Error al eliminar detalles de pesaje:', error);
+    res.status(500).json({ error: 'Error al eliminar detalles de pesaje', details: error.message });
+  }
+};
+
 // Añadir esta función al controlador existente
 exports.createBulkDetallesPesaje = async (req, res) => {
   try {

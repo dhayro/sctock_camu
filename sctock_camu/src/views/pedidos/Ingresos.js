@@ -823,24 +823,9 @@ const Ingresos = () => {
   // };
 
 
-  // Also, fix the socio display format in the select options. Replace this part:
-  {
-    socios.map((socio) => (
-      <option key={socio.id} value={socio.id}>
-        {socio.codigo} - {socio.nombre} {socio.apellido}
-      </option>
-    ))
-  }
 
-  // With this (matching the socio model structure):
-  {
-    socios.map((socio) => (
-      <option key={socio.id} value={socio.id}>
-        {socio.codigo} - {socio.nombres} {socio.apellidos}
-      </option>
-    ))
-  }
 
+  
 
 
   const cargarOrdenesPendientes = async (searchTerm = '') => {
@@ -2787,6 +2772,17 @@ const Ingresos = () => {
         await cargarOrdenesPendientes();
       }
 
+      const socioExistente = socios.find(socio => socio.id === ingresoDetalles.socio_id);
+    if (!socioExistente) {
+      const nuevoSocio = {
+        id: ingresoDetalles.socio_id,
+        codigo: ingresoDetalles.socio.codigo,
+        nombres: ingresoDetalles.socio.nombres,
+        apellidos: ingresoDetalles.socio.apellidos
+      };
+      setSocios(prevSocios => [...prevSocios, nuevoSocio]);
+    }
+
 
 
       // Establecer el estado con los detalles del ingreso
@@ -3495,8 +3491,10 @@ const Ingresos = () => {
       if (currentIngreso.id) {
         // Update existing ingreso
         const response = await ingresoService.update(currentIngreso.id, ingresoData);
-        // ingresoCreado = response.data || response;
+        ingresoCreado = response.data || response;
         console.log('Ingreso actualizado:', ingresoCreado);
+
+        await detallePesajeService.deleteByIngresoId(ingresoCreado.id);
       } else {
         // Create new ingreso
         const response = await ingresoService.create(ingresoData);
@@ -3517,19 +3515,19 @@ const Ingresos = () => {
           try {
             const detallePesajeData = {
               ingreso_id: ingresoCreado.id,
-              numero_pesaje: pesaje.numero_pesaje || (i + 1),
+              numero_pesaje: (i + 1), //pesaje.numero_pesaje || 
               peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
               peso_jaba: parseFloat(pesaje.peso_jaba) || 0,
               descuento_merma: parseFloat(pesaje.descuento_merma) || 0,
               peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_jaba) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
-              num_jabas_pesaje: parseInt(pesaje.num_jabas) || 0,
-              observacion_pesaje: pesaje.observacion || '',
+              num_jabas_pesaje: parseInt(pesaje.num_jabas_pesaje) ||parseInt(pesaje.num_jabas) || 0,
+              // observacion_pesaje: pesaje.observacion || '',
               producto_id: productoSeleccionado.producto_id,
               tipo_fruta_id: productoSeleccionado.tipo_fruta_id,
               detalle_orden_id: parseInt(productoSeleccionadoPesaje),
               rawData: (pesaje.rawData || '').toString(),
               observacion: pesaje.observacion || '',
-              fecha_pesaje: pesaje.timestamp,
+              fecha_pesaje: (pesaje.fecha_pesaje || pesaje.timestamp),
               producto_nombre: pesaje.producto_nombre,
               tipo_fruta_nombre: pesaje.tipo_fruta_nombre,
               usuario_pesaje_id: user?.id
@@ -5539,7 +5537,9 @@ const Ingresos = () => {
                                                 ...prev,
                                                 peso_bruto: totalPesoBruto.toFixed(3),
                                                 num_jabas_pesaje: totalJabas,
+                                                num_jabas: totalJabas,
                                                 peso_jaba: totalPesoJabas.toFixed(3),
+                                                peso_total_jabas: totalPesoJabas.toFixed(3),
                                                 descuento_merma: totalDescuentoMerma.toFixed(3),
                                                 peso_neto: totalPesoNeto.toFixed(3),
                                                 total: subtotal.toFixed(2),

@@ -61,10 +61,10 @@ const detallePesajeService = {
     }
   },
 
-  // Eliminar un detalle de pesaje
-  delete: async (id) => {
+  // Eliminar todos los detalles de pesaje por ID de ingreso
+  deleteByIngresoId: async (ingresoId) => {
     try {
-      const response = await api.delete(`/detalles-pesaje/${id}`);
+      const response = await api.delete(`/detalles-pesaje/ingreso/${ingresoId}`);
       return response.data;
     } catch (error) {
       throw error;

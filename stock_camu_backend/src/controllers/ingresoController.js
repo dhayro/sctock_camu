@@ -245,7 +245,7 @@ exports.getIngresoById = async (req, res) => {
         { 
           model: Socio, 
           as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni', 'telefono', 'direccion']
+          attributes: ['id', 'nombres', 'apellidos', 'codigo']
         },
         {
           model: DetalleOrdenCompra,
@@ -497,6 +497,7 @@ exports.createIngreso = async (req, res) => {
 };
 
 // Actualizar un ingreso existente
+
 exports.updateIngreso = async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -527,10 +528,17 @@ exports.updateIngreso = async (req, res) => {
       }
     }
     
+    // Use a fallback for user ID if req.user is undefined
+    const userId = req.user?.id || req.usuario?.id || null;
+    if (!userId) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'Usuario no autenticado' });
+    }
+
     // Actualizar el ingreso
     await ingreso.update({
       ...req.body,
-      usuario_modificacion_id: req.user.id,
+      usuario_modificacion_id: userId,
       aplicarPrecioJaba: req.body.aplicarPrecioJaba || ingreso.aplicarPrecioJaba
     }, { transaction });
     
