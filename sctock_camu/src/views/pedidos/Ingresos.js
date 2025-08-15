@@ -39,7 +39,8 @@ import {
   CAlert
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { toast } from 'react-toastify'
+import { toast,ToastContainer  } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import * as XLSX from 'xlsx';
 import {
   cilPlus,
@@ -92,6 +93,10 @@ const Ingresos = () => {
   const { user } = useContext(UserContext); // Obtener el usuario del contexto
   const toggleRow = (id) => {
     setExpandedRow(expandedRow === id ? null : id);
+  };
+
+  const showToast = () => {
+    toast.success('This is a success message!');
   };
 
   // Estados principales
@@ -215,7 +220,15 @@ const Ingresos = () => {
   // Estados para pestañas y balanza
   const [activeTab, setActiveTab] = useState('general')
   const [pesoActual, setPesoActual] = useState(0)
-  const [balanzaConectada, setBalanzaConectada] = useState(false)
+  const [balanzaConectada, setBalanzaConectada] = useState(() => {
+    const savedState = localStorage.getItem('balanzaConectada');
+    return savedState ? JSON.parse(savedState) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('balanzaConectada', JSON.stringify(balanzaConectada));
+  }, [balanzaConectada]);
+  
 
   // Agregar estos estados adicionales después de los estados existentes
 
@@ -441,6 +454,10 @@ const Ingresos = () => {
     cargarConfiguracionGuardada();
   }, []);
 
+
+  useEffect(() => {
+    verificarEstadoBalanza();
+  }, []);
 
   // Agrega este useEffect para cargar puertos cuando se abra el modal
   useEffect(() => {
@@ -694,6 +711,7 @@ const Ingresos = () => {
   // También agregar una función para abrir el modal que cargue los datos iniciales
   const abrirModal = async (titulo, ingreso = null) => {
     setModalTitle(titulo);
+    verificarEstadoBalanza();
 
     if (ingreso) {
       // Modo edición
@@ -1023,30 +1041,36 @@ const Ingresos = () => {
 
 
 
-  const conectarBalanza = async () => {
-    if (!puertoSeleccionado) {
+  
+const conectarBalanza = async () => {
+  if (!puertoSeleccionado) {
       toast.warning('Por favor, seleccione un puerto');
       return;
-    }
+  }
 
-    try {
+  // Check if the selected port is available
+  const puertoDisponible = puertosDisponibles.some(puerto => puerto.path === puertoSeleccionado);
+  if (!puertoDisponible) {
+      toast.error('El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.');
+      return;
+  }
+
+  try {
       setConectandoBalanza(true);
       const response = await balanzaService.connect({
-        port: puertoSeleccionado,
-        baudRate: parseInt(baudRate)
+          port: puertoSeleccionado,
+          baudRate: parseInt(baudRate)
       });
 
-      // Corregir el acceso a la respuesta - quitar .data
       toast.success(response.message || 'Balanza conectada exitosamente');
       setBalanzaConectada(true);
-      setConectandoBalanza(false);
-    } catch (error) {
+  } catch (error) {
       console.error('Error al conectar balanza:', error);
       toast.error('Error al conectar: ' + (error.response?.data?.error || error.message));
+  } finally {
       setConectandoBalanza(false);
-    }
-  };
-
+  }
+};
   // Cargar puertos cuando se abre la pestaña de pesaje
   useEffect(() => {
     if (activeTab === 'pesaje' && puertosDisponibles.length === 0) {
@@ -1523,7 +1547,11 @@ const Ingresos = () => {
   };
 
 
-  const calcularCantidadPendienteActualizada = (producto) => {
+  function calcularCantidadPendienteActualizada(producto) {
+    if (!producto || typeof producto.cantidad === 'undefined') {
+      console.error('Invalid producto:', producto);
+      return 0; // or some default value
+    }
     const cantidadTotal = producto.cantidad || 0;
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
@@ -3232,7 +3260,7 @@ const Ingresos = () => {
       setBalanzaConectada(response.connected || false);
 
       if (response.connected) {
-        // Si está conectada, también actualizar la configuración actual
+        // If connected, also update the current configuration
         if (response.config) {
           setPuertoSeleccionado(response.config.port || '');
           setBaudRate(response.config.baudRate || 9600);
@@ -3622,6 +3650,7 @@ const Ingresos = () => {
 
   // Y la función handleCreate si no existe
   const handleCreate = () => {
+    verificarEstadoBalanza();
     setEditingId(null);
     setCurrentIngreso({
       numero_ingreso: '',
@@ -4000,6 +4029,7 @@ const Ingresos = () => {
                           &raquo;
                         </CPaginationItem>
                       </CPagination>
+                      <ToastContainer />
                     </div>
 
                     {/* Paginación */}
@@ -5035,7 +5065,10 @@ const Ingresos = () => {
                                   </thead>
                                   <tbody>
                                     {productosOrden.map((producto) => {
-                                      // Usar las nuevas funciones para calcular valores actualizados
+                                      if (!producto || typeof producto.cantidad === 'undefined') {
+                                        console.error('Invalid producto:', producto);
+                                        return null; // or handle the error appropriately
+                                      }
                                       const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(producto);
                                       const progresoActualizado = calcularProgresoActualizado(producto);
                                       const isCompleto = cantidadPendienteActualizada <= 0;
@@ -5754,6 +5787,7 @@ const Ingresos = () => {
         </CRow>
       </CContainer>
     </>
+    
   )
 }
 
