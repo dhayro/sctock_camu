@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useRef, useContext } from 'react'
-import { debounce } from 'lodash';
+import { Document, Page } from 'react-pdf'
+import { debounce } from 'lodash'
 import {
   CCard,
+  CDropdown,
+  CDropdownToggle,
+  CDropdownMenu,
+  CDropdownItem,
   CCardBody,
   CCardHeader,
   CCol,
@@ -12,7 +17,9 @@ import {
   CTableHead,
   CTableHeaderCell,
   CTableRow,
-  CButton, CContainer, CFormCheck,
+  CButton,
+  CContainer,
+  CFormCheck,
   CButtonGroup,
   CModal,
   CModalBody,
@@ -36,12 +43,12 @@ import {
   CTabPane,
   CPagination,
   CPaginationItem,
-  CAlert
+  CAlert,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { toast,ToastContainer  } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import * as XLSX from 'xlsx';
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import * as XLSX from 'xlsx'
 import {
   cilPlus,
   cilPencil,
@@ -57,47 +64,58 @@ import {
   cilCheckCircle,
   cilMediaPlay,
   cilArrowBottom,
-  cilSync, cilSave, cilCloudDownload, cilMediaStop, cilArrowCircleBottom, cilLocationPin, cilSpreadsheet, cilFilter, cilFilterX,
+  cilSync,
+  cilSave,
+  cilCloudDownload,
+  cilMediaStop,
+  cilArrowCircleBottom,
+  cilLocationPin,
+  cilSpreadsheet,
+  cilFilter,
+  cilFilterX,
   cilSettings,
   cilBrushAlt,
   cilHistory,
-  cilList, cilClock,
-  cilX
+  cilList,
+  cilClock,
+  cilX,
 } from '@coreui/icons'
 import Swal from 'sweetalert2'
 import Select from 'react-select'
-import { UserContext } from '../../context/UserContext';
-import ingresoService from '../../services/api/ingresoService';
-import socioService from '../../services/api/socioService';
-import productoService from '../../services/api/productoService';
-import detalleOrdenCompraService from '../../services/api/detalleOrdenCompraService';
-import detallePesajeService from '../../services/api/detallePesajeService';
-import ordenCompraService from '../../services/api/ordenCompraService';
-import unidadMedidaService from '../../services/api/unidadMedidaService';
-import tipoFrutaService from '../../services/api/tipoFrutaService';
-import balanzaService from '../../services/api/balanzaService';
+import { UserContext } from '../../context/UserContext'
+import ingresoService from '../../services/api/ingresoService'
+import socioService from '../../services/api/socioService'
+import productoService from '../../services/api/productoService'
+import detalleOrdenCompraService from '../../services/api/detalleOrdenCompraService'
+import detallePesajeService from '../../services/api/detallePesajeService'
+import ordenCompraService from '../../services/api/ordenCompraService'
+import unidadMedidaService from '../../services/api/unidadMedidaService'
+import tipoFrutaService from '../../services/api/tipoFrutaService'
+import balanzaService from '../../services/api/balanzaService'
+
+import jsPDF from 'jspdf'
 
 const modalStyles = {
   modalDialog90vw: {
     maxWidth: '90vw',
-    width: '90vw'
+    width: '90vw',
   },
   modalBody: {
     maxHeight: 'calc(90vh - 140px)',
-    overflowY: 'auto'
-  }
-};
+    overflowY: 'auto',
+  },
+}
 
 const Ingresos = () => {
-  const [expandedRow, setExpandedRow] = useState(null);
-  const { user } = useContext(UserContext); // Obtener el usuario del contexto
+  const [expandedRow, setExpandedRow] = useState(null)
+  const { user } = useContext(UserContext) // Obtener el usuario del contexto
   const toggleRow = (id) => {
-    setExpandedRow(expandedRow === id ? null : id);
-  };
+    setExpandedRow(expandedRow === id ? null : id)
+  }
 
   const showToast = () => {
-    toast.success('This is a success message!');
-  };
+    toast.success('This is a success message!')
+  }
 
   // Estados principales
   const [ingresos, setIngresos] = useState([])
@@ -125,12 +143,12 @@ const Ingresos = () => {
     pago_socio: 0,
     pago_con_descuento: 0,
     observacion: '',
-    aplicarPrecioJaba: false
+    aplicarPrecioJaba: false,
   })
   const [formErrors, setFormErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
 
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState(null)
 
   // Estados para datos relacionados
   const [socios, setSocios] = useState([])
@@ -148,105 +166,373 @@ const Ingresos = () => {
   const [numeroFilter, setNumeroFilter] = useState('')
   const [socioFilter, setSocioFilter] = useState('')
   const [fechaFilter, setFechaFilter] = useState('')
-  const [historialPesajes, setHistorialPesajes] = useState([]);
+  const [historialPesajes, setHistorialPesajes] = useState([])
 
-  const [clienteFilter, setClienteFilter] = useState('');
-  const [activeFilter, setActiveFilter] = useState(null);
-  const [isFilterActive, setIsFilterActive] = useState(false);
+  const [clienteFilter, setClienteFilter] = useState('')
+  const [activeFilter, setActiveFilter] = useState(null)
+  const [isFilterActive, setIsFilterActive] = useState(false)
 
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null)
 
-  const filterInputRef = useRef(null);
+  const filterInputRef = useRef(null)
 
+  const [pdfData, setPdfData] = useState(null)
+  const [showPdfModal, setShowPdfModal] = useState(false)
 
+  const drawTable = (doc, tableData, startY, format) => {
+    const cellPadding = 2 // Padding inside each cell
+    let cellHeight = 7 // Default height of each cell
+    let firstColumnWidth = 40 // Default width for the first column
 
-  const handleSearchChange = (e) => {
-    setSearchTermIngresos(e.target.value);
+    // Adjust settings for the "ticket" format
+    if (format === 'ticket') {
+      firstColumnWidth = 30 // Reduce the width for the first column
+      cellHeight = 6 // Reduce the height of each cell
+    }
+
+    // Calculate the maximum text width for other columns
+    const maxTextWidth = tableData.reduce((maxWidth, row) => {
+      return row.slice(1).reduce((rowMaxWidth, cell) => {
+        const textWidth = doc.getTextWidth(cell)
+        return Math.max(rowMaxWidth, textWidth)
+      }, maxWidth)
+    }, 0)
+
+    // Add padding to the maximum text width to get the cell width for other columns
+    const otherColumnWidth = maxTextWidth + cellPadding * 2
+
+    // Calculate total table width
+    const totalTableWidth = firstColumnWidth + otherColumnWidth
+
+    // Calculate starting X position based on format
+    const pageWidth = doc.internal.pageSize.getWidth()
+    let startX
+
+    if (format === 'a5') {
+      // Center the table for A5 format
+      startX = (pageWidth - totalTableWidth) / 2
+    } else {
+      // Align to the left for other formats (e.g., A4)
+      startX = 10 // 10mm margin from the left
+    }
+
+    tableData.forEach((row, rowIndex) => {
+      row.forEach((cell, cellIndex) => {
+        const cellWidth = cellIndex === 0 ? firstColumnWidth : otherColumnWidth
+        const x =
+          startX +
+          (cellIndex === 0 ? 0 : firstColumnWidth) +
+          (cellIndex > 0 ? (cellIndex - 1) * otherColumnWidth : 0)
+        const y = startY + rowIndex * cellHeight
+
+        // Set background color for the first column
+        if (cellIndex === 0) {
+          doc.setFillColor('#ffc000')
+          doc.rect(x, y, cellWidth, cellHeight, 'F') // 'F' for fill
+        }
+
+        // Draw cell border
+        doc.rect(x, y, cellWidth, cellHeight).stroke()
+
+        // Add text to cell, centered vertically
+        const textY = y + cellHeight / 2 + cellPadding / 2 // Center text vertically
+        doc.text(cell, x + cellPadding, textY, { baseline: 'middle' })
+      })
+    })
   };
+
+ 
+
+const calculateCellHeight = (doc, text, cellWidth, cellPadding, fontSize, lineHeight) => {
+  const textLines = doc.splitTextToSize(text, cellWidth - cellPadding * 2);
+  return textLines.length * fontSize * lineHeight;
+};
+
+const drawPesajesTable = (doc, headers, data, startY, format, fontSize = 10) => {
+  const cellPadding = 2; // Padding inside each cell
+  const lineHeight = 1.2; // Adjusted line height for text
+  const headerHeight = 8; // Fixed height for header cells
+
+  // Set the font size
+  doc.setFontSize(fontSize);
+
+  // Function to calculate the width of a cell based on its text
+  const calculateCellWidth = (text) => {
+    return doc.getTextWidth(text) + cellPadding * 2;
+  };
+
+  // Calculate the maximum width for each column
+  const columnWidths = headers.map((header, index) => {
+    const headerWidth = calculateCellWidth(header);
+    const maxDataWidth = data.reduce((maxWidth, row) => {
+      const cellWidth = calculateCellWidth(row[index].toString());
+      return Math.max(maxWidth, cellWidth);
+    }, 0);
+    return Math.max(headerWidth, maxDataWidth);
+  });
+
+  // Calculate total table width
+  const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+
+  // Calculate starting X position based on format
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const startX = (pageWidth - totalTableWidth) / 2; // Center the table
+
+  // Draw the table headers with borders
+  headers.forEach((header, index) => {
+    const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
+    const y = startY;
+
+    // Draw header cell border with fixed height
+    const cellWidth = columnWidths[index];
+    doc.rect(x, y, cellWidth, headerHeight).stroke();
+
+    // Add text to header cell, centered vertically
+    const textY = y + headerHeight / 2 + cellPadding / 2; // Center text vertically
+    const textX = x + (cellWidth - doc.getTextWidth(header)) / 2; // Center text horizontally
+    doc.text(header, textX, textY, { baseline: 'middle' });
+  });
+
+  // Draw the table data
+  data.forEach((row, rowIndex) => {
+    row.forEach((cell, cellIndex) => {
+      const cellWidth = columnWidths[cellIndex];
+      const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0);
+      const y = startY + headerHeight + rowIndex * fontSize * lineHeight; // Adjust Y position for each row
+
+      // Calculate cell height based on text
+      const cellHeight = calculateCellHeight(doc, cell.toString(), cellWidth, cellPadding, fontSize, lineHeight);
+
+      // Draw cell border
+      doc.rect(x, y, cellWidth, cellHeight).stroke();
+
+      // Add text to cell, centered vertically and horizontally
+      const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2);
+      textLines.forEach((line, lineIndex) => {
+        const textY = y + cellPadding + lineIndex * fontSize * lineHeight;
+        const textX = x + (cellWidth - doc.getTextWidth(line)) / 2; // Center text horizontally
+        doc.text(line, textX, textY, { baseline: 'top' });
+      });
+    });
+  });
+};
+
+const handleGeneratePDF = async (ingreso, format) => {
+  try {
+    // Fetch pesajes temporales using the ingreso ID
+    const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id);
+
+    const pesajesTableData = pesajesTemporales.map(pesaje => ([
+      new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
+      `${pesaje.producto_nombre || 'Producto no especificado'} - ${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
+      parseFloat(pesaje.peso_bruto || 0).toFixed(3),
+      pesaje.num_jabas_pesaje || 0,
+      parseFloat(pesaje.peso_jaba || 0).toFixed(3),
+      parseFloat(pesaje.peso_neto || 0).toFixed(3),
+      parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
+      (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
+      parseFloat(ingreso.pago_transporte || 0).toFixed(2),
+      parseFloat(ingreso.ingreso_cooperativa || 0).toFixed(2),
+      parseFloat(ingreso.pago_socio || 0).toFixed(2),
+      pesaje.observacion || ''
+    ]));
+
+    const doc = new jsPDF({
+      orientation: format === 'a4' || format === 'a5' ? 'landscape' : 'portrait',
+      unit: 'mm',
+      format: format === 'ticket' ? [80, 297] : format, // Use custom size for ticket
+    });
+
+    // Define positions for different formats
+    const imgWidth = format === 'ticket' ? 40 : format === 'a5' ? 30 : 35;
+    const imgHeight = format === 'ticket' ? 30 : format === 'a5' ? 25 : 25;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const xPosImage = pageWidth - imgWidth - 20; // Image position on the right with margin
+    const yPosImage = 5; // Top position for image
+
+    // Calculate available width for text
+    const availableWidth = xPosImage - 20; // 20mm margin for text
+    const xPosText = 10; // Text position with margin
+    const yPosText = format === 'ticket' ? yPosImage + imgHeight - 10 : yPosImage + 10; // Adjust for ticket
+
+    // Convert image to base64 and add to PDF
+    const imageUrl = '/img/coopay.png';
+    const img = new Image();
+    img.src = imageUrl;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const base64Image = canvas.toDataURL('image/png');
+      doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight);
+
+      // Set font size based on format
+      const fontSize = format === 'ticket' ? 8 : 12;
+      doc.setFontSize(fontSize);
+
+      // Center the text
+      const notaIngresoText = 'NOTA DE INGRESO';
+      const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA';
+      const coopaySubText = 'COOPAY';
+      const notaIngresoWidth = doc.getTextWidth(notaIngresoText);
+      const coopayWidth = doc.getTextWidth(coopayText);
+      const coopaySubWidth = doc.getTextWidth(coopaySubText);
+      const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2;
+      const centerXCoopay = (pageWidth - coopayWidth) / 2;
+      const centerXCoopaySub = (pageWidth - coopaySubWidth) / 2;
+
+      doc.text(notaIngresoText, centerXNotaIngreso, yPosText + 10);
+      if (format === 'ticket') {
+        doc.text(coopayText, centerXCoopay, yPosText + 15);
+        doc.text(coopaySubText, centerXCoopaySub, yPosText + 20);
+      } else {
+        // Center the combined text for A4 and A5 formats
+        const combinedText = `${coopayText} - ${coopaySubText}`;
+        const combinedTextWidth = doc.getTextWidth(combinedText);
+        const centerXCombined = (pageWidth - combinedTextWidth) / 2;
+        doc.text(combinedText, centerXCombined, yPosText + 20);
+      }
+
+      // Add the table
+      const tableData = [
+        ['Nro registro', ingreso.numero_ingreso],
+        ['Apellidos del socio', ingreso.socio.apellidos],
+        ['Nombre del socio', ingreso.socio.nombres],
+        ['Código del socio', ingreso.socio.codigo],
+      ];
+
+      // Replace autoTable with a custom table drawing function
+      drawTable(doc, tableData, yPosText + 25, format);
+
+      // Add the new table for pesajesTemporales
+      const detailText = 'DETALLE DE LA NOTA DE INGRESO:';
+      const detailTextYPos = yPosText + (format === 'ticket' ? 25 : 30) + tableData.length * (format === 'ticket' ? 6 : 7) + 5; // Adjust Y position based on table height
+      doc.text(detailText, xPosText, detailTextYPos);
+
+      // Prepare pesajes table data
+      const pesajesTableHeaders = [
+        'Fecha', 'Producto', 'Peso Bruto', 'Jabas', 'Dscto Peso Jabas', 'Peso Neto',
+        'Precio de Venta', 'Subtotal', 'Pago Transporte', 'Ingreso Cooperativa', 'Pago al Socio', 'Observación'
+      ];
+
+      // Draw the pesajes table
+      drawPesajesTable(doc, pesajesTableHeaders, pesajesTableData, detailTextYPos + 10, format, 8);
+
+      // Add signature placeholders
+     // Add signature placeholders
+const signatureYPos = detailTextYPos + 10 + pesajesTableData.length * 10 + 20; // Adjust Y position based on table height
+const signatureWidth = pageWidth / 2 - 20; // Width for each signature column
+const signatureXPosLeft = 125; // Left margin
+const signatureXPosRight = pageWidth - signatureWidth + 70; // Right column start
+
+doc.setFontSize(10);
+
+// Center the text within each column
+const emisorText = `FIRMA DEL EMISOR DE NOTA DE INGRESO\nNombre:  \nDNI:  \n\n\n_____________________________________`;
+const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI:  \n\n\n_____________________________`;
+const emisorTextWidth = doc.getTextWidth(emisorText);
+const socioTextWidth = doc.getTextWidth(socioText);
+
+const centerXEmisor = signatureXPosLeft + (signatureWidth - emisorTextWidth) / 2;
+const centerXSocio = signatureXPosRight + (signatureWidth - socioTextWidth) / 2;
+
+doc.text(emisorText, centerXEmisor, signatureYPos, { align: 'center' });
+doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
+
+      // Generate PDF data
+      const pdfBlob = doc.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      setPdfData(pdfUrl);
+      setShowPdfModal(true);
+    };
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Failed to generate PDF. Please try again.',
+      confirmButtonColor: '#321fdb',
+    });
+  }
+};
+  const handleSearchChange = (e) => {
+    setSearchTermIngresos(e.target.value)
+  }
 
   useEffect(() => {
     if (activeFilter && filterInputRef.current) {
-      filterInputRef.current.focus();
+      filterInputRef.current.focus()
     }
-  }, [activeFilter]);
+  }, [activeFilter])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterInputRef.current && !filterInputRef.current.contains(event.target)) {
-        setActiveFilter(null);
+        setActiveFilter(null)
       }
-    };
+    }
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   const handlePageChange = (newPage) => {
-    if (newPage < 1 || newPage > totalPages) return;
-    setCurrentPage(newPage);
-    fetchIngresos(newPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
-  };
+    if (newPage < 1 || newPage > totalPages) return
+    setCurrentPage(newPage)
+    fetchIngresos(newPage, itemsPerPage, searchTerm, numeroFilter, socioFilter)
+  }
 
   useEffect(() => {
     // Llama a fetchIngresos cuando cambien los filtros o la página
-    fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
-  }, [currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter]);
+    fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter)
+  }, [currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter])
 
   // const handleSearchChange = (e) => {
   //   setSearchTerm(e.target.value);
   // };
 
   const handleSearch = () => {
-    fetchIngresos(1, itemsPerPage, searchTerm, numeroFilter, socioFilter);
-  };
+    fetchIngresos(1, itemsPerPage, searchTerm, numeroFilter, socioFilter)
+  }
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setNumeroFilter('');
-    setSocioFilter('');
-    fetchIngresos(1, itemsPerPage, '', '', '');
-  };
+    setSearchTerm('')
+    setNumeroFilter('')
+    setSocioFilter('')
+    fetchIngresos(1, itemsPerPage, '', '', '')
+  }
 
   // const handleFilterInputChange = (setter) => (e) => {
   //   const value = e.target.value;
   //   setter(value);
   // };
 
-
-
-
   // Estados para pestañas y balanza
   const [activeTab, setActiveTab] = useState('general')
   const [pesoActual, setPesoActual] = useState(0)
   const [balanzaConectada, setBalanzaConectada] = useState(() => {
-    const savedState = localStorage.getItem('balanzaConectada');
-    return savedState ? JSON.parse(savedState) : false;
-  });
+    const savedState = localStorage.getItem('balanzaConectada')
+    return savedState ? JSON.parse(savedState) : false
+  })
 
   useEffect(() => {
-    localStorage.setItem('balanzaConectada', JSON.stringify(balanzaConectada));
-  }, [balanzaConectada]);
-
+    localStorage.setItem('balanzaConectada', JSON.stringify(balanzaConectada))
+  }, [balanzaConectada])
 
   // Agregar estos estados adicionales después de los estados existentes
 
   // Estados para el monitor en tiempo real
-  const [eventSource, setEventSource] = useState(null);
+  const [eventSource, setEventSource] = useState(null)
 
   // Asegúrate de que el estado inicial esté correctamente definido
 
-
   // Función para iniciar el monitoreo en tiempo real
 
-
-
-
-
-
   // Función para aplicar peso en tiempo real al formulario
-
 
   // Limpiar EventSource cuando el componente se desmonte
 
@@ -254,10 +540,10 @@ const Ingresos = () => {
   useEffect(() => {
     return () => {
       if (eventSource) {
-        eventSource.close();
+        eventSource.close()
       }
-    };
-  }, [eventSource]);
+    }
+  }, [eventSource])
 
   // Modificar la función obtenerPesoBalanza existente
   // const obtenerPesoBalanza = async () => {
@@ -296,18 +582,14 @@ const Ingresos = () => {
   const [ingresoToDelete, setIngresoToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
-  const [modalBalanzaVisible, setModalBalanzaVisible] = useState(false);
+  const [modalBalanzaVisible, setModalBalanzaVisible] = useState(false)
 
-  const [productosOrden, setProductosOrden] = useState([]);
-  const [productoSeleccionadoPesaje, setProductoSeleccionadoPesaje] = useState('');
-  const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({});
-  const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false);
+  const [productosOrden, setProductosOrden] = useState([])
+  const [productoSeleccionadoPesaje, setProductoSeleccionadoPesaje] = useState('')
+  const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({})
+  const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false)
 
-  const [pesajesTemporales, setPesajesTemporales] = useState([]); // Lista de pesajes temporales del producto activo
-
-
-
-
+  const [pesajesTemporales, setPesajesTemporales] = useState([]) // Lista de pesajes temporales del producto activo
 
   const agregarPesajeTemporal = () => {
     if (!productoSeleccionadoPesaje) {
@@ -315,9 +597,9 @@ const Ingresos = () => {
         icon: 'warning',
         title: 'Producto no seleccionado',
         text: 'Por favor seleccione un producto antes de agregar el pesaje',
-        confirmButtonColor: '#321fdb'
-      });
-      return;
+        confirmButtonColor: '#321fdb',
+      })
+      return
     }
 
     if (!pesajeRealTime.stable || pesajeRealTime.weight <= 0) {
@@ -325,9 +607,9 @@ const Ingresos = () => {
         icon: 'warning',
         title: 'Peso no estable',
         text: 'Espere a que el peso se estabilice antes de agregarlo',
-        confirmButtonColor: '#321fdb'
-      });
-      return;
+        confirmButtonColor: '#321fdb',
+      })
+      return
     }
 
     const nuevoPesaje = {
@@ -340,14 +622,14 @@ const Ingresos = () => {
       fecha_pesaje: new Date().toISOString(),
       estable: true,
       timestamp: new Date().toISOString(),
-      peso_jaba: pesoJaba
-    };
+      peso_jaba: pesoJaba,
+    }
 
-    setPesajesTemporales(prev => [...prev, nuevoPesaje]);
+    setPesajesTemporales((prev) => [...prev, nuevoPesaje])
 
     // Limpiar campos
-    setNumJabas('');
-    setObservacionPesaje('');
+    setNumJabas('')
+    setObservacionPesaje('')
 
     // Mostrar mensaje de éxito
     Swal.fire({
@@ -355,267 +637,256 @@ const Ingresos = () => {
       title: '¡Pesaje agregado!',
       text: `Peso: ${pesajeRealTime.weight.toFixed(3)} kg`,
       timer: 1500,
-      showConfirmButton: false
-    });
-  };
-
-
-
+      showConfirmButton: false,
+    })
+  }
 
   // Agregar esta función cerca de las otras funciones
   const cargarProductosDeOrden = async (ordenId) => {
     if (!ordenId) {
-      setProductosOrden([]);
-      setCantidadPendientePorProducto({});
-      return;
+      setProductosOrden([])
+      setCantidadPendientePorProducto({})
+      return
     }
 
-    setCargandoProductosOrden(true);
+    setCargandoProductosOrden(true)
     try {
       // Cargar los detalles de la orden
-      const response = await detalleOrdenCompraService.getByOrdenId(ordenId);
+      const response = await detalleOrdenCompraService.getByOrdenId(ordenId)
 
       if (response && response.data && Array.isArray(response.data)) {
         // Formatear los productos con los nombres correctos de campos
-        const productosFormateados = response.data.map(detalle => ({
+        const productosFormateados = response.data.map((detalle) => ({
           id: detalle.id,
           producto_id: detalle.producto_id,
           tipo_fruta_id: detalle.tipo_fruta_id,
           cantidad: parseFloat(detalle.cantidad) || 0, // Convertir string a número
-          precio: parseFloat(detalle.precio) || 0,     // Convertir string a número
+          precio: parseFloat(detalle.precio) || 0, // Convertir string a número
           subtotal: parseFloat(detalle.subtotal) || 0, // Convertir string a número
           cantidad_ingresada: parseFloat(detalle.cantidad_ingresada) || 0, // Convertir string a número
           estado: detalle.estado,
           observacion: detalle.observacion,
           // Nombres de las relaciones (si vienen incluidas)
           producto_nombre: detalle.producto?.nombre || 'Producto no especificado',
-          tipo_fruta_nombre: detalle.tipo_fruta?.nombre || 'Tipo no especificado'
-        }));
+          tipo_fruta_nombre: detalle.tipo_fruta?.nombre || 'Tipo no especificado',
+        }))
 
-        setProductosOrden(productosFormateados);
+        setProductosOrden(productosFormateados)
 
         // Inicializar cantidades pendientes (toda la cantidad está pendiente inicialmente)
-        const cantidadesPendientes = {};
-        productosFormateados.forEach(producto => {
-          cantidadesPendientes[producto.producto_id] = producto.cantidad;
-        });
-        setCantidadPendientePorProducto(cantidadesPendientes);
+        const cantidadesPendientes = {}
+        productosFormateados.forEach((producto) => {
+          cantidadesPendientes[producto.producto_id] = producto.cantidad
+        })
+        setCantidadPendientePorProducto(cantidadesPendientes)
 
-        toast.success(`Se cargaron ${productosFormateados.length} productos de la orden`);
+        toast.success(`Se cargaron ${productosFormateados.length} productos de la orden`)
       } else {
-        setProductosOrden([]);
-        setCantidadPendientePorProducto({});
-        toast.info('No se encontraron productos en esta orden');
+        setProductosOrden([])
+        setCantidadPendientePorProducto({})
+        toast.info('No se encontraron productos en esta orden')
       }
     } catch (error) {
-      console.error('Error al cargar productos de la orden:', error);
-      setProductosOrden([]);
-      setCantidadPendientePorProducto({});
-      toast.error('Error al cargar los productos de la orden');
+      console.error('Error al cargar productos de la orden:', error)
+      setProductosOrden([])
+      setCantidadPendientePorProducto({})
+      toast.error('Error al cargar los productos de la orden')
     } finally {
-      setCargandoProductosOrden(false);
+      setCargandoProductosOrden(false)
     }
-  };
-
-
+  }
 
   // Estados adicionales para balanza
   const [puertosBalanza, setPuertosBalanza] = useState([])
 
   // Agregar estos estados al inicio del componente (después de los estados existentes)
-  const [puertosDisponibles, setPuertosDisponibles] = useState([]);
-  const [puertoSeleccionado, setPuertoSeleccionado] = useState('');
-  const [baudRate, setBaudRate] = useState(9600);
-  const [cargandoPuertos, setCargandoPuertos] = useState(false);
-  const [cargandoSocios, setCargandoSocios] = useState(false);
-
-
-
+  const [puertosDisponibles, setPuertosDisponibles] = useState([])
+  const [puertoSeleccionado, setPuertoSeleccionado] = useState('')
+  const [baudRate, setBaudRate] = useState(9600)
+  const [cargandoPuertos, setCargandoPuertos] = useState(false)
+  const [cargandoSocios, setCargandoSocios] = useState(false)
 
   // Efecto para cargar la configuración guardada al montar el componente
   useEffect(() => {
     const cargarConfiguracionGuardada = () => {
       try {
-        const configuracionGuardada = localStorage.getItem('configuracionBalanza');
+        const configuracionGuardada = localStorage.getItem('configuracionBalanza')
         if (configuracionGuardada) {
-          const config = JSON.parse(configuracionGuardada);
+          const config = JSON.parse(configuracionGuardada)
           if (config.puerto) {
-            setPuertoSeleccionado(config.puerto);
+            setPuertoSeleccionado(config.puerto)
           }
           if (config.baudRate) {
-            setBaudRate(config.baudRate);
+            setBaudRate(config.baudRate)
           }
           // Cargar otras configuraciones si las tienes
         }
       } catch (error) {
-        console.error('Error al cargar configuración guardada:', error);
+        console.error('Error al cargar configuración guardada:', error)
       }
-    };
+    }
 
-    cargarConfiguracionGuardada();
-  }, []);
-
+    cargarConfiguracionGuardada()
+  }, [])
 
   useEffect(() => {
-    verificarEstadoBalanza();
-  }, []);
+    verificarEstadoBalanza()
+  }, [])
 
   // Agrega este useEffect para cargar puertos cuando se abra el modal
   useEffect(() => {
     if (modalBalanzaVisible) {
-      cargarPuertos();
-      verificarEstadoBalanza();
+      cargarPuertos()
+      verificarEstadoBalanza()
     }
-  }, [modalBalanzaVisible]);
+  }, [modalBalanzaVisible])
 
   // También agrega este useEffect para cargar la configuración guardada al montar el componente
   useEffect(() => {
     const cargarConfiguracionGuardada = () => {
       try {
-        const configuracionGuardada = localStorage.getItem('configuracionBalanza');
+        const configuracionGuardada = localStorage.getItem('configuracionBalanza')
         if (configuracionGuardada) {
-          const config = JSON.parse(configuracionGuardada);
+          const config = JSON.parse(configuracionGuardada)
           if (config.puerto) {
-            setPuertoSeleccionado(config.puerto);
+            setPuertoSeleccionado(config.puerto)
           }
           if (config.baudRate) {
-            setBaudRate(config.baudRate);
+            setBaudRate(config.baudRate)
           }
         }
       } catch (error) {
-        console.error('Error al cargar configuración guardada:', error);
+        console.error('Error al cargar configuración guardada:', error)
       }
-    };
+    }
 
-    cargarConfiguracionGuardada();
-  }, []);
+    cargarConfiguracionGuardada()
+  }, [])
 
   // Modifica las funciones para persistir la configuración
   const handlePuertoChange = (puerto) => {
-    setPuertoSeleccionado(puerto);
+    setPuertoSeleccionado(puerto)
 
     // Guardar en localStorage
     try {
-      const configuracionActual = JSON.parse(localStorage.getItem('configuracionBalanza') || '{}');
+      const configuracionActual = JSON.parse(localStorage.getItem('configuracionBalanza') || '{}')
       const nuevaConfiguracion = {
         ...configuracionActual,
-        puerto: puerto
-      };
-      localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfiguracion));
+        puerto: puerto,
+      }
+      localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfiguracion))
     } catch (error) {
-      console.error('Error al guardar puerto seleccionado:', error);
+      console.error('Error al guardar puerto seleccionado:', error)
     }
-  };
+  }
 
   const handleBaudRateChange = (baudRate) => {
-    setBaudRate(baudRate);
+    setBaudRate(baudRate)
 
     // Guardar en localStorage
     try {
-      const configuracionActual = JSON.parse(localStorage.getItem('configuracionBalanza') || '{}');
+      const configuracionActual = JSON.parse(localStorage.getItem('configuracionBalanza') || '{}')
       const nuevaConfiguracion = {
         ...configuracionActual,
-        baudRate: baudRate
-      };
-      localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfiguracion));
+        baudRate: baudRate,
+      }
+      localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfiguracion))
     } catch (error) {
-      console.error('Error al guardar baudRate:', error);
+      console.error('Error al guardar baudRate:', error)
     }
-  };
+  }
 
   // Asegúrate de que la función cargarPuertos esté definida correctamente
 
   const cargarPuertos = async () => {
     try {
-      setCargandoPuertos(true);
-      const response = await balanzaService.getPuertosDisponibles();
+      setCargandoPuertos(true)
+      const response = await balanzaService.getPuertosDisponibles()
 
       // Verificar que la respuesta sea válida y sea un array
-      let puertos = [];
+      let puertos = []
       if (response && Array.isArray(response)) {
-        puertos = response;
+        puertos = response
       } else if (response && response.data && Array.isArray(response.data)) {
-        puertos = response.data;
+        puertos = response.data
       } else {
-        console.warn('Respuesta de puertos no válida:', response);
-        puertos = [];
+        console.warn('Respuesta de puertos no válida:', response)
+        puertos = []
       }
 
-      setPuertosDisponibles(puertos);
+      setPuertosDisponibles(puertos)
 
       // Si hay un puerto guardado en localStorage, verificar que aún esté disponible
-      const configuracionGuardada = localStorage.getItem('configuracionBalanza');
+      const configuracionGuardada = localStorage.getItem('configuracionBalanza')
       if (configuracionGuardada && puertos.length > 0) {
-        const config = JSON.parse(configuracionGuardada);
+        const config = JSON.parse(configuracionGuardada)
         if (config.puerto) {
-          const puertoExiste = puertos.some(puerto => puerto.path === config.puerto);
+          const puertoExiste = puertos.some((puerto) => puerto.path === config.puerto)
           if (!puertoExiste) {
             // Si el puerto guardado ya no está disponible, limpiar la selección
-            setPuertoSeleccionado('');
-            const nuevaConfig = { ...config };
-            delete nuevaConfig.puerto;
-            localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfig));
+            setPuertoSeleccionado('')
+            const nuevaConfig = { ...config }
+            delete nuevaConfig.puerto
+            localStorage.setItem('configuracionBalanza', JSON.stringify(nuevaConfig))
           }
         }
       }
 
       if (puertos.length === 0) {
-        mostrarMensaje('No se encontraron puertos disponibles', 'warning');
+        mostrarMensaje('No se encontraron puertos disponibles', 'warning')
       }
-
     } catch (error) {
-      console.error('Error al cargar puertos:', error);
-      setPuertosDisponibles([]);
-      mostrarMensaje('Error al cargar puertos: ' + (error.response?.data?.error || error.message), 'danger');
+      console.error('Error al cargar puertos:', error)
+      setPuertosDisponibles([])
+      mostrarMensaje(
+        'Error al cargar puertos: ' + (error.response?.data?.error || error.message),
+        'danger',
+      )
     } finally {
-      setCargandoPuertos(false);
+      setCargandoPuertos(false)
     }
-  };
-
+  }
 
   const cargarSocios = async (searchTerm = '') => {
     try {
-      setCargandoSocios(true);
+      setCargandoSocios(true)
       // Enviar el searchTerm al backend
       const response = await socioService.getAllSocios({
         search: searchTerm,
         page: 1,
-        itemsPerPage: 100 // Aumentar el límite para obtener más resultados
-      });
+        itemsPerPage: 100, // Aumentar el límite para obtener más resultados
+      })
 
       if (response && Array.isArray(response.socios)) {
-        setSocios(response.socios);
+        setSocios(response.socios)
       } else if (Array.isArray(response)) {
-        setSocios(response);
+        setSocios(response)
       } else {
-        console.error('Formato de respuesta inesperado para socios:', response);
-        setSocios([]);
+        console.error('Formato de respuesta inesperado para socios:', response)
+        setSocios([])
       }
     } catch (error) {
-      console.error('Error al cargar socios:', error);
-      setSocios([]);
+      console.error('Error al cargar socios:', error)
+      setSocios([])
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'No se pudieron cargar los socios',
-        confirmButtonColor: '#321fdb'
-      });
+        confirmButtonColor: '#321fdb',
+      })
     } finally {
-      setCargandoSocios(false);
+      setCargandoSocios(false)
     }
-  };
+  }
 
   // Add these state variables near the top of your component where other useState declarations are:
-  const [socioSeleccionado, setSocioSeleccionado] = useState('');
-  const [ordenSeleccionada, setOrdenSeleccionada] = useState('');
-  const [ordenesPendientes, setOrdenesPendientes] = useState([]);
-  const [searchTermOrdenes, setSearchTermOrdenes] = useState('');
-  const [cargandoOrdenes, setCargandoOrdenes] = useState(false);
-  const [searchTermSocios, setSearchTermSocios] = useState('');
-  const [searchTermIngresos, setSearchTermIngresos] = useState('');
-
-
-
+  const [socioSeleccionado, setSocioSeleccionado] = useState('')
+  const [ordenSeleccionada, setOrdenSeleccionada] = useState('')
+  const [ordenesPendientes, setOrdenesPendientes] = useState([])
+  const [searchTermOrdenes, setSearchTermOrdenes] = useState('')
+  const [cargandoOrdenes, setCargandoOrdenes] = useState(false)
+  const [searchTermSocios, setSearchTermSocios] = useState('')
+  const [searchTermIngresos, setSearchTermIngresos] = useState('')
 
   // Luego, modifica la función limpiarModal para incluir la limpieza de socios:
   const limpiarModal = () => {
@@ -641,16 +912,16 @@ const Ingresos = () => {
       pago_socio: 0,
       pago_con_descuento: 0,
       observacion: '',
-      aplicarPrecioJaba: false
-    });
+      aplicarPrecioJaba: false,
+    })
 
-    detenerMonitoreoRealTime();
+    detenerMonitoreoRealTime()
 
     // Limpiar orden y productos
-    setOrdenSeleccionada('');
-    setProductosOrden([]);
-    setCantidadPendientePorProducto({});
-    setProductoSeleccionadoPesaje('');
+    setOrdenSeleccionada('')
+    setProductosOrden([])
+    setCantidadPendientePorProducto({})
+    setProductoSeleccionadoPesaje('')
 
     // // Limpiar pesajes temporales
     // if (typeof setPesajesTemporales !== 'undefined') {
@@ -658,28 +929,32 @@ const Ingresos = () => {
     // }
 
     // Limpiar errores
-    setFormErrors({});
+    setFormErrors({})
 
-    setPesoJaba(2); // Peso configurable por jaba
-    setPrecioVentaKg(2.7); // Precio por defecto
-    setPorcentajeImpuesto(4); // Impuesto por defecto
+    setPesoJaba(2) // Peso configurable por jaba
+    setPrecioVentaKg(2.7) // Precio por defecto
+    setPorcentajeImpuesto(4) // Impuesto por defecto
 
     // Limpiar búsquedas
-    setSearchTermOrdenes('');
-    setSearchTermSocios('');
+    setSearchTermOrdenes('')
+    setSearchTermSocios('')
 
     // Limpiar selecciones de socios y órdenes
-    setSocioSeleccionado('');
-    setOrdenSeleccionada('');
-    setContadorPesajes(1);
+    setSocioSeleccionado('')
+    setOrdenSeleccionada('')
+    setContadorPesajes(1)
 
     // Resetear listas de datos
     // setSocios([]);
     // setOrdenesPendientes([]);
 
     // Detener monitoreo si está activo
-    if (typeof setMonitorActivo !== 'undefined' && typeof monitorActivo !== 'undefined' && monitorActivo) {
-      setMonitorActivo(false);
+    if (
+      typeof setMonitorActivo !== 'undefined' &&
+      typeof monitorActivo !== 'undefined' &&
+      monitorActivo
+    ) {
+      setMonitorActivo(false)
     }
 
     // Resetear peso en tiempo real
@@ -687,60 +962,71 @@ const Ingresos = () => {
       setPesajeRealTime({
         weight: 0,
         stable: false,
-        unit: 'kg'
-      });
+        unit: 'kg',
+      })
     }
 
     // Limpiar historial de pesajes
-    setHistorialPesajes([]);
+    setHistorialPesajes([])
 
     // Resetear pestañas
-    setActiveTab('general');
+    setActiveTab('general')
 
-    console.log('Modal limpiado completamente');
-  };
-
-
+    console.log('Modal limpiado completamente')
+  }
 
   // Modificar la función para cerrar el modal
   const cerrarModal = () => {
-    limpiarModal();
-    setShowModal(false);
-  };
-
+    limpiarModal()
+    setShowModal(false)
+  }
 
   // También agregar una función para abrir el modal que cargue los datos iniciales
   const abrirModal = async (titulo, ingreso = null) => {
-    setModalTitle(titulo);
-    verificarEstadoBalanza();
+    setModalTitle(titulo)
+    verificarEstadoBalanza()
 
     if (ingreso) {
       // Modo edición
-      setCurrentIngreso(ingreso);
-      setEditingId(ingreso.id); // Establecer el ID del ingreso que se está editando
+      setCurrentIngreso(ingreso)
+      setEditingId(ingreso.id) // Establecer el ID del ingreso que se está editando
 
       // Cargar pesajes temporales para el ingreso en edición
       try {
-        const pesajes = await obtenerPesajesTemporales(ingreso.id);
-        setPesajesTemporales(pesajes);
+        const pesajes = await obtenerPesajesTemporales(ingreso.id)
+        setPesajesTemporales(pesajes)
 
         if (ingreso.detalle_orden.producto_id) {
-          setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id);
+          setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id)
         }
 
-
-        setPesajesTemporales(prev => {
-          const nuevosTemporales = [...prev];
+        setPesajesTemporales((prev) => {
+          const nuevosTemporales = [...prev]
 
           // Calcular los totales de los pesajes temporales
-          const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-          const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
-          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0);
-          const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
-          const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+          const totalPesoBruto = nuevosTemporales.reduce(
+            (sum, p) => sum + (parseFloat(p.peso_bruto) || 0),
+            0,
+          )
+          const totalJabas = nuevosTemporales.reduce(
+            (sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0),
+            0,
+          )
+          const totalPesoJabas = nuevosTemporales.reduce(
+            (sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0),
+            0,
+          )
+          const totalDescuentoMerma = nuevosTemporales.reduce(
+            (sum, p) => sum + (parseFloat(p.descuento_merma) || 0),
+            0,
+          )
+          const totalPesoNeto = nuevosTemporales.reduce(
+            (sum, p) => sum + (parseFloat(p.peso_neto) || 0),
+            0,
+          )
 
           // Actualizar el estado del ingreso actual con los nuevos totales
-          setCurrentIngreso(prev => ({
+          setCurrentIngreso((prev) => ({
             ...prev,
             peso_bruto: totalPesoBruto.toFixed(3),
             num_jabas: totalJabas,
@@ -748,40 +1034,37 @@ const Ingresos = () => {
             descuento_merma: totalDescuentoMerma.toFixed(3),
             peso_neto: totalPesoNeto.toFixed(3),
             // Recalcular el total basado en el nuevo peso neto
-            total: (totalPesoNeto * parseFloat((prev.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)
-          }));
+            total: (totalPesoNeto * parseFloat(prev.precio_venta_kg || precioVentaKg || 0)).toFixed(
+              2,
+            ),
+          }))
 
-          return nuevosTemporales;
-        });
+          return nuevosTemporales
+        })
       } catch (error) {
-        console.error('Error al cargar pesajes temporales:', error);
-        setPesajesTemporales([]);
+        console.error('Error al cargar pesajes temporales:', error)
+        setPesajesTemporales([])
       }
     } else {
       // Modo creación - limpiar todo primero
-      limpiarModal();
-      setEditingId(null); // No hay ingreso en edición
-      setPesajesTemporales([]); // Limpiar pesajes temporales
+      limpiarModal()
+      setEditingId(null) // No hay ingreso en edición
+      setPesajesTemporales([]) // Limpiar pesajes temporales
 
       // Luego cargar datos iniciales
-      cargarSocios('');
-      cargarOrdenesPendientes('');
+      cargarSocios('')
+      cargarOrdenesPendientes('')
     }
 
-    setShowModal(true);
-  };
-
-
+    setShowModal(true)
+  }
 
   const obtenerPesajesTemporales = async (ingresoId) => {
     // Implementa la lógica para obtener los pesajes temporales desde el backend o el estado
     // Aquí se asume que hay un servicio que devuelve los pesajes temporales para un ingreso dado
-    const response = await detallePesajeService.getByIngresoId(ingresoId);
-    return response || [];
-  };
-
-
-
+    const response = await detallePesajeService.getByIngresoId(ingresoId)
+    return response || []
+  }
 
   // Busca el useEffect que maneja el cambio de orden seleccionada y agrega el reset del producto seleccionado
   useEffect(() => {
@@ -790,7 +1073,7 @@ const Ingresos = () => {
       // setProductoSeleccionadoPesaje('');
 
       // Cargar productos de la orden
-      cargarProductosDeOrden(ordenSeleccionada); // Pasar el ID de la orden
+      cargarProductosDeOrden(ordenSeleccionada) // Pasar el ID de la orden
 
       // Limpiar datos del ingreso actual con valores por defecto solo si no estás editando
       if (!editingId) {
@@ -815,11 +1098,11 @@ const Ingresos = () => {
           pago_socio: 0,
           pago_con_descuento: 0,
           observacion: '',
-          aplicarPrecioJaba: false
-        });
+          aplicarPrecioJaba: false,
+        })
       }
     }
-  }, [ordenSeleccionada, editingId]);
+  }, [ordenSeleccionada, editingId])
 
   // También agregar el reset cuando se cambia de orden en el selector
   // const handleOrdenChange = (e) => {
@@ -841,196 +1124,190 @@ const Ingresos = () => {
   //   }
   // };
 
-
-
-
-
-
-
   const cargarOrdenesPendientes = async (searchTerm = '') => {
     try {
-      setCargandoOrdenes(true);
+      setCargandoOrdenes(true)
 
       // Obtener órdenes pendientes con término de búsqueda
       const response = await ordenCompraService.getPendientes({
         search: searchTerm,
         page: 1,
-        itemsPerPage: 50 // Límite razonable para el dropdown
-      });
+        itemsPerPage: 50, // Límite razonable para el dropdown
+      })
 
       // Manejar diferentes formatos de respuesta
-      let ordenes = [];
+      let ordenes = []
       if (response && Array.isArray(response.ordenesPendientes)) {
-        ordenes = response.ordenesPendientes;
+        ordenes = response.ordenesPendientes
       } else if (response.data && Array.isArray(response.data.ordenesPendientes)) {
-        ordenes = response.data.ordenesPendientes;
+        ordenes = response.data.ordenesPendientes
       } else if (response.data && Array.isArray(response.data.ordenesCompra)) {
-        ordenes = response.data.ordenesCompra;
+        ordenes = response.data.ordenesCompra
       } else if (response.data && Array.isArray(response.data)) {
-        ordenes = response.data;
+        ordenes = response.data
       } else if (Array.isArray(response)) {
-        ordenes = response;
+        ordenes = response
       } else {
-        console.error('Formato de respuesta inesperado para órdenes:', response);
-        ordenes = [];
+        console.error('Formato de respuesta inesperado para órdenes:', response)
+        ordenes = []
       }
 
-      setOrdenesPendientes(ordenes);
+      setOrdenesPendientes(ordenes)
     } catch (error) {
-      console.error('Error al cargar órdenes pendientes:', error);
-      setOrdenesPendientes([]);
-      if (searchTerm === '') { // Solo mostrar error si es la carga inicial
+      console.error('Error al cargar órdenes pendientes:', error)
+      setOrdenesPendientes([])
+      if (searchTerm === '') {
+        // Solo mostrar error si es la carga inicial
         Swal.fire({
           icon: 'error',
           title: 'Error',
           text: 'No se pudieron cargar las órdenes pendientes',
-          confirmButtonColor: '#321fdb'
-        });
+          confirmButtonColor: '#321fdb',
+        })
       }
     } finally {
-      setCargandoOrdenes(false);
+      setCargandoOrdenes(false)
     }
-  };
+  }
 
   // Debounce para la búsqueda de órdenes
   const debouncedCargarSocios = useRef(
     debounce((searchTerm) => {
-      cargarSocios(searchTerm);
-    }, 300)
-  ).current;
+      cargarSocios(searchTerm)
+    }, 300),
+  ).current
 
   // useEffect para cargar órdenes al inicio
   useEffect(() => {
-    cargarSocios(); // Cargar órdenes pendientes al inicio
-  }, []);
+    cargarSocios() // Cargar órdenes pendientes al inicio
+  }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
     if (searchTermSocios !== undefined) {
-      debouncedCargarSocios(searchTermSocios);
+      debouncedCargarSocios(searchTermSocios)
     }
-  }, [searchTermSocios, debouncedCargarSocios]);
+  }, [searchTermSocios, debouncedCargarSocios])
 
   // Debounce para la búsqueda de órdenes
   const debouncedCargarIngresos = useRef(
     debounce((searchTerm) => {
-      fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter);
-    }, 300)
-  ).current;
+      fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter)
+    }, 300),
+  ).current
 
   // useEffect para cargar órdenes al inicio
   useEffect(() => {
-    fetchIngresos(); // Cargar órdenes pendientes al inicio
-  }, []);
+    fetchIngresos() // Cargar órdenes pendientes al inicio
+  }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
     if (searchTermIngresos !== undefined) {
-      debouncedCargarIngresos(searchTermIngresos);
+      debouncedCargarIngresos(searchTermIngresos)
     }
-  }, [searchTermIngresos, debouncedCargarIngresos]);
+  }, [searchTermIngresos, debouncedCargarIngresos])
 
   // Debounce para la búsqueda de órdenes
   const debouncedCargarOrdenes = useRef(
     debounce((searchTerm) => {
-      cargarOrdenesPendientes(searchTerm);
-    }, 300)
-  ).current;
+      cargarOrdenesPendientes(searchTerm)
+    }, 300),
+  ).current
 
   // useEffect para cargar órdenes al inicio
   useEffect(() => {
-    cargarOrdenesPendientes(); // Cargar órdenes pendientes al inicio
-  }, []);
+    cargarOrdenesPendientes() // Cargar órdenes pendientes al inicio
+  }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
     if (searchTermOrdenes !== undefined) {
-      debouncedCargarOrdenes(searchTermOrdenes);
+      debouncedCargarOrdenes(searchTermOrdenes)
     }
-  }, [searchTermOrdenes, debouncedCargarOrdenes]);
+  }, [searchTermOrdenes, debouncedCargarOrdenes])
   // Agregar un useEffect que recargue los datos cuando cambie el searchTerm
   useEffect(() => {
     // Debounce para evitar demasiadas llamadas al API
     const timeoutId = setTimeout(() => {
       if (searchTerm.trim() !== '') {
         // Recargar socios con el nuevo término de búsqueda
-        cargarSocios(searchTerm);
+        cargarSocios(searchTerm)
         // Recargar órdenes con el término de búsqueda
-        cargarOrdenesPendientes();
+        cargarOrdenesPendientes()
       } else {
         // Si no hay término de búsqueda, cargar todos los datos
-        cargarSocios('');
-        cargarOrdenesPendientes('');
+        cargarSocios('')
+        cargarOrdenesPendientes('')
       }
-    }, 300); // Esperar 300ms después de que el usuario deje de escribir
+    }, 300) // Esperar 300ms después de que el usuario deje de escribir
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]); // Remover socioSeleccionado de las dependencias
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm]) // Remover socioSeleccionado de las dependencias
 
+  const conectarBalanza = async () => {
+    if (!puertoSeleccionado) {
+      toast.warning('Por favor, seleccione un puerto')
+      return
+    }
 
+    // Check if the selected port is available
+    const puertoDisponible = puertosDisponibles.some((puerto) => puerto.path === puertoSeleccionado)
+    if (!puertoDisponible) {
+      toast.error(
+        'El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.',
+      )
+      return
+    }
 
-
-
-const conectarBalanza = async () => {
-  if (!puertoSeleccionado) {
-      toast.warning('Por favor, seleccione un puerto');
-      return;
-  }
-
-  // Check if the selected port is available
-  const puertoDisponible = puertosDisponibles.some(puerto => puerto.path === puertoSeleccionado);
-  if (!puertoDisponible) {
-      toast.error('El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.');
-      return;
-  }
-
-  try {
-      setConectandoBalanza(true);
+    try {
+      setConectandoBalanza(true)
       const response = await balanzaService.connect({
-          port: puertoSeleccionado,
-          baudRate: parseInt(baudRate)
-      });
+        port: puertoSeleccionado,
+        baudRate: parseInt(baudRate),
+      })
 
-      toast.success(response.message || 'Balanza conectada exitosamente');
-      setBalanzaConectada(true);
-  } catch (error) {
-      console.error('Error al conectar balanza:', error);
-      toast.error('Error al conectar: ' + (error.response?.data?.error || error.message));
-  } finally {
-      setConectandoBalanza(false);
+      toast.success(response.message || 'Balanza conectada exitosamente')
+      setBalanzaConectada(true)
+    } catch (error) {
+      console.error('Error al conectar balanza:', error)
+      toast.error('Error al conectar: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setConectandoBalanza(false)
+    }
   }
-};
   // Cargar puertos cuando se abre la pestaña de pesaje
   useEffect(() => {
     if (activeTab === 'pesaje' && puertosDisponibles.length === 0) {
-      cargarPuertos();
+      cargarPuertos()
     }
-  }, [activeTab]);
+  }, [activeTab])
 
   // Función para filtrar socios basada en el término de búsqueda
   const filtrarSocios = (socios, searchTerm) => {
-    if (!searchTerm) return socios;
+    if (!searchTerm) return socios
 
-    const term = searchTerm.toLowerCase();
-    return socios.filter(socio =>
-      socio.codigo?.toLowerCase().includes(term) ||
-      socio.nombres?.toLowerCase().includes(term) ||
-      socio.apellidos?.toLowerCase().includes(term) ||
-      `${socio.nombres} ${socio.apellidos}`.toLowerCase().includes(term)
-    );
-  };
+    const term = searchTerm.toLowerCase()
+    return socios.filter(
+      (socio) =>
+        socio.codigo?.toLowerCase().includes(term) ||
+        socio.nombres?.toLowerCase().includes(term) ||
+        socio.apellidos?.toLowerCase().includes(term) ||
+        `${socio.nombres} ${socio.apellidos}`.toLowerCase().includes(term),
+    )
+  }
 
   // Función para filtrar órdenes basada en el término de búsqueda
   const filtrarOrdenes = (ordenes, searchTerm) => {
-    if (!searchTerm) return ordenes;
+    if (!searchTerm) return ordenes
 
-    const term = searchTerm.toLowerCase();
-    return ordenes.filter(orden =>
-      orden.codigo_lote?.toLowerCase().includes(term) ||
-      orden.cliente?.razon_social?.toLowerCase().includes(term)
-    );
-  };
-
+    const term = searchTerm.toLowerCase()
+    return ordenes.filter(
+      (orden) =>
+        orden.codigo_lote?.toLowerCase().includes(term) ||
+        orden.cliente?.razon_social?.toLowerCase().includes(term),
+    )
+  }
 
   // Referencias
   const numeroInputRef = useRef(null)
@@ -1048,7 +1325,7 @@ const conectarBalanza = async () => {
         text: 'El ingreso ha sido eliminado correctamente.',
         confirmButtonColor: '#321fdb',
         timer: 2000,
-        timerProgressBar: true
+        timerProgressBar: true,
       })
 
       await fetchIngresos()
@@ -1060,19 +1337,24 @@ const conectarBalanza = async () => {
         icon: 'error',
         title: 'Error',
         text: error.response?.data?.error || 'Error al eliminar el ingreso',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     } finally {
       setDeleting(false)
     }
   }
 
-
   // Funciones de carga de datos
 
-  const fetchIngresos = async (page = 1, itemsPerPage = 10, searchTerm = '', numero = '', socio = '') => {
-    setLoading(true);
-    setError(null);
+  const fetchIngresos = async (
+    page = 1,
+    itemsPerPage = 10,
+    searchTerm = '',
+    numero = '',
+    socio = '',
+  ) => {
+    setLoading(true)
+    setError(null)
     try {
       const response = await ingresoService.getAll({
         page,
@@ -1080,33 +1362,32 @@ const conectarBalanza = async () => {
         search: searchTerm,
         numero_ingreso: numero,
         socio_nombre: socio,
-      });
-      console.log('API Response:', response);
+      })
+      console.log('API Response:', response)
 
       if (response && Array.isArray(response.ingresos)) {
-        setIngresos(response.ingresos);
-        setTotalPages(response.totalPages || 1);
-        setTotalItems(response.total || 0);
-        setCurrentPage(response.currentPage || 1);
+        setIngresos(response.ingresos)
+        setTotalPages(response.totalPages || 1)
+        setTotalItems(response.total || 0)
+        setCurrentPage(response.currentPage || 1)
       } else {
-        console.error('Unexpected response format:', response);
-        setError('Unexpected response format. Please contact the administrator.');
+        console.error('Unexpected response format:', response)
+        setError('Unexpected response format. Please contact the administrator.')
       }
     } catch (err) {
-      console.error('Error fetching ingresos:', err);
-      setError('Error loading ingresos. Please try again.');
+      console.error('Error fetching ingresos:', err)
+      setError('Error loading ingresos. Please try again.')
 
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'Could not load ingresos. Please try again.',
         confirmButtonColor: '#321fdb',
-      });
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
-
+  }
 
   const fetchDatosRelacionados = async () => {
     try {
@@ -1115,7 +1396,7 @@ const conectarBalanza = async () => {
         productoService.getAll(),
         detalleOrdenCompraService.getAll(),
         unidadMedidaService.getAll(),
-        tipoFrutaService.getAll()
+        tipoFrutaService.getAll(),
       ])
 
       setSocios(sociosRes?.socios || sociosRes || [])
@@ -1180,11 +1461,19 @@ const conectarBalanza = async () => {
   // Funciones de manejo de formulario
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setCurrentIngreso(prev => {
+    setCurrentIngreso((prev) => {
       const updated = { ...prev, [name]: value }
 
       // Calcular automáticamente valores dependientes
-      if (['peso_neto', 'precio_venta_kg', 'descuento_merma', 'dscto_jaba', 'pago_transporte'].includes(name)) {
+      if (
+        [
+          'peso_neto',
+          'precio_venta_kg',
+          'descuento_merma',
+          'dscto_jaba',
+          'pago_transporte',
+        ].includes(name)
+      ) {
         const pesoNeto = parseFloat(updated.peso_neto) || 0
         const precioKg = parseFloat(updated.precio_venta_kg) || 0
         const descuentoMerma = parseFloat(updated.descuento_merma) || 0
@@ -1208,7 +1497,7 @@ const conectarBalanza = async () => {
 
     // Limpiar error del campo
     if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }))
+      setFormErrors((prev) => ({ ...prev, [name]: '' }))
     }
   }
 
@@ -1216,8 +1505,8 @@ const conectarBalanza = async () => {
     const event = {
       target: {
         name: fieldName,
-        value: selectedOption ? selectedOption.value : ''
-      }
+        value: selectedOption ? selectedOption.value : '',
+      },
     }
     handleInputChange(event)
   }
@@ -1227,9 +1516,9 @@ const conectarBalanza = async () => {
       const response = await balanzaService.getWeight()
       if (response.weight !== undefined) {
         setPesoActual(response.weight)
-        setCurrentIngreso(prev => ({
+        setCurrentIngreso((prev) => ({
           ...prev,
-          peso_neto: response.weight.toFixed(3)
+          peso_neto: response.weight.toFixed(3),
         }))
 
         Swal.fire({
@@ -1238,7 +1527,7 @@ const conectarBalanza = async () => {
           text: `Peso actual: ${response.weight} ${response.unit || 'kg'}`,
           timer: 2000,
           timerProgressBar: true,
-          confirmButtonColor: '#321fdb'
+          confirmButtonColor: '#321fdb',
         })
       }
     } catch (error) {
@@ -1247,15 +1536,12 @@ const conectarBalanza = async () => {
         icon: 'error',
         title: 'Error',
         text: 'No se pudo obtener el peso de la balanza',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     }
   }
 
-
-
   // Agregar después de la línea 693, en la sección del monitor en tiempo real:
-
 
   // Funciones para el Monitor en Tiempo Real
 
@@ -1266,32 +1552,31 @@ const conectarBalanza = async () => {
   // Función para iniciar el monitoreo en tiempo real
   const iniciarMonitoreoRealTime = async () => {
     if (!balanzaConectada) {
-      toast.warning('Debe conectar la balanza primero');
-      return;
+      toast.warning('Debe conectar la balanza primero')
+      return
     }
 
     try {
-      setMonitorActivo(true);
+      setMonitorActivo(true)
 
       // Cerrar cualquier conexión EventSource existente
       if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+        eventSourceRef.current.close()
       }
-
 
       // Usar el servicio createRealtimeConnection en lugar de crear EventSource manualmente
       const eventSource = balanzaService.createRealtimeConnection(
         // Función onData - se ejecuta cuando llegan datos
         (data) => {
-          console.log('Datos recibidos del monitor:', data);
+          console.log('Datos recibidos del monitor:', data)
 
           // Solo procesar si el tipo es 'messageProcessed'
           if (data.type !== 'messageProcessed') {
-            return;
+            return
           }
 
           // Actualizar el estado del pesaje en tiempo real
-          setPesajeRealTime(prev => ({
+          setPesajeRealTime((prev) => ({
             ...prev,
             weight: data.weight || 0,
             stable: data.stable || false,
@@ -1299,31 +1584,31 @@ const conectarBalanza = async () => {
             statusColor: data.stable ? '#28a745' : '#ffc107',
             timestamp: data.timestamp || new Date().toISOString(),
             rawData: data.rawData || '',
-            hexData: data.hexData || ''
-          }));
+            hexData: data.hexData || '',
+          }))
 
           // Si el peso es estable, agregarlo al historial
           if (data.stable && data.weight > 0) {
-            setPesajes(prev => {
+            setPesajes((prev) => {
               const nuevoPesaje = {
                 id: `pesaje_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ID único
                 peso: data.weight,
                 stable: data.stable,
                 timestamp: data.timestamp || new Date().toISOString(),
-                rawData: data.rawData
-              };
+                rawData: data.rawData,
+              }
 
               // Mantener solo los últimos 10 pesajes
-              const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10);
-              return nuevoHistorial;
-            });
+              const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10)
+              return nuevoHistorial
+            })
           }
         },
         // Función onError - se ejecuta cuando hay errores
         (error) => {
-          console.error('Error en conexión de tiempo real:', error);
-          setMonitorActivo(false);
-          toast.error('Error en la conexión del monitor');
+          console.error('Error en conexión de tiempo real:', error)
+          setMonitorActivo(false)
+          toast.error('Error en la conexión del monitor')
 
           // Resetear el estado del pesaje
           setPesajeRealTime({
@@ -1333,29 +1618,28 @@ const conectarBalanza = async () => {
             statusColor: '#dc3545',
             timestamp: null,
             rawData: '',
-            hexData: ''
-          });
-        }
-      );
+            hexData: '',
+          })
+        },
+      )
 
-      eventSourceRef.current = eventSource;
-      toast.success('Monitor de peso iniciado');
-
+      eventSourceRef.current = eventSource
+      toast.success('Monitor de peso iniciado')
     } catch (error) {
-      console.error('Error al iniciar monitoreo:', error);
-      setMonitorActivo(false);
-      toast.error('Error al iniciar el monitor de peso');
+      console.error('Error al iniciar monitoreo:', error)
+      setMonitorActivo(false)
+      toast.error('Error al iniciar el monitor de peso')
     }
-  };
+  }
 
   // Función para detener el monitoreo
   const detenerMonitoreoRealTime = () => {
     if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
     }
 
-    setMonitorActivo(false);
+    setMonitorActivo(false)
 
     // Resetear el estado del pesaje
     setPesajeRealTime({
@@ -1365,152 +1649,154 @@ const conectarBalanza = async () => {
       statusColor: '#6c757d',
       timestamp: null,
       rawData: '',
-      hexData: ''
-    });
+      hexData: '',
+    })
 
-    toast.info('Monitor de peso detenido');
-  };
+    toast.info('Monitor de peso detenido')
+  }
 
   // Función para aplicar peso estable
   const aplicarPesoEstable = () => {
     if (!monitorActivo) {
-      toast.warning('Debe iniciar el monitor primero');
-      return;
+      toast.warning('Debe iniciar el monitor primero')
+      return
     }
 
-    const peso = pesajeRealTime?.weight ?? 0;
+    const peso = pesajeRealTime?.weight ?? 0
 
     if (!pesajeRealTime.stable || peso <= 0) {
-      toast.warning('Debe esperar a que el peso se estabilice');
-      return;
+      toast.warning('Debe esperar a que el peso se estabilice')
+      return
     }
 
-    setCurrentIngreso(prev => ({
+    setCurrentIngreso((prev) => ({
       ...prev,
-      peso_neto: peso.toFixed(3)
-    }));
+      peso_neto: peso.toFixed(3),
+    }))
 
     // Recalcular totales automáticamente
     const event = {
       target: {
         name: 'peso_neto',
-        value: peso.toFixed(3)
-      }
-    };
-    handleInputChange(event);
+        value: peso.toFixed(3),
+      },
+    }
+    handleInputChange(event)
 
-    toast.success(`Peso aplicado: ${peso.toFixed(3)} kg`);
-  };
+    toast.success(`Peso aplicado: ${peso.toFixed(3)} kg`)
+  }
 
-  const [aplicarPrecioJaba, setAplicarPrecioJaba] = useState(false);
+  const [aplicarPrecioJaba, setAplicarPrecioJaba] = useState(false)
 
   // Función para manejar el cambio del checkbox
   const handleCheckboxChange = (event) => {
-    const { checked } = event.target;
+    const { checked } = event.target
     setCurrentIngreso((prev) => ({
       ...prev,
-      aplicarPrecioJaba: checked
-    }));
-  };
-
+      aplicarPrecioJaba: checked,
+    }))
+  }
 
   // Función para aplicar peso en tiempo real al formulario (corregida)
 
   // Agregar estos estados al inicio del componente (cerca de los otros useState)
 
-  const [contadorPesajes, setContadorPesajes] = useState(1); // Contador para numerar los pesajes
+  const [contadorPesajes, setContadorPesajes] = useState(1) // Contador para numerar los pesajes
 
-  const [pesoJaba, setPesoJaba] = useState(2); // Peso configurable por jaba
-  const [precioVentaKg, setPrecioVentaKg] = useState(2.7); // Precio por defecto
-  const [porcentajeImpuesto, setPorcentajeImpuesto] = useState(4); // Impuesto por defecto
+  const [pesoJaba, setPesoJaba] = useState(2) // Peso configurable por jaba
+  const [precioVentaKg, setPrecioVentaKg] = useState(2.7) // Precio por defecto
+  const [porcentajeImpuesto, setPorcentajeImpuesto] = useState(4) // Impuesto por defecto
 
-  const camposBloqueados = pesajesTemporales.length > 0;
-
+  const camposBloqueados = pesajesTemporales.length > 0
 
   // Función para sincronizar totales del ingreso con pesajes temporales
   const sincronizarTotalesIngreso = (pesajesActualizados) => {
-    const totalPesoBruto = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-    const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_jabas) || parseFloat(p.peso_total_jabas) || 0), 0); //kong
+    const totalPesoBruto = pesajesActualizados.reduce(
+      (sum, p) => sum + (parseFloat(p.peso_bruto) || 0),
+      0,
+    )
+    const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0)
+    const totalPesoJabas = pesajesActualizados.reduce(
+      (sum, p) => sum + (parseFloat(p.peso_jabas) || parseFloat(p.peso_total_jabas) || 0),
+      0,
+    ) //kong
 
-    setCurrentIngreso(prev => ({
+    setCurrentIngreso((prev) => ({
       ...prev,
       peso_bruto: totalPesoBruto.toFixed(3),
       num_jabas: totalJabas,
-      peso_total_jabas: totalPesoJabas.toFixed(3)
-    }));
+      peso_total_jabas: totalPesoJabas.toFixed(3),
+    }))
 
-    return { totalPesoBruto, totalJabas, totalPesoJabas };
-  };
-
+    return { totalPesoBruto, totalJabas, totalPesoJabas }
+  }
 
   const detectarJabas = (peso) => {
-    if (!peso || peso <= 0 || !pesoJaba || pesoJaba <= 0) return 0;
+    if (!peso || peso <= 0 || !pesoJaba || pesoJaba <= 0) return 0
 
     // Calcular número aproximado de jabas
-    const jabasCalculadas = Math.round(peso / pesoJaba);
+    const jabasCalculadas = Math.round(peso / pesoJaba)
 
     // Validar que el cálculo sea razonable (no más de 50 jabas por pesaje)
-    return jabasCalculadas > 50 ? 0 : jabasCalculadas;
-  };
-
-
+    return jabasCalculadas > 50 ? 0 : jabasCalculadas
+  }
 
   // Agregar un useEffect para forzar re-render cuando cambien los pesajesTemporales
   useEffect(() => {
     // Forzar re-render cuando cambien los pesajes temporales
     if (pesajesTemporales.length > 0) {
       // Esto forzará que se recalculen los valores en el render
-      setProductosOrden(prev => [...prev]);
+      setProductosOrden((prev) => [...prev])
     }
-  }, [pesajesTemporales]);
+  }, [pesajesTemporales])
 
   // Asegúrate de que estas funciones estén definidas ANTES del return del componente
   const calcularPesoNetoIngresadoPorProducto = (productoId) => {
     return pesajesTemporales
-      .filter(pesaje => pesaje.producto_id === productoId)
+      .filter((pesaje) => pesaje.producto_id === productoId)
       .reduce((sum, pesaje) => {
-        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jabas || parseFloat(pesaje.peso_total_jabas)  || 0);
-        return sum + pesoNeto;
-      }, 0);
-  };
-
+        const pesoNeto =
+          parseFloat(pesaje.peso_bruto || 0) -
+          parseFloat(pesaje.peso_jabas || parseFloat(pesaje.peso_total_jabas) || 0)
+        return sum + pesoNeto
+      }, 0)
+  }
 
   function calcularCantidadPendienteActualizada(producto) {
     if (!producto || typeof producto.cantidad === 'undefined') {
-      console.error('Invalid producto:', producto);
-      return 0; // or some default value
+      console.error('Invalid producto:', producto)
+      return 0 // or some default value
     }
-    const cantidadTotal = producto.cantidad || 0;
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id);
-    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado;
+    const cantidadTotal = producto.cantidad || 0
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id)
+    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
 
     // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
-    return Math.max(0, cantidadTotal - cantidadIngresadaTotal);
-  };
+    return Math.max(0, cantidadTotal - cantidadIngresadaTotal)
+  }
 
   const calcularProgresoActualizado = (producto) => {
-    const cantidadTotal = producto.cantidad || 0;
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id);
-    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado;
+    const cantidadTotal = producto.cantidad || 0
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id)
+    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
 
-    return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0;
-  };
+    return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0
+  }
 
   const aplicarPesoRealTime = async () => {
     if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
-      toast.error('El peso debe estar estabilizado para aplicarlo');
-      return;
+      toast.error('El peso debe estar estabilizado para aplicarlo')
+      return
     }
 
-    const pesoBruto = pesajeRealTime.weight;
+    const pesoBruto = pesajeRealTime.weight
 
     // Verificar que hay un producto seleccionado
     if (!productoSeleccionadoPesaje) {
-      toast.warning('Debe seleccionar un producto antes de aplicar el peso');
-      return;
+      toast.warning('Debe seleccionar un producto antes de aplicar el peso')
+      return
     }
 
     // Preguntar cuántas jabas y descuento por merma
@@ -1592,66 +1878,66 @@ const conectarBalanza = async () => {
       cancelButtonColor: '#6c757d',
       width: '600px',
       didOpen: () => {
-        const jabasInput = document.getElementById('swal-jabas');
-        const mermaInput = document.getElementById('swal-merma');
-        const pesoJabasSpan = document.getElementById('swal-peso-jabas');
-        const descuentoMermaSpan = document.getElementById('swal-descuento-merma');
-        const pesoNetoSpan = document.getElementById('swal-peso-neto');
+        const jabasInput = document.getElementById('swal-jabas')
+        const mermaInput = document.getElementById('swal-merma')
+        const pesoJabasSpan = document.getElementById('swal-peso-jabas')
+        const descuentoMermaSpan = document.getElementById('swal-descuento-merma')
+        const pesoNetoSpan = document.getElementById('swal-peso-neto')
 
         const calcularPesos = () => {
-          const jabas = parseInt(jabasInput.value) || 0;
-          const merma = parseFloat(mermaInput.value) || 0;
-          const pesoTotalJabas = jabas * pesoJaba;
-          const pesoNeto = Math.max(0, pesoBruto - pesoTotalJabas - merma);
+          const jabas = parseInt(jabasInput.value) || 0
+          const merma = parseFloat(mermaInput.value) || 0
+          const pesoTotalJabas = jabas * pesoJaba
+          const pesoNeto = Math.max(0, pesoBruto - pesoTotalJabas - merma)
 
-          pesoJabasSpan.textContent = pesoTotalJabas.toFixed(2);
-          descuentoMermaSpan.textContent = merma.toFixed(3);
-          pesoNetoSpan.textContent = pesoNeto.toFixed(3);
-        };
+          pesoJabasSpan.textContent = pesoTotalJabas.toFixed(2)
+          descuentoMermaSpan.textContent = merma.toFixed(3)
+          pesoNetoSpan.textContent = pesoNeto.toFixed(3)
+        }
 
-        jabasInput.addEventListener('input', calcularPesos);
-        mermaInput.addEventListener('input', calcularPesos);
-        calcularPesos(); // Calcular inicial
+        jabasInput.addEventListener('input', calcularPesos)
+        mermaInput.addEventListener('input', calcularPesos)
+        calcularPesos() // Calcular inicial
       },
       preConfirm: () => {
-        const jabas = parseInt(document.getElementById('swal-jabas').value);
-        const merma = parseFloat(document.getElementById('swal-merma').value) || 0;
+        const jabas = parseInt(document.getElementById('swal-jabas').value)
+        const merma = parseFloat(document.getElementById('swal-merma').value) || 0
 
         if (!jabas || jabas <= 0) {
-          Swal.showValidationMessage('Debe ingresar un número válido de jabas');
-          return false;
+          Swal.showValidationMessage('Debe ingresar un número válido de jabas')
+          return false
         }
         if (jabas > 50) {
-          Swal.showValidationMessage('El número de jabas no puede ser mayor a 50');
-          return false;
+          Swal.showValidationMessage('El número de jabas no puede ser mayor a 50')
+          return false
         }
         if (merma < 0) {
-          Swal.showValidationMessage('El descuento por merma no puede ser negativo');
-          return false;
+          Swal.showValidationMessage('El descuento por merma no puede ser negativo')
+          return false
         }
 
-        return { jabas, merma };
-      }
-    });
+        return { jabas, merma }
+      },
+    })
 
     // Si el usuario canceló o no ingresó valores válidos
     if (!formValues) {
-      return;
+      return
     }
 
-    const jabasIngresadas = formValues.jabas;
-    const descuentoMerma = formValues.merma;
-    const pesoTotalJabas = jabasIngresadas * pesoJaba;
-    const pesoNeto = pesoBruto - pesoTotalJabas - descuentoMerma;
+    const jabasIngresadas = formValues.jabas
+    const descuentoMerma = formValues.merma
+    const pesoTotalJabas = jabasIngresadas * pesoJaba
+    const pesoNeto = pesoBruto - pesoTotalJabas - descuentoMerma
 
     // Buscar el producto seleccionado en la lista de productos de la orden
-    const productoOrden = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
+    const productoOrden = productosOrden.find(
+      (p) => p.producto_id === parseInt(productoSeleccionadoPesaje),
+    )
     if (!productoOrden) {
-      toast.error('No se encontró el producto seleccionado en la orden');
-      return;
+      toast.error('No se encontró el producto seleccionado en la orden')
+      return
     }
-
-
 
     // Crear el pesaje temporal con TODA la información necesaria
     const nuevoPesaje = {
@@ -1676,24 +1962,37 @@ const conectarBalanza = async () => {
       timestamp: new Date().toISOString(),
       stable: pesajeRealTime.stable,
       rawData: pesajeRealTime.rawData,
-      observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}${descuentoMerma > 0 ? ` - Merma: ${descuentoMerma.toFixed(3)}kg` : ''}`
-    };
+      observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}${descuentoMerma > 0 ? ` - Merma: ${descuentoMerma.toFixed(3)}kg` : ''}`,
+    }
 
-    console.log('Aplicando peso con merma:', nuevoPesaje);
+    console.log('Aplicando peso con merma:', nuevoPesaje)
 
+    setPesajesTemporales((prev) => {
+      const nuevosTemporales = [...prev, nuevoPesaje]
 
-
-    setPesajesTemporales(prev => {
-      const nuevosTemporales = [...prev, nuevoPesaje];
-
-      const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-      const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0), 0);
-      const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0);
-      const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
-      const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+      const totalPesoBruto = nuevosTemporales.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_bruto) || 0),
+        0,
+      )
+      const totalJabas = nuevosTemporales.reduce(
+        (sum, p) => sum + (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0),
+        0,
+      )
+      const totalPesoJabas = nuevosTemporales.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0),
+        0,
+      )
+      const totalDescuentoMerma = nuevosTemporales.reduce(
+        (sum, p) => sum + (parseFloat(p.descuento_merma) || 0),
+        0,
+      )
+      const totalPesoNeto = nuevosTemporales.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_neto) || 0),
+        0,
+      )
 
       // Actualizar el currentIngreso con los nuevos totales
-      setCurrentIngreso(prev => ({
+      setCurrentIngreso((prev) => ({
         ...prev,
         peso_bruto: totalPesoBruto.toFixed(3),
         num_jabas: totalJabas,
@@ -1702,29 +2001,33 @@ const conectarBalanza = async () => {
         descuento_merma: totalDescuentoMerma.toFixed(3),
         peso_neto: totalPesoNeto.toFixed(3),
         // Recalcular el total basado en el nuevo peso neto
-        total: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)
-      }));
+        total: (
+          totalPesoNeto * parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0)
+        ).toFixed(2),
+      }))
 
-
-      return nuevosTemporales;
-    });
+      return nuevosTemporales
+    })
 
     // Incrementar el contador para el próximo pesaje
-    setContadorPesajes(prev => prev + 1);
+    setContadorPesajes((prev) => prev + 1)
 
     // Agregar al historial de pesajes
-    setHistorialPesajes(prev => [...prev, {
-      ...nuevoPesaje,
-      fecha_hora: new Date().toLocaleString()
-    }]);
+    setHistorialPesajes((prev) => [
+      ...prev,
+      {
+        ...nuevoPesaje,
+        fecha_hora: new Date().toLocaleString(),
+      },
+    ])
 
     // Forzar re-render de la tabla de productos para actualizar progreso
-    setProductosOrden(prev => [...prev]);
+    setProductosOrden((prev) => [...prev])
 
-    toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto, ${jabasIngresadas} jabas${descuentoMerma > 0 ? `, merma ${descuentoMerma.toFixed(3)} kg` : ''} = ${pesoNeto.toFixed(3)} kg neto`);
-  };
-
-
+    toast.success(
+      `Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto, ${jabasIngresadas} jabas${descuentoMerma > 0 ? `, merma ${descuentoMerma.toFixed(3)} kg` : ''} = ${pesoNeto.toFixed(3)} kg neto`,
+    )
+  }
 
   // const aplicarPesoRealTime = async () => {
   //   if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
@@ -1811,7 +2114,6 @@ const conectarBalanza = async () => {
 
   //   setProductosOrden(prev => [...prev]);
 
-
   //   // Incrementar el contador para el próximo pesaje
   //   setContadorPesajes(prev => prev + 1);
 
@@ -1876,11 +2178,10 @@ const conectarBalanza = async () => {
   //   toast.success(`Peso aplicado: ${pesajeRealTime.weight.toFixed(3)} kg`);
   // };
 
-
   const limpiarPesajesTemporales = async () => {
     if (pesajesTemporales.length === 0) {
-      toast.info('No hay pesajes temporales para limpiar');
-      return;
+      toast.info('No hay pesajes temporales para limpiar')
+      return
     }
 
     const result = await Swal.fire({
@@ -1891,20 +2192,20 @@ const conectarBalanza = async () => {
       confirmButtonColor: '#dc3545',
       cancelButtonColor: '#6c757d',
       confirmButtonText: 'Sí, limpiar todo',
-      cancelButtonText: 'Cancelar'
-    });
+      cancelButtonText: 'Cancelar',
+    })
 
-    if (!result.isConfirmed) return;
+    if (!result.isConfirmed) return
 
     try {
       // Limpiar los pesajes temporales
-      setPesajesTemporales([]);
+      setPesajesTemporales([])
 
       // Resetear el contador de pesajes
-      setContadorPesajes(1);
+      setContadorPesajes(1)
 
       // Resetear los valores del formulario principal
-      setCurrentIngreso(prev => ({
+      setCurrentIngreso((prev) => ({
         ...prev,
         peso_bruto: '0.000',
         num_jabas: 0,
@@ -1914,46 +2215,59 @@ const conectarBalanza = async () => {
         total: '0.00',
         ingreso_cooperativa: '0.00',
         pago_socio: '0.00',
-        pago_con_descuento: '0.00'
-      }));
+        pago_con_descuento: '0.00',
+      }))
 
       // Limpiar el historial de pesajes
-      setHistorialPesajes([]);
+      setHistorialPesajes([])
 
-      toast.success('Todos los pesajes temporales han sido eliminados');
-
+      toast.success('Todos los pesajes temporales han sido eliminados')
     } catch (error) {
-      console.error('Error al limpiar pesajes temporales:', error);
-      toast.error('Error al limpiar los pesajes temporales');
+      console.error('Error al limpiar pesajes temporales:', error)
+      toast.error('Error al limpiar los pesajes temporales')
     }
-  };
+  }
 
   // Función para actualizar el progreso del producto
   const actualizarProgresoProducto = (productoId, pesoNeto) => {
-    setCantidadPendientePorProducto(prev => {
-      const cantidadActual = prev[productoId] || 0;
-      const nuevaCantidad = Math.max(0, cantidadActual - pesoNeto);
+    setCantidadPendientePorProducto((prev) => {
+      const cantidadActual = prev[productoId] || 0
+      const nuevaCantidad = Math.max(0, cantidadActual - pesoNeto)
       return {
         ...prev,
-        [productoId]: nuevaCantidad
-      };
-    });
-  };
-
+        [productoId]: nuevaCantidad,
+      }
+    })
+  }
 
   const eliminarPesajeTemporal = (pesajeId) => {
-    setPesajesTemporales(prev => {
-      const updatedPesajes = prev.filter(p => p.id !== pesajeId);
+    setPesajesTemporales((prev) => {
+      const updatedPesajes = prev.filter((p) => p.id !== pesajeId)
 
       // Recalcular todos los totales después de eliminar
-      const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || parseInt(p.num_jabas_pesaje) || 0), 0);
-      const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
-      const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
-      const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+      const totalPesoBruto = updatedPesajes.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_bruto) || 0),
+        0,
+      )
+      const totalJabas = updatedPesajes.reduce(
+        (sum, p) => sum + (parseInt(p.num_jabas) || parseInt(p.num_jabas_pesaje) || 0),
+        0,
+      )
+      const totalPesoJabas = updatedPesajes.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_jaba) || 0),
+        0,
+      )
+      const totalDescuentoMerma = updatedPesajes.reduce(
+        (sum, p) => sum + (parseFloat(p.descuento_merma) || 0),
+        0,
+      )
+      const totalPesoNeto = updatedPesajes.reduce(
+        (sum, p) => sum + (parseFloat(p.peso_neto) || 0),
+        0,
+      )
 
       // Actualizar el currentIngreso con los nuevos totales
-      setCurrentIngreso(prev => ({
+      setCurrentIngreso((prev) => ({
         ...prev,
         peso_bruto: totalPesoBruto.toFixed(3),
         num_jabas: totalJabas,
@@ -1961,54 +2275,67 @@ const conectarBalanza = async () => {
         descuento_merma: totalDescuentoMerma.toFixed(3),
         peso_neto: totalPesoNeto.toFixed(3),
         // Recalcular el total basado en el nuevo peso neto
-        total: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2),
+        total: (
+          totalPesoNeto * parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0)
+        ).toFixed(2),
         // Recalcular el ingreso a la cooperativa y el pago al socio
-        ingreso_cooperativa: (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0) / 100).toFixed(2),
-        pago_socio: (totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0) - totalDescuentoMerma - (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0) / 100)).toFixed(2)
-      }));
+        ingreso_cooperativa: (
+          (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0)) /
+          100
+        ).toFixed(2),
+        pago_socio: (
+          totalPesoNeto * parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0) -
+          totalDescuentoMerma -
+          (totalPesoNeto * parseFloat(currentIngreso.impuesto || 0)) / 100
+        ).toFixed(2),
+      }))
 
-      return updatedPesajes;
-    });
+      return updatedPesajes
+    })
 
-    toast.success('Pesaje eliminado y totales actualizados');
-  };
+    toast.success('Pesaje eliminado y totales actualizados')
+  }
 
   // Modificar la función guardarPesajeAutomatico para incluir el producto seleccionado
   const guardarPesajeAutomatico = () => {
     if (!monitorActivo || !pesajeRealTime.stable) {
-      toast.error('El peso debe estar estabilizado para guardarlo');
-      return;
+      toast.error('El peso debe estar estabilizado para guardarlo')
+      return
     }
 
     if (!productoSeleccionadoPesaje) {
-      toast.error('Debe seleccionar un producto para el pesaje');
-      return;
+      toast.error('Debe seleccionar un producto para el pesaje')
+      return
     }
 
     if (!currentIngreso.num_jabas || currentIngreso.num_jabas <= 0) {
-      toast.error('Debe especificar el número de jabas');
-      return;
+      toast.error('Debe especificar el número de jabas')
+      return
     }
 
-    const pesoTotalJabas = currentIngreso.num_jabas * pesoJaba;
-    const pesoNeto = pesajeRealTime.weight - pesoTotalJabas;
+    const pesoTotalJabas = currentIngreso.num_jabas * pesoJaba
+    const pesoNeto = pesajeRealTime.weight - pesoTotalJabas
 
     if (pesoNeto <= 0) {
-      toast.error('El peso neto debe ser mayor a 0');
-      return;
+      toast.error('El peso neto debe ser mayor a 0')
+      return
     }
 
     // Verificar que no exceda la cantidad pendiente
-    const cantidadPendiente = cantidadPendientePorProducto[productoSeleccionadoPesaje] || 0;
+    const cantidadPendiente = cantidadPendientePorProducto[productoSeleccionadoPesaje] || 0
     if (pesoNeto > cantidadPendiente) {
-      toast.error(`El peso neto (${pesoNeto.toFixed(3)} kg) excede la cantidad pendiente (${cantidadPendiente.toFixed(3)} kg)`);
-      return;
+      toast.error(
+        `El peso neto (${pesoNeto.toFixed(3)} kg) excede la cantidad pendiente (${cantidadPendiente.toFixed(3)} kg)`,
+      )
+      return
     }
 
     const nuevoPesaje = {
       id: Date.now(),
       producto_id: productoSeleccionadoPesaje,
-      producto_nombre: productosOrden.find(p => p.producto_id === productoSeleccionadoPesaje)?.producto_nombre || '',
+      producto_nombre:
+        productosOrden.find((p) => p.producto_id === productoSeleccionadoPesaje)?.producto_nombre ||
+        '',
       peso_bruto: pesajeRealTime.weight,
       num_jabas: currentIngreso.num_jabas,
       impuesto: currentIngreso.impuesto,
@@ -2016,49 +2343,45 @@ const conectarBalanza = async () => {
       peso_neto: pesoNeto,
       fecha_pesaje: new Date().toISOString(),
       observacion: currentIngreso.observacion || '',
-      estable: pesajeRealTime.stable,peso_jaba: pesoJaba,
-      peso_jaba: pesoJaba
-    };
+      estable: pesajeRealTime.stable,
+      peso_jaba: pesoJaba,
+    }
 
     // Agregar a pesajes temporales
-    setPesajesTemporales(prev => [...prev, nuevoPesaje]);
+    setPesajesTemporales((prev) => [...prev, nuevoPesaje])
 
     // Actualizar progreso del producto
-    actualizarProgresoProducto(productoSeleccionadoPesaje, pesoNeto);
+    actualizarProgresoProducto(productoSeleccionadoPesaje, pesoNeto)
 
     // Limpiar formulario
-    setCurrentIngreso(prev => ({
+    setCurrentIngreso((prev) => ({
       ...prev,
       num_jabas: '',
-      observacion: ''
-    }));
+      observacion: '',
+    }))
 
-    toast.success(`Pesaje guardado: ${pesoNeto.toFixed(3)} kg neto`);
-  };
-
-
-
-
-
+    toast.success(`Pesaje guardado: ${pesoNeto.toFixed(3)} kg neto`)
+  }
 
   // Función para calcular el progreso de un producto
   const calcularProgresoProducto = (productoId) => {
-    const producto = productosOrden.find(p => p.producto_id === productoId);
-    if (!producto || !producto.cantidad) return { porcentaje: 0, pesado: 0, pendiente: producto?.cantidad || 0 };
+    const producto = productosOrden.find((p) => p.producto_id === productoId)
+    if (!producto || !producto.cantidad)
+      return { porcentaje: 0, pesado: 0, pendiente: producto?.cantidad || 0 }
 
     const pesado = pesajesTemporales
-      .filter(p => p.producto_id === productoId)
-      .reduce((total, pesaje) => total + pesaje.peso_neto, 0);
+      .filter((p) => p.producto_id === productoId)
+      .reduce((total, pesaje) => total + pesaje.peso_neto, 0)
 
-    const pendiente = Math.max(0, producto.cantidad - pesado);
-    const porcentaje = Math.min(100, (pesado / producto.cantidad) * 100);
+    const pendiente = Math.max(0, producto.cantidad - pesado)
+    const porcentaje = Math.min(100, (pesado / producto.cantidad) * 100)
 
-    return { porcentaje, pesado, pendiente };
-  };
+    return { porcentaje, pesado, pendiente }
+  }
 
   // Función auxiliar para aplicar el peso al formulario
   const aplicarPesoAlFormulario = (peso) => {
-    console.log('Aplicando peso al formulario:', peso);
+    console.log('Aplicando peso al formulario:', peso)
 
     // Aplicar el peso al formulario
     // setCurrentIngreso(prev => {
@@ -2086,19 +2409,14 @@ const conectarBalanza = async () => {
 
     // Limpiar error del campo peso_neto si existe
     if (formErrors.peso_neto) {
-      setFormErrors(prev => ({ ...prev, peso_neto: '' }));
+      setFormErrors((prev) => ({ ...prev, peso_neto: '' }))
     }
 
-    toast.success(`Peso aplicado: ${peso.toFixed(3)} kg`);
-  };
-
+    toast.success(`Peso aplicado: ${peso.toFixed(3)} kg`)
+  }
 
   // También asegúrate de que el botón esté correctamente conectado en el JSX:
   // En la sección del monitor en tiempo real, el botón debe verse así:
-
-
-
-
 
   // Función para limpiar datos del monitor
   const limpiarDatosMonitor = () => {
@@ -2109,55 +2427,56 @@ const conectarBalanza = async () => {
       statusColor: '#6c757d',
       timestamp: null,
       rawData: '',
-      hexData: ''
-    });
+      hexData: '',
+    })
 
-    setPesajes([]);
-    toast.info('Datos del monitor limpiados');
-  };
+    setPesajes([])
+    toast.info('Datos del monitor limpiados')
+  }
 
   // Función para exportar datos del monitor
   const exportarDatosMonitor = () => {
     if (pesajes.length === 0) {
-      toast.warning('No hay datos para exportar');
-      return;
+      toast.warning('No hay datos para exportar')
+      return
     }
 
     try {
       // Crear CSV con los datos
-      const headers = ['Timestamp', 'Peso (kg)', 'Estado', 'Datos Originales'];
+      const headers = ['Timestamp', 'Peso (kg)', 'Estado', 'Datos Originales']
       const csvContent = [
         headers.join(','),
-        ...pesajes.map(pesaje => [
-          new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString(),
-          pesaje.peso.toFixed(3),
-          pesaje.stable ? 'Estable' : 'Inestable',
-          `"${pesaje.rawData || ''}"`
-        ].join(','))
-      ].join('\n');
+        ...pesajes.map((pesaje) =>
+          [
+            new Date(pesaje.fecha_pesaje || pesaje.timestamp).toLocaleString(),
+            pesaje.peso.toFixed(3),
+            pesaje.stable ? 'Estable' : 'Inestable',
+            `"${pesaje.rawData || ''}"`,
+          ].join(','),
+        ),
+      ].join('\n')
 
       // Crear y descargar archivo
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `pesajes_monitor_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute('download', `pesajes_monitor_${new Date().toISOString().split('T')[0]}.csv`)
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
 
-      toast.success('Datos exportados correctamente');
+      toast.success('Datos exportados correctamente')
     } catch (error) {
-      console.error('Error al exportar datos:', error);
-      toast.error('Error al exportar los datos');
+      console.error('Error al exportar datos:', error)
+      toast.error('Error al exportar los datos')
     }
-  };
-
+  }
 
   // Asegúrate de que estas variables estén definidas en el estado
   // Agregar al inicio del componente si no existen:
-  const [monitorActivo, setMonitorActivo] = useState(false);
+  const [monitorActivo, setMonitorActivo] = useState(false)
   const [pesajeRealTime, setPesajeRealTime] = useState({
     weight: 0,
     stable: false,
@@ -2165,45 +2484,45 @@ const conectarBalanza = async () => {
     statusColor: '#6c757d',
     timestamp: null,
     rawData: '',
-    hexData: ''
-  });
-  const [pesajes, setPesajes] = useState([]);
-  const eventSourceRef = useRef(null);
+    hexData: '',
+  })
+  const [pesajes, setPesajes] = useState([])
+  const eventSourceRef = useRef(null)
 
   // Limpiar al desmontar el componente
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+        eventSourceRef.current.close()
       }
-    };
-  }, []);
+    }
+  }, [])
 
   // Función para obtener peso interpretado de la balanza (nueva)
   const obtenerPesoInterpretado = async () => {
     try {
-      setSubmitting(true);
-      const response = await balanzaService.getWeight();
+      setSubmitting(true)
+      const response = await balanzaService.getWeight()
 
       if (response && response.weight !== undefined) {
-        const pesoInterpretado = response.weight;
-        const unidad = response.unit || 'kg';
-        const esEstable = response.stable || false;
+        const pesoInterpretado = response.weight
+        const unidad = response.unit || 'kg'
+        const esEstable = response.stable || false
 
-        setPesoActual(pesoInterpretado);
-        setCurrentIngreso(prev => ({
+        setPesoActual(pesoInterpretado)
+        setCurrentIngreso((prev) => ({
           ...prev,
-          peso_neto: pesoInterpretado.toFixed(3)
-        }));
+          peso_neto: pesoInterpretado.toFixed(3),
+        }))
 
         // Recalcular totales
         const event = {
           target: {
             name: 'peso_neto',
-            value: pesoInterpretado.toFixed(3)
-          }
-        };
-        handleInputChange(event);
+            value: pesoInterpretado.toFixed(3),
+          },
+        }
+        handleInputChange(event)
 
         // Mostrar resultado con información del peso interpretado
         Swal.fire({
@@ -2218,18 +2537,20 @@ const conectarBalanza = async () => {
         `,
           timer: 3000,
           timerProgressBar: true,
-          confirmButtonColor: '#321fdb'
-        });
+          confirmButtonColor: '#321fdb',
+        })
       } else {
-        throw new Error('No se pudo interpretar el peso de la balanza');
+        throw new Error('No se pudo interpretar el peso de la balanza')
       }
     } catch (error) {
-      console.error('Error al obtener peso interpretado:', error);
-      toast.error('Error al obtener el peso interpretado: ' + (error.response?.data?.error || error.message));
+      console.error('Error al obtener peso interpretado:', error)
+      toast.error(
+        'Error al obtener el peso interpretado: ' + (error.response?.data?.error || error.message),
+      )
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   // Función para guardar pesaje con peso interpretado (modificada)
   const guardarPesaje = async () => {
@@ -2238,20 +2559,20 @@ const conectarBalanza = async () => {
         icon: 'warning',
         title: 'Advertencia',
         text: 'Debe guardar el ingreso antes de registrar pesajes',
-        confirmButtonColor: '#321fdb'
-      });
-      return;
+        confirmButtonColor: '#321fdb',
+      })
+      return
     }
 
     try {
-      setSubmitting(true);
+      setSubmitting(true)
 
       // Usar el peso interpretado actual
-      const pesoInterpretado = pesajeRealTime.weight > 0 ? pesajeRealTime.weight : pesoActual;
+      const pesoInterpretado = pesajeRealTime.weight > 0 ? pesajeRealTime.weight : pesoActual
 
       if (pesoInterpretado <= 0) {
-        toast.warning('No hay un peso válido para guardar');
-        return;
+        toast.warning('No hay un peso válido para guardar')
+        return
       }
 
       const pesajeData = {
@@ -2262,12 +2583,10 @@ const conectarBalanza = async () => {
         datos_originales: pesajeRealTime.rawData || null,
         es_estable: pesajeRealTime.stable || false,
         timestamp: new Date().toISOString(),
-        observacion: `Pesaje ${pesajes.length + 1} - Peso interpretado: ${pesoInterpretado.toFixed(3)} kg`
-      };
+        observacion: `Pesaje ${pesajes.length + 1} - Peso interpretado: ${pesoInterpretado.toFixed(3)} kg`,
+      }
 
-      await balanzaService.saveWeight(pesajeData);
-
-
+      await balanzaService.saveWeight(pesajeData)
 
       Swal.fire({
         icon: 'success',
@@ -2281,32 +2600,32 @@ const conectarBalanza = async () => {
       `,
         timer: 2000,
         timerProgressBar: true,
-        confirmButtonColor: '#321fdb'
-      });
+        confirmButtonColor: '#321fdb',
+      })
     } catch (error) {
-      console.error('Error al guardar pesaje:', error);
+      console.error('Error al guardar pesaje:', error)
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'No se pudo guardar el pesaje: ' + (error.response?.data?.error || error.message),
-        confirmButtonColor: '#321fdb'
-      });
+        confirmButtonColor: '#321fdb',
+      })
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   // Función para mostrar información detallada del peso interpretado
   const mostrarDetallesPesoInterpretado = () => {
     if (!pesajeRealTime.weight && !pesoActual) {
-      toast.info('No hay datos de peso disponibles');
-      return;
+      toast.info('No hay datos de peso disponibles')
+      return
     }
 
-    const peso = pesajeRealTime.weight || pesoActual;
-    const datosOriginales = pesajeRealTime.rawData || 'No disponible';
-    const esEstable = pesajeRealTime.stable || false;
-    const timestamp = pesajeRealTime.timestamp || new Date().toISOString();
+    const peso = pesajeRealTime.weight || pesoActual
+    const datosOriginales = pesajeRealTime.rawData || 'No disponible'
+    const esEstable = pesajeRealTime.stable || false
+    const timestamp = pesajeRealTime.timestamp || new Date().toISOString()
 
     Swal.fire({
       icon: 'info',
@@ -2332,12 +2651,9 @@ const conectarBalanza = async () => {
       </div>
     `,
       width: '600px',
-      confirmButtonColor: '#321fdb'
-    });
-  };
-
-
-
+      confirmButtonColor: '#321fdb',
+    })
+  }
 
   // Función para mostrar detalles de un pesaje
   const mostrarDetallesPesaje = (pesaje) => {
@@ -2348,70 +2664,79 @@ const conectarBalanza = async () => {
         <h5>Información del Pesaje</h5>
         <p><strong>Peso:</strong> ${pesaje.peso?.toFixed(3) || '0.000'} kg</p>
         <p><strong>Estado:</strong> <span style="color: ${pesaje.es_estable ? 'green' : 'orange'}">${pesaje.es_estable ? 'Estable' : 'Inestable'}</span></p>
-        <p><strong>Fecha/Hora:</strong> ${pesaje.fecha_pesaje||pesaje.timestamp ? new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString() : 'N/A'}</p>
+        <p><strong>Fecha/Hora:</strong> ${pesaje.fecha_pesaje || pesaje.timestamp ? new Date(pesaje.fecha_pesaje || pesaje.timestamp).toLocaleString() : 'N/A'}</p>
 
         ${pesaje.peso_bruto ? `<p><strong>Peso Bruto:</strong> ${pesaje.peso_bruto.toFixed(3)} kg</p>` : ''}
         ${pesaje.peso_neto ? `<p><strong>Peso Neto:</strong> ${pesaje.peso_neto.toFixed(3)} kg</p>` : ''}
         ${pesaje.peso_jaba ? `<p><strong>Peso Jaba:</strong> ${pesaje.peso_jaba.toFixed(3)} kg</p>` : ''}
 
 
-        ${pesaje.observacion ? `
+        ${
+          pesaje.observacion
+            ? `
           <h5>Observaciones</h5>
           <p>${pesaje.observacion}</p>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${pesaje.datos_originales ? `
+        ${
+          pesaje.datos_originales
+            ? `
           <h5>Datos Originales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
             <code>${pesaje.datos_originales}</code>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
 
-        ${pesaje.datos_hex ? `
+        ${
+          pesaje.datos_hex
+            ? `
           <h5>Datos Hexadecimales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
             <code>${pesaje.datos_hex}</code>
           </div>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
     `,
       icon: 'info',
       confirmButtonText: 'Cerrar',
       confirmButtonColor: '#321fdb',
-      width: '600px'
-    });
-  };
-
-
+      width: '600px',
+    })
+  }
 
   // Función para resetear el estado cuando se cambia de ingreso
   const resetearEstadoPesajes = () => {
     // setPesajesTemporales([]);
     // setContadorPesajes(1);
-    setCantidadPendientePorProducto({});
-    setPesajes([]);
+    setCantidadPendientePorProducto({})
+    setPesajes([])
     // setProductoSeleccionadoPesaje('');
-  };
-
+  }
 
   // Función para validar si todos los productos están completos
   const validarProductosCompletos = () => {
-    const productosIncompletos = productosOrden.filter(producto => {
-      const progreso = calcularProgresoProducto(producto.producto_id);
-      return progreso.porcentaje < 100;
-    });
+    const productosIncompletos = productosOrden.filter((producto) => {
+      const progreso = calcularProgresoProducto(producto.producto_id)
+      return progreso.porcentaje < 100
+    })
 
     return {
       completo: productosIncompletos.length === 0,
-      productosIncompletos: productosIncompletos
-    };
-  };
+      productosIncompletos: productosIncompletos,
+    }
+  }
 
   // Función para mostrar resumen antes de confirmar
   const mostrarResumenPesajes = () => {
-    const validacion = validarProductosCompletos();
-    const totalPesajes = pesajesTemporales.length;
-    const pesoTotal = pesajesTemporales.reduce((total, p) => total + p.peso_neto, 0);
+    const validacion = validarProductosCompletos()
+    const totalPesajes = pesajesTemporales.length
+    const pesoTotal = pesajesTemporales.reduce((total, p) => total + p.peso_neto, 0)
 
     let mensaje = `
     <div style="text-align: left;">
@@ -2421,41 +2746,40 @@ const conectarBalanza = async () => {
 
       <h6>Productos:</h6>
       <ul>
-  `;
+  `
 
-    productosOrden.forEach(producto => {
-      const progreso = calcularProgresoProducto(producto.producto_id);
-      const estado = progreso.porcentaje >= 100 ? '✅' : '⚠️';
+    productosOrden.forEach((producto) => {
+      const progreso = calcularProgresoProducto(producto.producto_id)
+      const estado = progreso.porcentaje >= 100 ? '✅' : '⚠️'
       mensaje += `
       <li>
         ${estado} ${producto.producto?.nombre}:
         ${progreso.pesado.toFixed(3)}/${producto.cantidad} kg
         (${progreso.porcentaje.toFixed(1)}%)
       </li>
-    `;
-    });
+    `
+    })
 
-    mensaje += '</ul>';
+    mensaje += '</ul>'
 
     if (!validacion.completo) {
       mensaje += `
       <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0; border-left: 4px solid #ffc107;">
         <strong>⚠️ Advertencia:</strong> Algunos productos no están completos.
       </div>
-    `;
+    `
     }
 
-    mensaje += '</div>';
+    mensaje += '</div>'
 
-    return mensaje;
-  };
-
+    return mensaje
+  }
 
   // Función para exportar pesajes temporales a CSV
   const exportarPesajesTemporales = () => {
     if (pesajesTemporales.length === 0) {
-      toast.warning('No hay pesajes temporales para exportar');
-      return;
+      toast.warning('No hay pesajes temporales para exportar')
+      return
     }
 
     try {
@@ -2466,39 +2790,43 @@ const conectarBalanza = async () => {
         'Peso Neto (kg)',
         'Fecha/Hora',
         'Estado',
-        'Datos Originales'
-      ];
+        'Datos Originales',
+      ]
 
       const csvContent = [
         headers.join(','),
-        ...pesajesTemporales.map(pesaje => [
-          pesaje.numero,
-          `"${pesaje.producto_nombre}"`,
-          pesaje.peso_bruto.toFixed(3),
-          pesaje.peso_neto.toFixed(3),
-          `"${new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString()}"`,
-          pesaje.stable ? 'Estable' : 'Inestable',
-          `"${pesaje.rawData || ''}"`
-        ].join(','))
-      ].join('\n');
+        ...pesajesTemporales.map((pesaje) =>
+          [
+            pesaje.numero,
+            `"${pesaje.producto_nombre}"`,
+            pesaje.peso_bruto.toFixed(3),
+            pesaje.peso_neto.toFixed(3),
+            `"${new Date(pesaje.fecha_pesaje || pesaje.timestamp).toLocaleString()}"`,
+            pesaje.stable ? 'Estable' : 'Inestable',
+            `"${pesaje.rawData || ''}"`,
+          ].join(','),
+        ),
+      ].join('\n')
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `pesajes_temporales_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      link.setAttribute(
+        'download',
+        `pesajes_temporales_${new Date().toISOString().split('T')[0]}.csv`,
+      )
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
 
-      toast.success('Pesajes temporales exportados correctamente');
+      toast.success('Pesajes temporales exportados correctamente')
     } catch (error) {
-      console.error('Error al exportar pesajes temporales:', error);
-      toast.error('Error al exportar los datos');
+      console.error('Error al exportar pesajes temporales:', error)
+      toast.error('Error al exportar los datos')
     }
-  };
-
+  }
 
   // // Funciones CRUD
   // const handleCreate = () => {
@@ -2530,34 +2858,29 @@ const conectarBalanza = async () => {
   //   setShowModal(true)
   // }
 
-
-
-
   const handleEdit = async (ingreso) => {
     try {
       // Cargar los detalles del ingreso desde el servicio
-      const ingresoDetalles = await ingresoService.getById(ingreso.id);
+      const ingresoDetalles = await ingresoService.getById(ingreso.id)
 
       // Asegúrate de que los datos de socios y órdenes estén cargados
       if (socios.length === 0) {
-        await cargarSocios();
+        await cargarSocios()
       }
       if (ordenesPendientes.length === 0) {
-        await cargarOrdenesPendientes();
+        await cargarOrdenesPendientes()
       }
 
-      const socioExistente = socios.find(socio => socio.id === ingresoDetalles.socio_id);
-    if (!socioExistente) {
-      const nuevoSocio = {
-        id: ingresoDetalles.socio_id,
-        codigo: ingresoDetalles.socio.codigo,
-        nombres: ingresoDetalles.socio.nombres,
-        apellidos: ingresoDetalles.socio.apellidos
-      };
-      setSocios(prevSocios => [...prevSocios, nuevoSocio]);
-    }
-
-
+      const socioExistente = socios.find((socio) => socio.id === ingresoDetalles.socio_id)
+      if (!socioExistente) {
+        const nuevoSocio = {
+          id: ingresoDetalles.socio_id,
+          codigo: ingresoDetalles.socio.codigo,
+          nombres: ingresoDetalles.socio.nombres,
+          apellidos: ingresoDetalles.socio.apellidos,
+        }
+        setSocios((prevSocios) => [...prevSocios, nuevoSocio])
+      }
 
       // Establecer el estado con los detalles del ingreso
       setCurrentIngreso({
@@ -2571,33 +2894,31 @@ const conectarBalanza = async () => {
         num_jabas: ingresoDetalles.num_jabas || 0,
         peso_total_jabas: ingresoDetalles.peso_total_jabas || 0,
         total: ingresoDetalles.peso_neto * ingresoDetalles.precio_venta_kg || 0, //kong
-      });
+      })
 
-      setContadorPesajes(ingresoDetalles.num_pesajes + 1);
-
-
+      setContadorPesajes(ingresoDetalles.num_pesajes + 1)
 
       // Establecer los valores seleccionados para los selectores
-      setSocioSeleccionado(ingresoDetalles.socio_id);
-      setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id);
+      setSocioSeleccionado(ingresoDetalles.socio_id)
+      setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id)
 
       // Limpiar errores del formulario
-      setFormErrors({});
-      setActiveTab('general');
+      setFormErrors({})
+      setActiveTab('general')
 
       // Establecer el título del modal y mostrarlo
-      setModalTitle('Editar Ingreso');
-      abrirModal('Editar Ingreso', ingresoDetalles);
+      setModalTitle('Editar Ingreso')
+      abrirModal('Editar Ingreso', ingresoDetalles)
     } catch (error) {
-      console.error('Error al cargar detalles del ingreso:', error);
+      console.error('Error al cargar detalles del ingreso:', error)
       Swal.fire({
         icon: 'error',
         title: 'Error',
         text: 'No se pudieron cargar los detalles del ingreso',
-        confirmButtonColor: '#321fdb'
-      });
+        confirmButtonColor: '#321fdb',
+      })
     }
-  };
+  }
 
   const handleDelete = async (ingreso) => {
     const result = await Swal.fire({
@@ -2608,7 +2929,7 @@ const conectarBalanza = async () => {
       confirmButtonColor: '#d33',
       cancelButtonColor: '#6c757d',
       confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+      cancelButtonText: 'Cancelar',
     })
 
     if (result.isConfirmed) {
@@ -2621,7 +2942,7 @@ const conectarBalanza = async () => {
           text: 'El ingreso ha sido eliminado correctamente.',
           confirmButtonColor: '#321fdb',
           timer: 2000,
-          timerProgressBar: true
+          timerProgressBar: true,
         })
 
         await fetchIngresos()
@@ -2631,7 +2952,7 @@ const conectarBalanza = async () => {
           icon: 'error',
           title: 'Error',
           text: error.response?.data?.error || 'Error al eliminar el ingreso',
-          confirmButtonColor: '#321fdb'
+          confirmButtonColor: '#321fdb',
         })
       }
     }
@@ -2717,7 +3038,7 @@ const conectarBalanza = async () => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-PE', {
       style: 'currency',
-      currency: 'PEN'
+      currency: 'PEN',
     }).format(amount || 0)
   }
 
@@ -2730,35 +3051,35 @@ const conectarBalanza = async () => {
   }
 
   // Opciones para selects
-  const socioOptions = socios.map(socio => ({
+  const socioOptions = socios.map((socio) => ({
     value: socio.id,
-    label: `${socio.codigo} - ${socio.nombre} ${socio.apellido}`
+    label: `${socio.codigo} - ${socio.nombre} ${socio.apellido}`,
   }))
 
-  const productoOptions = productos.map(producto => ({
+  const productoOptions = productos.map((producto) => ({
     value: producto.producto_id,
-    label: producto.nombre
+    label: producto.nombre,
   }))
 
-  const pedidoLoteOptions = pedidosLote.map(pedido => ({
+  const pedidoLoteOptions = pedidosLote.map((pedido) => ({
     value: pedido.id,
-    label: `${pedido.codigo} - ${pedido.descripcion}`
+    label: `${pedido.codigo} - ${pedido.descripcion}`,
   }))
 
-  const unidadMedidaOptions = unidadesMedida.map(unidad => ({
+  const unidadMedidaOptions = unidadesMedida.map((unidad) => ({
     value: unidad.id,
-    label: unidad.nombre
+    label: unidad.nombre,
   }))
 
-  const tipoFrutaOptions = tiposFruta.map(tipo => ({
+  const tipoFrutaOptions = tiposFruta.map((tipo) => ({
     value: tipo.id,
-    label: tipo.nombre
+    label: tipo.nombre,
   }))
 
   const limpiarPesos = async () => {
     if (!currentIngreso.id) {
-      toast.warning('Debe guardar el ingreso antes de limpiar pesos');
-      return;
+      toast.warning('Debe guardar el ingreso antes de limpiar pesos')
+      return
     }
 
     const result = await Swal.fire({
@@ -2769,111 +3090,111 @@ const conectarBalanza = async () => {
       confirmButtonColor: '#d33',
       cancelButtonColor: '#6c757d',
       confirmButtonText: 'Sí, limpiar',
-      cancelButtonText: 'Cancelar'
-    });
+      cancelButtonText: 'Cancelar',
+    })
 
     if (result.isConfirmed) {
       try {
-        setSubmitting(true);
+        setSubmitting(true)
 
         // Eliminar todos los pesajes del ingreso
-        await balanzaService.clearPesajes(currentIngreso.id);
+        await balanzaService.clearPesajes(currentIngreso.id)
 
         // Actualizar la lista de pesajes
-        setPesajes([]);
+        setPesajes([])
 
         // Limpiar el peso neto del formulario
-        setCurrentIngreso(prev => ({
+        setCurrentIngreso((prev) => ({
           ...prev,
-          peso_neto: 0
-        }));
+          peso_neto: 0,
+        }))
 
         // Recalcular totales
         const event = {
           target: {
             name: 'peso_neto',
-            value: '0'
-          }
-        };
-        handleInputChange(event);
+            value: '0',
+          },
+        }
+        handleInputChange(event)
 
-        toast.success('Todos los pesajes han sido eliminados');
-
+        toast.success('Todos los pesajes han sido eliminados')
       } catch (error) {
-        console.error('Error al limpiar pesos:', error);
-        toast.error('Error al limpiar los pesajes');
+        console.error('Error al limpiar pesos:', error)
+        toast.error('Error al limpiar los pesajes')
       } finally {
-        setSubmitting(false);
+        setSubmitting(false)
       }
     }
-  };
-
-
+  }
 
   const exportarPesajesExcel = () => {
-    const datosNumericos = pesajesTemporales.map(pesaje => {
-      const pesoBruto = parseFloat(pesaje.peso_bruto || 0);
-      const pesoJaba = parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0);
-      const descuentoMerma = parseFloat(pesaje.descuento_merma || 0);
-      const pesoNeto = pesoBruto - pesoJaba - descuentoMerma;
-      const precioVentaKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-      const subtotal = pesoNeto * precioVentaKg;
-      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-      const pagoTransporte = pesoNeto * porcentajeTransporte;
-      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-      const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
-      const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || 0) * 1.00 : 0;
-      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
+    const datosNumericos = pesajesTemporales.map((pesaje) => {
+      const pesoBruto = parseFloat(pesaje.peso_bruto || 0)
+      const pesoJaba = parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0)
+      const descuentoMerma = parseFloat(pesaje.descuento_merma || 0)
+      const pesoNeto = pesoBruto - pesoJaba - descuentoMerma
+      const precioVentaKg = parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0)
+      const subtotal = pesoNeto * precioVentaKg
+      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100
+      const pagoTransporte = pesoNeto * porcentajeTransporte
+      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100
+      const ingresoCooperativa = pesoNeto * porcentajeImpuesto
+      const precioPorJaba = currentIngreso.aplicarPrecioJaba
+        ? (pesaje.num_jabas_pesaje || 0) * 1.0
+        : 0
+      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba
 
       return {
-        'Número': { v: pesaje.numero_pesaje, t: 'n' },
+        Número: { v: pesaje.numero_pesaje, t: 'n' },
         'Peso Bruto (kg)': { v: pesoBruto.toFixed(3), t: 'n' },
-        'Jabas': { v: pesaje.num_jabas_pesaje || 0, t: 'n' },
+        Jabas: { v: pesaje.num_jabas_pesaje || 0, t: 'n' },
         'Peso Jabas (kg)': { v: pesoJaba.toFixed(3), t: 'n' },
         'Descuento Merma (kg)': { v: descuentoMerma.toFixed(3), t: 'n' },
         'Peso Neto (kg)': { v: pesoNeto.toFixed(3), t: 'n' },
         'Precio/kg': { v: precioVentaKg.toFixed(2), t: 'n' },
-        'Subtotal': { v: subtotal.toFixed(2), t: 'n' },
+        Subtotal: { v: subtotal.toFixed(2), t: 'n' },
         'Pago Transporte': { v: pagoTransporte.toFixed(2), t: 'n' },
         'Ingreso Cooperativa': { v: ingresoCooperativa.toFixed(2), t: 'n' },
-        'Pago al Socio': { v: pagoSocio.toFixed(2), t: 'n' }
-      };
-    });
+        'Pago al Socio': { v: pagoSocio.toFixed(2), t: 'n' },
+      }
+    })
 
-    const worksheet = XLSX.utils.json_to_sheet(datosNumericos);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pesajes Temporales');
+    const worksheet = XLSX.utils.json_to_sheet(datosNumericos)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Pesajes Temporales')
 
-    XLSX.writeFile(workbook, 'Pesajes_Temporales.xlsx');
-  };
-
+    XLSX.writeFile(workbook, 'Pesajes_Temporales.xlsx')
+  }
 
   // Reemplaza la función cargarPuertosBalanza existente con esta versión corregida:
   const cargarPuertosBalanza = async () => {
     try {
-      const response = await balanzaService.getPuertosDisponibles();
+      const response = await balanzaService.getPuertosDisponibles()
 
       // Verificar que la respuesta sea válida y sea un array
       if (response && Array.isArray(response)) {
-        setPuertosBalanza(response);
+        setPuertosBalanza(response)
       } else if (response && response.data && Array.isArray(response.data)) {
-        setPuertosBalanza(response.data);
+        setPuertosBalanza(response.data)
       } else {
-        console.warn('Respuesta de puertos no válida:', response);
-        setPuertosBalanza([]);
-        toast.warning('No se encontraron puertos disponibles');
+        console.warn('Respuesta de puertos no válida:', response)
+        setPuertosBalanza([])
+        toast.warning('No se encontraron puertos disponibles')
       }
     } catch (error) {
-      console.error('Error al cargar puertos:', error);
-      setPuertosBalanza([]);
+      console.error('Error al cargar puertos:', error)
+      setPuertosBalanza([])
 
       // Mostrar error más específico
-      const errorMessage = error.response?.data?.error || error.message || 'No se pudieron cargar los puertos disponibles';
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        'No se pudieron cargar los puertos disponibles'
 
-      toast.error(`Error al cargar puertos: ${errorMessage}`);
+      toast.error(`Error al cargar puertos: ${errorMessage}`)
     }
-  };
-
+  }
 
   const leerPeso = async () => {
     if (!balanzaConectada) {
@@ -2881,7 +3202,7 @@ const conectarBalanza = async () => {
         icon: 'warning',
         title: 'Balanza no conectada',
         text: 'Debe conectar la balanza antes de leer el peso',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
       return
     }
@@ -2895,17 +3216,17 @@ const conectarBalanza = async () => {
 
         // Si hay un ingreso activo, actualizar el peso neto
         if (currentIngreso) {
-          setCurrentIngreso(prev => ({
+          setCurrentIngreso((prev) => ({
             ...prev,
-            peso_neto: response.weight.toFixed(3)
+            peso_neto: response.weight.toFixed(3),
           }))
 
           // Recalcular totales si es necesario
           const event = {
             target: {
               name: 'peso_neto',
-              value: response.weight.toFixed(3)
-            }
+              value: response.weight.toFixed(3),
+            },
           }
           handleInputChange(event)
         }
@@ -2916,7 +3237,7 @@ const conectarBalanza = async () => {
           text: `Peso actual: ${response.weight} ${response.unit || 'kg'}`,
           timer: 2000,
           timerProgressBar: true,
-          confirmButtonColor: '#321fdb'
+          confirmButtonColor: '#321fdb',
         })
       } else {
         throw new Error('No se pudo obtener el peso')
@@ -2927,19 +3248,18 @@ const conectarBalanza = async () => {
         icon: 'error',
         title: 'Error',
         text: error.response?.data?.error || 'No se pudo obtener el peso de la balanza',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     } finally {
       setLeyendoPeso(false)
     }
   }
 
-
   const aplicarPesoBruto = () => {
     if (pesoActual > 0) {
-      setCurrentIngreso(prev => ({
+      setCurrentIngreso((prev) => ({
         ...prev,
-        peso_bruto: pesoActual.toFixed(2)
+        peso_bruto: pesoActual.toFixed(2),
       }))
 
       Swal.fire({
@@ -2948,57 +3268,56 @@ const conectarBalanza = async () => {
         text: `Peso bruto actualizado a ${pesoActual.toFixed(2)} kg`,
         timer: 2000,
         timerProgressBar: true,
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     }
   }
 
   const verificarEstadoBalanza = async () => {
     try {
-      const response = await balanzaService.getStatus();
-      setBalanzaConectada(response.connected || false);
+      const response = await balanzaService.getStatus()
+      setBalanzaConectada(response.connected || false)
 
       if (response.connected) {
         // If connected, also update the current configuration
         if (response.config) {
-          setPuertoSeleccionado(response.config.port || '');
-          setBaudRate(response.config.baudRate || 9600);
+          setPuertoSeleccionado(response.config.port || '')
+          setBaudRate(response.config.baudRate || 9600)
         }
       }
     } catch (error) {
-      console.error('Error al verificar estado de la balanza:', error);
-      setBalanzaConectada(false);
+      console.error('Error al verificar estado de la balanza:', error)
+      setBalanzaConectada(false)
     }
-  };
+  }
 
   // También agregar la función mostrarMensaje si no existe
   const mostrarMensaje = (texto, tipo) => {
     // Usar toast en lugar de un sistema de mensajes personalizado
     switch (tipo) {
       case 'success':
-        toast.success(texto);
-        break;
+        toast.success(texto)
+        break
       case 'danger':
       case 'error':
-        toast.error(texto);
-        break;
+        toast.error(texto)
+        break
       case 'warning':
-        toast.warning(texto);
-        break;
+        toast.warning(texto)
+        break
       case 'info':
-        toast.info(texto);
-        break;
+        toast.info(texto)
+        break
       default:
-        toast(texto);
+        toast(texto)
     }
-  };
-
+  }
 
   const aplicarPesoNeto = () => {
     if (pesoActual > 0) {
-      setCurrentIngreso(prev => ({
+      setCurrentIngreso((prev) => ({
         ...prev,
-        peso_neto: pesoActual.toFixed(2)
+        peso_neto: pesoActual.toFixed(2),
       }))
 
       Swal.fire({
@@ -3007,25 +3326,25 @@ const conectarBalanza = async () => {
         text: `Peso neto actualizado a ${pesoActual.toFixed(2)} kg`,
         timer: 2000,
         timerProgressBar: true,
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     }
   }
 
   const calcularPesoNeto = () => {
-    const pesoBruto = parseFloat(currentIngreso.peso_bruto) || 0;
-    const numJabas = parseInt(currentIngreso.num_jabas) || 0;
-    const pesoTotalJabas = numJabas * pesoJaba;
-    const pesoNeto = pesoBruto - pesoTotalJabas;
-    return pesoNeto > 0 ? parseFloat(pesoNeto) : 0;
+    const pesoBruto = parseFloat(currentIngreso.peso_bruto) || 0
+    const numJabas = parseInt(currentIngreso.num_jabas) || 0
+    const pesoTotalJabas = numJabas * pesoJaba
+    const pesoNeto = pesoBruto - pesoTotalJabas
+    return pesoNeto > 0 ? parseFloat(pesoNeto) : 0
   }
 
   const calcularPesoNetoAutomatico = () => {
     const pesoNetoCalculado = calcularPesoNeto()
 
-    setCurrentIngreso(prev => ({
+    setCurrentIngreso((prev) => ({
       ...prev,
-      peso_neto: pesoNetoCalculado
+      peso_neto: pesoNetoCalculado,
     }))
 
     Swal.fire({
@@ -3034,7 +3353,7 @@ const conectarBalanza = async () => {
       text: `Peso neto actualizado a ${pesoNetoCalculado} kg`,
       timer: 2000,
       timerProgressBar: true,
-      confirmButtonColor: '#321fdb'
+      confirmButtonColor: '#321fdb',
     })
   }
 
@@ -3044,7 +3363,7 @@ const conectarBalanza = async () => {
         icon: 'warning',
         title: 'Balanza no conectada',
         text: 'Debe conectar la balanza antes de tarar',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
       return
     }
@@ -3064,7 +3383,7 @@ const conectarBalanza = async () => {
           text: 'La balanza ha sido tarada correctamente',
           timer: 2000,
           timerProgressBar: true,
-          confirmButtonColor: '#321fdb'
+          confirmButtonColor: '#321fdb',
         })
       } else {
         throw new Error(response.message || 'Error al tarar la balanza')
@@ -3075,7 +3394,7 @@ const conectarBalanza = async () => {
         icon: 'error',
         title: 'Error al tarar',
         text: error.response?.data?.error || 'No se pudo tarar la balanza',
-        confirmButtonColor: '#321fdb'
+        confirmButtonColor: '#321fdb',
       })
     } finally {
       setTarando(false)
@@ -3089,104 +3408,109 @@ const conectarBalanza = async () => {
   // Agrega esto en la sección de estados si no existe:
   const [leyendoPeso, setLeyendoPeso] = useState(false)
 
-
-
   const handleSubmit = async () => {
     try {
-      setSubmitting(true);
-      setFormErrors({});
+      setSubmitting(true)
+      setFormErrors({})
 
       // Validar campos requeridos
-      const errors = {};
+      const errors = {}
 
       if (!ordenSeleccionada) {
-        errors.orden_id = 'Debe seleccionar una orden pendiente';
+        errors.orden_id = 'Debe seleccionar una orden pendiente'
       }
 
       if (!socioSeleccionado) {
-        errors.socio_id = 'Debe seleccionar un socio';
+        errors.socio_id = 'Debe seleccionar un socio'
       }
 
       if (!productoSeleccionadoPesaje) {
-        errors.producto_seleccionado = 'Debe seleccionar un producto de la orden para el pesaje';
+        errors.producto_seleccionado = 'Debe seleccionar un producto de la orden para el pesaje'
       }
 
       if (pesajesTemporales.length === 0) {
-        errors.pesajes = 'Debe registrar al menos un pesaje antes de crear el ingreso';
+        errors.pesajes = 'Debe registrar al menos un pesaje antes de crear el ingreso'
       }
 
       if (!pesoJaba || pesoJaba <= 0) {
-        errors.peso_jaba = 'El peso por jaba debe ser mayor a 0';
+        errors.peso_jaba = 'El peso por jaba debe ser mayor a 0'
       }
 
       if (!(currentIngreso.precio_venta_kg || precioVentaKg) || precioVentaKg <= 0) {
-        errors.precio_venta = 'El precio de venta debe ser mayor a 0';
+        errors.precio_venta = 'El precio de venta debe ser mayor a 0'
       }
 
       if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
+        setFormErrors(errors)
 
         // Mostrar alerta con los errores
         Swal.fire({
           icon: 'error',
           title: 'Errores de validación',
-          html: Object.values(errors).map(error => `• ${error}`).join('<br>'),
-          confirmButtonColor: '#321fdb'
-        });
+          html: Object.values(errors)
+            .map((error) => `• ${error}`)
+            .join('<br>'),
+          confirmButtonColor: '#321fdb',
+        })
 
-        setSubmitting(false);
-        return;
+        setSubmitting(false)
+        return
       }
 
       // Obtener el producto seleccionado para obtener sus datos
-      const productoSeleccionado = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
+      const productoSeleccionado = productosOrden.find(
+        (p) => p.producto_id === parseInt(productoSeleccionadoPesaje),
+      )
 
       if (!productoSeleccionado) {
         Swal.fire({
           icon: 'error',
           title: 'Error',
           text: 'No se pudo encontrar el producto seleccionado',
-          confirmButtonColor: '#321fdb'
-        });
-        setSubmitting(false);
-        return;
+          confirmButtonColor: '#321fdb',
+        })
+        setSubmitting(false)
+        return
       }
 
       // Crear un ingreso consolidado con todos los pesajes
       const pesoNetoTotal = pesajesTemporales.reduce((total, pesaje) => {
-        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
-        return total + pesoNeto;
-      }, 0);
+        const pesoNeto =
+          parseFloat(pesaje.peso_bruto || 0) -
+          parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) -
+          parseFloat(pesaje.descuento_merma || 0)
+        return total + pesoNeto
+      }, 0)
 
       const numJabasTotal = pesajesTemporales.reduce((total, pesaje) => {
-        return total + parseInt(pesaje.num_jabas_pesaje || pesaje.num_jabas || 0);
-      }, 0);
+        return total + parseInt(pesaje.num_jabas_pesaje || pesaje.num_jabas || 0)
+      }, 0)
 
       const pesoBrutoTotal = pesajesTemporales.reduce((total, pesaje) => {
-        return total + parseFloat(pesaje.peso_bruto || 0);
-      }, 0);
+        return total + parseFloat(pesaje.peso_bruto || 0)
+      }, 0)
 
       const descuentoMermaTotal = pesajesTemporales.reduce((total, pesaje) => {
-        return total + parseFloat(pesaje.descuento_merma || 0);
-      }, 0);
+        return total + parseFloat(pesaje.descuento_merma || 0)
+      }, 0)
 
       // Calcular montos totales
-      const subtotal = pesoNetoTotal * (currentIngreso.precio_venta_kg || precioVentaKg);
+      const subtotal = pesoNetoTotal * (currentIngreso.precio_venta_kg || precioVentaKg)
 
       // Calcular pagos basados en porcentajes
-      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-      const pagoTransporte = pesoNetoTotal * porcentajeTransporte;
+      const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100
+      const pagoTransporte = pesoNetoTotal * porcentajeTransporte
 
-      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-      const ingresoCooperativa = pesoNetoTotal * porcentajeImpuesto;
+      const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100
+      const ingresoCooperativa = pesoNetoTotal * porcentajeImpuesto
 
       // Calculate price per jaba if applicable
-      const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (numJabasTotal * 1.00) : 0;
+      const precioPorJaba = currentIngreso.aplicarPrecioJaba ? numJabasTotal * 1.0 : 0
 
       // Calculate payment to the partner
-      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
+      const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba
 
-      const pesoTotalJabas = numJabasTotal * pesoJaba;
+      const pesoTotalJabas = numJabasTotal * pesoJaba
 
       // Preparar datos del ingreso consolidado
       const ingresoData = {
@@ -3198,7 +3522,7 @@ const conectarBalanza = async () => {
         peso_neto: pesoNetoTotal,
         dscto_merma: descuentoMermaTotal,
         aplicarPrecioJaba: currentIngreso.aplicarPrecioJaba || false,
-        precio_venta_kg: parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0),
+        precio_venta_kg: parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0),
         precio_jaba: parseFloat(pesoJaba || 0),
         impuesto: parseFloat(porcentajeImpuesto * 100),
         pago_transporte: parseFloat(currentIngreso.pago_transporte || 0),
@@ -3209,73 +3533,78 @@ const conectarBalanza = async () => {
         num_pesajes: pesajesTemporales.length,
         observacion: currentIngreso.observacion || '',
         estado: currentIngreso.estado !== undefined ? currentIngreso.estado : true,
-        usuario_creacion_id: user?.id
-      };
+        usuario_creacion_id: user?.id,
+      }
 
-      console.log('Datos del ingreso consolidado a enviar:', ingresoData);
+      console.log('Datos del ingreso consolidado a enviar:', ingresoData)
 
-      let ingresoCreado;
+      let ingresoCreado
       if (currentIngreso.id) {
         // Update existing ingreso
-        const response = await ingresoService.update(currentIngreso.id, ingresoData);
-        ingresoCreado = response.data || response;
-        console.log('Ingreso actualizado:', ingresoCreado);
+        const response = await ingresoService.update(currentIngreso.id, ingresoData)
+        ingresoCreado = response.data || response
+        console.log('Ingreso actualizado:', ingresoCreado)
 
-        await detallePesajeService.deleteByIngresoId(ingresoCreado.id);
+        await detallePesajeService.deleteByIngresoId(ingresoCreado.id)
       } else {
         // Create new ingreso
-        const response = await ingresoService.create(ingresoData);
-        ingresoCreado = response.data || response;
-        console.log('Ingreso creado:', ingresoCreado);
+        const response = await ingresoService.create(ingresoData)
+        ingresoCreado = response.data || response
+        console.log('Ingreso creado:', ingresoCreado)
       }
 
       // Guardar todos los detalles de pesaje asociados al ingreso
       if (pesajesTemporales.length > 0 && ingresoCreado.id) {
-        console.log('Guardando detalles de pesaje para ingreso ID:', ingresoCreado.id);
+        console.log('Guardando detalles de pesaje para ingreso ID:', ingresoCreado.id)
 
-        let detallesCreados = 0;
-        let erroresDetalles = 0;
+        let detallesCreados = 0
+        let erroresDetalles = 0
 
         for (let i = 0; i < pesajesTemporales.length; i++) {
-          const pesaje = pesajesTemporales[i];
+          const pesaje = pesajesTemporales[i]
 
           try {
             const detallePesajeData = {
               ingreso_id: ingresoCreado.id,
-              numero_pesaje: (i + 1), //pesaje.numero_pesaje ||
+              numero_pesaje: i + 1, //pesaje.numero_pesaje ||
               peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
               peso_jaba: parseFloat(pesaje.peso_jaba) || 0,
               descuento_merma: parseFloat(pesaje.descuento_merma) || 0,
-              peso_neto_pesaje: (parseFloat(pesaje.peso_bruto) || 0) - (parseFloat(pesaje.peso_jaba) || 0) - (parseFloat(pesaje.descuento_merma) || 0),
-              num_jabas_pesaje: parseInt(pesaje.num_jabas_pesaje) ||parseInt(pesaje.num_jabas) || 0,
+              peso_neto_pesaje:
+                (parseFloat(pesaje.peso_bruto) || 0) -
+                (parseFloat(pesaje.peso_jaba) || 0) -
+                (parseFloat(pesaje.descuento_merma) || 0),
+              num_jabas_pesaje:
+                parseInt(pesaje.num_jabas_pesaje) || parseInt(pesaje.num_jabas) || 0,
               // observacion_pesaje: pesaje.observacion || '',
               producto_id: productoSeleccionado.producto_id,
               tipo_fruta_id: productoSeleccionado.tipo_fruta_id,
               detalle_orden_id: parseInt(productoSeleccionadoPesaje),
               rawData: (pesaje.rawData || '').toString(),
               observacion: pesaje.observacion || '',
-              fecha_pesaje: (pesaje.fecha_pesaje || pesaje.fecha_pesaje||pesaje.timestamp),
+              fecha_pesaje: pesaje.fecha_pesaje || pesaje.fecha_pesaje || pesaje.timestamp,
               producto_nombre: pesaje.producto_nombre,
               tipo_fruta_nombre: pesaje.tipo_fruta_nombre,
-              usuario_pesaje_id: user?.id
-            };
+              usuario_pesaje_id: user?.id,
+            }
 
-            console.log(`Creando detalle de pesaje ${i + 1}:`, detallePesajeData);
+            console.log(`Creando detalle de pesaje ${i + 1}:`, detallePesajeData)
 
-            await detallePesajeService.create(detallePesajeData);
-            detallesCreados++;
-
+            await detallePesajeService.create(detallePesajeData)
+            detallesCreados++
           } catch (pesajeError) {
-            console.error(`Error al crear detalle de pesaje ${i + 1}:`, pesajeError);
-            erroresDetalles++;
+            console.error(`Error al crear detalle de pesaje ${i + 1}:`, pesajeError)
+            erroresDetalles++
           }
         }
 
         // Mostrar resultado del proceso de detalles
         if (erroresDetalles > 0) {
-          console.warn(`Se crearon ${detallesCreados} detalles correctamente, pero hubo ${erroresDetalles} errores`);
+          console.warn(
+            `Se crearon ${detallesCreados} detalles correctamente, pero hubo ${erroresDetalles} errores`,
+          )
         } else {
-          console.log(`Todos los ${detallesCreados} detalles de pesaje se crearon correctamente`);
+          console.log(`Todos los ${detallesCreados} detalles de pesaje se crearon correctamente`)
         }
       }
 
@@ -3293,32 +3622,38 @@ const conectarBalanza = async () => {
         `,
         confirmButtonColor: '#321fdb',
         timer: 4000,
-        timerProgressBar: true
-      });
+        timerProgressBar: true,
+      })
 
       // Recargar la lista de ingresos
-      await fetchIngresos(currentPage, itemsPerPage, searchTerm, numeroFilter, socioFilter, fechaFilter);
+      await fetchIngresos(
+        currentPage,
+        itemsPerPage,
+        searchTerm,
+        numeroFilter,
+        socioFilter,
+        fechaFilter,
+      )
 
       // Cerrar modal y limpiar
-      cerrarModal();
-
+      cerrarModal()
     } catch (error) {
-      console.error('Error al crear ingreso:', error);
+      console.error('Error al crear ingreso:', error)
 
       Swal.fire({
         icon: 'error',
         title: 'Error al crear ingreso',
         text: error.response?.data?.error || error.message || 'Ocurrió un error inesperado',
-        confirmButtonColor: '#321fdb'
-      });
+        confirmButtonColor: '#321fdb',
+      })
 
       setFormErrors({
-        api: error.response?.data?.error || 'Error al crear el ingreso'
-      });
+        api: error.response?.data?.error || 'Error al crear el ingreso',
+      })
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
+  }
 
   // También necesitas la función handleCloseModal si no existe
   const handleCloseModal = () => {
@@ -3338,19 +3673,19 @@ const conectarBalanza = async () => {
       impuesto: '0.00',
       total: '0.00',
       observacion: '',
-      estado: 'activo'
-    });
+      estado: 'activo',
+    })
 
-    setPesajesTemporales([]);
-    setFormErrors({});
-    setEditingId(null);
-    setShowModal(false);
-  };
+    setPesajesTemporales([])
+    setFormErrors({})
+    setEditingId(null)
+    setShowModal(false)
+  }
 
   // Y la función handleCreate si no existe
   const handleCreate = () => {
-    verificarEstadoBalanza();
-    setEditingId(null);
+    verificarEstadoBalanza()
+    setEditingId(null)
     setCurrentIngreso({
       numero_ingreso: '',
       cliente_id: '',
@@ -3367,22 +3702,22 @@ const conectarBalanza = async () => {
       impuesto: '0.00',
       total: '0.00',
       observacion: '',
-      estado: 'activo'
-    });
+      estado: 'activo',
+    })
 
-    setPesajesTemporales([]);
-    setFormErrors({});
-    setShowModal(true);
-  };
+    setPesajesTemporales([])
+    setFormErrors({})
+    setShowModal(true)
+  }
 
   const guardarConfiguracionPesaje = async () => {
     try {
-      setSubmitting(true);
+      setSubmitting(true)
 
       // Validar que la configuración tenga valores válidos
       if (!puertoSeleccionado || !baudRate) {
-        toast.warning('Por favor, complete todos los campos de configuración');
-        return;
+        toast.warning('Por favor, complete todos los campos de configuración')
+        return
       }
 
       // Crear objeto de configuración completo
@@ -3393,56 +3728,54 @@ const conectarBalanza = async () => {
         stopBits: configuracionPesaje.stopBits || 1,
         parity: configuracionPesaje.parity || 'none',
         parser: configuracionPesaje.parser || 'readline',
-        delimiter: configuracionPesaje.delimiter || '\r\n'
-      };
+        delimiter: configuracionPesaje.delimiter || '\r\n',
+      }
 
       // Guardar la configuración en localStorage para persistencia
-      localStorage.setItem('configuracionBalanza', JSON.stringify(configuracionCompleta));
+      localStorage.setItem('configuracionBalanza', JSON.stringify(configuracionCompleta))
 
       // Si hay una balanza conectada, aplicar la nueva configuración
       if (balanzaConectada) {
-        await balanzaService.configurar(configuracionCompleta);
+        await balanzaService.configurar(configuracionCompleta)
       }
 
-      toast.success('Configuración guardada exitosamente');
-
+      toast.success('Configuración guardada exitosamente')
     } catch (error) {
-      console.error('Error al guardar configuración:', error);
-      toast.error('Error al guardar la configuración: ' + (error.response?.data?.error || error.message));
+      console.error('Error al guardar configuración:', error)
+      toast.error(
+        'Error al guardar la configuración: ' + (error.response?.data?.error || error.message),
+      )
     } finally {
-      setSubmitting(false);
+      setSubmitting(false)
     }
-  };
-
+  }
 
   const desconectarBalanza = async () => {
     try {
-      setConectandoBalanza(true);
-      const response = await balanzaService.disconnect();
+      setConectandoBalanza(true)
+      const response = await balanzaService.disconnect()
 
       // Corregir el acceso a la respuesta - quitar .data
-      toast.success(response.message || 'Balanza desconectada exitosamente');
-      setBalanzaConectada(false);
-      setPesoActual(0);
-      setConectandoBalanza(false);
+      toast.success(response.message || 'Balanza desconectada exitosamente')
+      setBalanzaConectada(false)
+      setPesoActual(0)
+      setConectandoBalanza(false)
     } catch (error) {
-      console.error('Error al desconectar balanza:', error);
-      toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message));
-      setConectandoBalanza(false);
+      console.error('Error al desconectar balanza:', error)
+      toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message))
+      setConectandoBalanza(false)
     }
-  };
+  }
 
   useEffect(() => {
     setIsFilterActive(
-      searchTerm.trim() !== '' || numeroFilter.trim() !== '' || socioFilter.trim() !== ''
-    );
-  }, [searchTerm, numeroFilter, socioFilter]);
+      searchTerm.trim() !== '' || numeroFilter.trim() !== '' || socioFilter.trim() !== '',
+    )
+  }, [searchTerm, numeroFilter, socioFilter])
 
   const handleFilterInputChange = (setter) => (e) => {
-    setter(e.target.value);
-  };
-
-
+    setter(e.target.value)
+  }
 
   return (
     <>
@@ -3457,24 +3790,25 @@ const conectarBalanza = async () => {
                     Gestión de Ingresos
                   </h4>
                   <CButton
-                    color={balanzaConectada ? "success" : "warning"}
+                    color={balanzaConectada ? 'success' : 'warning'}
                     variant="outline"
                     onClick={() => setModalBalanzaVisible(true)}
                     className="d-flex align-items-right"
                   >
-                    <CIcon
-                      icon={balanzaConectada ? cilCheckCircle : cilXCircle}
-                      className="me-2"
-                    />
+                    <CIcon icon={balanzaConectada ? cilCheckCircle : cilXCircle} className="me-2" />
                     {balanzaConectada ? (
                       <>
                         Balanza Conectada
-                        <CBadge color="success" className="ms-2">Activa</CBadge>
+                        <CBadge color="success" className="ms-2">
+                          Activa
+                        </CBadge>
                       </>
                     ) : (
                       <>
                         Configurar Balanza
-                        <CBadge color="warning" className="ms-2">Desconectada</CBadge>
+                        <CBadge color="warning" className="ms-2">
+                          Desconectada
+                        </CBadge>
                       </>
                     )}
                   </CButton>
@@ -3516,14 +3850,18 @@ const conectarBalanza = async () => {
                           ref={filterInputRef}
                           placeholder={`Filtrar por ${activeFilter}...`}
                           value={
-                            activeFilter === 'numero' ? numeroFilter :
-                              activeFilter === 'cliente' ? clienteFilter :
-                                socioFilter
+                            activeFilter === 'numero'
+                              ? numeroFilter
+                              : activeFilter === 'cliente'
+                                ? clienteFilter
+                                : socioFilter
                           }
                           onChange={handleFilterInputChange(
-                            activeFilter === 'numero' ? setNumeroFilter :
-                              activeFilter === 'cliente' ? setClienteFilter :
-                                setSocioFilter
+                            activeFilter === 'numero'
+                              ? setNumeroFilter
+                              : activeFilter === 'cliente'
+                                ? setClienteFilter
+                                : setSocioFilter,
                           )}
                         />
                       )}
@@ -3535,7 +3873,8 @@ const conectarBalanza = async () => {
                 <div className="d-flex justify-content-between align-items-center mb-3">
                   <div>
                     <small className="text-muted">
-                      Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalItems)} de {totalItems} registros
+                      Mostrando {(currentPage - 1) * itemsPerPage + 1} a{' '}
+                      {Math.min(currentPage * itemsPerPage, totalItems)} de {totalItems} registros
                     </small>
                   </div>
                   <div className="d-flex align-items-center">
@@ -3573,7 +3912,9 @@ const conectarBalanza = async () => {
                             Número
                             <CButton
                               color="link"
-                              onClick={() => setActiveFilter(activeFilter === 'numero' ? null : 'numero')}
+                              onClick={() =>
+                                setActiveFilter(activeFilter === 'numero' ? null : 'numero')
+                              }
                             >
                               <CIcon icon={cilFilter} />
                             </CButton>
@@ -3582,7 +3923,9 @@ const conectarBalanza = async () => {
                             Fecha
                             <CButton
                               color="link"
-                              onClick={() => setActiveFilter(activeFilter === 'fecha' ? null : 'fecha')}
+                              onClick={() =>
+                                setActiveFilter(activeFilter === 'fecha' ? null : 'fecha')
+                              }
                             >
                               <CIcon icon={cilFilter} />
                             </CButton>
@@ -3591,7 +3934,9 @@ const conectarBalanza = async () => {
                             Socio
                             <CButton
                               color="link"
-                              onClick={() => setActiveFilter(activeFilter === 'socio' ? null : 'socio')}
+                              onClick={() =>
+                                setActiveFilter(activeFilter === 'socio' ? null : 'socio')
+                              }
                             >
                               <CIcon icon={cilFilter} />
                             </CButton>
@@ -3621,14 +3966,28 @@ const conectarBalanza = async () => {
                               <CTableRow onClick={() => toggleRow(ingreso.id)}>
                                 <CTableDataCell>{index + 1}</CTableDataCell>
                                 <CTableDataCell>{ingreso.numero_ingreso}</CTableDataCell>
-                                <CTableDataCell>{new Date(ingreso.fecha).toLocaleDateString()}</CTableDataCell>
-                                <CTableDataCell>{ingreso.socio.nombres} {ingreso.socio.apellidos}</CTableDataCell>
-                                <CTableDataCell>{(parseFloat(ingreso.peso_neto) || 0).toFixed(3)} kg</CTableDataCell>
+                                <CTableDataCell>
+                                  {new Date(ingreso.fecha).toLocaleDateString()}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  {ingreso.socio.nombres} {ingreso.socio.apellidos}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  {(parseFloat(ingreso.peso_neto) || 0).toFixed(3)} kg
+                                </CTableDataCell>
                                 <CTableDataCell>{ingreso.num_jabas}</CTableDataCell>
-                                <CTableDataCell>S/ {(parseFloat(ingreso.pago_transporte) || 0).toFixed(2)}</CTableDataCell>
-                                <CTableDataCell>S/ {(parseFloat(ingreso.ingreso_cooperativa) || 0).toFixed(2)}</CTableDataCell>
-                                <CTableDataCell>S/ {(parseFloat(ingreso.pago_socio) || 0).toFixed(2)}</CTableDataCell>
-                                <CTableDataCell>S/ {(parseFloat(ingreso.subtotal) || 0).toFixed(2)}</CTableDataCell>
+                                <CTableDataCell>
+                                  S/ {(parseFloat(ingreso.pago_transporte) || 0).toFixed(2)}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  S/ {(parseFloat(ingreso.ingreso_cooperativa) || 0).toFixed(2)}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  S/ {(parseFloat(ingreso.pago_socio) || 0).toFixed(2)}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  S/ {(parseFloat(ingreso.subtotal) || 0).toFixed(2)}
+                                </CTableDataCell>
                                 <CTableDataCell>
                                   <CButtonGroup size="sm">
                                     <CButton
@@ -3647,6 +4006,28 @@ const conectarBalanza = async () => {
                                     >
                                       <CIcon icon={cilTrash} />
                                     </CButton>
+                                    <CDropdown>
+                                      <CDropdownToggle color="secondary" variant="outline">
+                                        PDF
+                                      </CDropdownToggle>
+                                      <CDropdownMenu>
+                                        <CDropdownItem
+                                          onClick={() => handleGeneratePDF(ingreso, 'a4')}
+                                        >
+                                          A4
+                                        </CDropdownItem>
+                                        <CDropdownItem
+                                          onClick={() => handleGeneratePDF(ingreso, 'a5')}
+                                        >
+                                          A5
+                                        </CDropdownItem>
+                                        <CDropdownItem
+                                          onClick={() => handleGeneratePDF(ingreso, 'ticket')}
+                                        >
+                                          Ticket
+                                        </CDropdownItem>
+                                      </CDropdownMenu>
+                                    </CDropdown>
                                   </CButtonGroup>
                                 </CTableDataCell>
                               </CTableRow>
@@ -3657,36 +4038,48 @@ const conectarBalanza = async () => {
                                       <div className="row">
                                         <div className="col-md-6">
                                           <div className="mb-2">
-                                            <strong>Orden:</strong> {ingreso.detalle_orden.orden_compra.numero_orden}
+                                            <strong>Orden:</strong>{' '}
+                                            {ingreso.detalle_orden.orden_compra.numero_orden}
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Producto:</strong> {ingreso.detalle_orden.producto.nombre} - {ingreso.detalle_orden.tipo_fruta.nombre}
+                                            <strong>Producto:</strong>{' '}
+                                            {ingreso.detalle_orden.producto.nombre} -{' '}
+                                            {ingreso.detalle_orden.tipo_fruta.nombre}
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Pesajes Registrados:</strong> {ingreso.num_pesajes}
+                                            <strong>Pesajes Registrados:</strong>{' '}
+                                            {ingreso.num_pesajes}
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Peso Bruto:</strong> {(parseFloat(ingreso.peso_bruto) || 0).toFixed(3)} kg
+                                            <strong>Peso Bruto:</strong>{' '}
+                                            {(parseFloat(ingreso.peso_bruto) || 0).toFixed(3)} kg
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Peso Jabas:</strong> {(parseFloat(ingreso.peso_total_jabas) || 0).toFixed(3)} kg
+                                            <strong>Peso Jabas:</strong>{' '}
+                                            {(parseFloat(ingreso.peso_total_jabas) || 0).toFixed(3)}{' '}
+                                            kg
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Descuento Merma:</strong> {(parseFloat(ingreso.dscto_merma) || 0).toFixed(3)} kg
+                                            <strong>Descuento Merma:</strong>{' '}
+                                            {(parseFloat(ingreso.dscto_merma) || 0).toFixed(3)} kg
                                           </div>
                                         </div>
                                         <div className="col-md-6">
                                           <div className="mb-2">
-                                            <strong>Precio Venta por kg:</strong> S/ {(parseFloat(ingreso.precio_venta_kg) || 0).toFixed(2)}
+                                            <strong>Precio Venta por kg:</strong> S/{' '}
+                                            {(parseFloat(ingreso.precio_venta_kg) || 0).toFixed(2)}
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Precio por Jaba:</strong> S/ {(parseFloat(ingreso.precio_jaba) || 0).toFixed(2)}
+                                            <strong>Precio por Jaba:</strong> S/{' '}
+                                            {(parseFloat(ingreso.precio_jaba) || 0).toFixed(2)}
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Ingreso Cooperativa:</strong> {ingreso.impuesto}%
+                                            <strong>Ingreso Cooperativa:</strong> {ingreso.impuesto}
+                                            %
                                           </div>
                                           <div className="mb-2">
-                                            <strong>Pago Transporte:</strong> {ingreso.pago_transporte}%
+                                            <strong>Pago Transporte:</strong>{' '}
+                                            {ingreso.pago_transporte}%
                                           </div>
                                         </div>
                                       </div>
@@ -3710,7 +4103,7 @@ const conectarBalanza = async () => {
                           &laquo;
                         </CPaginationItem>
 
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                           <CPaginationItem
                             key={page}
                             active={page === currentPage}
@@ -3765,10 +4158,7 @@ const conectarBalanza = async () => {
                                   {page}
                                 </CPaginationItem>
                               )
-                            } else if (
-                              page === currentPage - 3 ||
-                              page === currentPage + 3
-                            ) {
+                            } else if (page === currentPage - 3 || page === currentPage + 3) {
                               return <CPaginationItem key={page}>...</CPaginationItem>
                             }
                             return null
@@ -3843,16 +4233,13 @@ const conectarBalanza = async () => {
                             disabled={cargandoPuertos || balanzaConectada}
                             title="Actualizar lista de puertos"
                           >
-                            {cargandoPuertos ? (
-                              <CSpinner size="sm" />
-                            ) : (
-                              <CIcon icon={cilReload} />
-                            )}
+                            {cargandoPuertos ? <CSpinner size="sm" /> : <CIcon icon={cilReload} />}
                           </CButton>
                         </div>
                         {puertosDisponibles.length === 0 && !cargandoPuertos && (
                           <small className="text-muted">
-                            No se encontraron puertos disponibles. Verifique que la balanza esté conectada.
+                            No se encontraron puertos disponibles. Verifique que la balanza esté
+                            conectada.
                           </small>
                         )}
                       </div>
@@ -3876,7 +4263,9 @@ const conectarBalanza = async () => {
 
                       {/* Configuraciones adicionales */}
                       <div className="mb-3">
-                        <CFormLabel htmlFor="timeout_conexion">Timeout de Conexión (ms):</CFormLabel>
+                        <CFormLabel htmlFor="timeout_conexion">
+                          Timeout de Conexión (ms):
+                        </CFormLabel>
                         <CFormInput
                           type="number"
                           id="timeout_conexion"
@@ -3887,7 +4276,6 @@ const conectarBalanza = async () => {
                           step="1000"
                         />
                       </div>
-
                     </CCardBody>
                   </CCard>
                 </CCol>
@@ -3909,9 +4297,7 @@ const conectarBalanza = async () => {
                               Puerto: {puertoSeleccionado}
                             </CBadge>
                             <br />
-                            <CBadge color="info">
-                              Velocidad: {baudRate} baudios
-                            </CBadge>
+                            <CBadge color="info">Velocidad: {baudRate} baudios</CBadge>
                           </div>
                         ) : (
                           <div>
@@ -3934,7 +4320,7 @@ const conectarBalanza = async () => {
                       {/* Controles de conexión */}
                       <div className="d-grid gap-2">
                         <CButton
-                          color={balanzaConectada ? "danger" : "success"}
+                          color={balanzaConectada ? 'danger' : 'success'}
                           onClick={balanzaConectada ? desconectarBalanza : conectarBalanza}
                           disabled={conectandoBalanza || (!balanzaConectada && !puertoSeleccionado)}
                           size="lg"
@@ -3944,22 +4330,18 @@ const conectarBalanza = async () => {
                               <CSpinner size="sm" className="me-2" />
                               Conectando...
                             </>
+                          ) : balanzaConectada ? (
+                            <>
+                              <CIcon icon={cilXCircle} className="me-2" />
+                              Desconectar Balanza
+                            </>
                           ) : (
-                            balanzaConectada ? (
-                              <>
-                                <CIcon icon={cilXCircle} className="me-2" />
-                                Desconectar Balanza
-                              </>
-                            ) : (
-                              <>
-                                <CIcon icon={cilCheckCircle} className="me-2" />
-                                Conectar Balanza
-                              </>
-                            )
+                            <>
+                              <CIcon icon={cilCheckCircle} className="me-2" />
+                              Conectar Balanza
+                            </>
                           )}
                         </CButton>
-
-
                       </div>
                     </CCardBody>
                   </CCard>
@@ -3973,7 +4355,9 @@ const conectarBalanza = async () => {
                     <CIcon icon={cilInfo} className="me-2" />
                     <strong>Información:</strong>
                     <ul className="mb-0 mt-2">
-                      <li>Asegúrese de que la balanza esté encendida y conectada al puerto USB/Serial</li>
+                      <li>
+                        Asegúrese de que la balanza esté encendida y conectada al puerto USB/Serial
+                      </li>
                       <li>Verifique que no haya otras aplicaciones usando el mismo puerto</li>
                       <li>La velocidad más común para balanzas es 9600 baudios</li>
                     </ul>
@@ -3982,10 +4366,7 @@ const conectarBalanza = async () => {
               </CRow>
             </CModalBody>
             <CModalFooter>
-              <CButton
-                color="secondary"
-                onClick={() => setModalBalanzaVisible(false)}
-              >
+              <CButton color="secondary" onClick={() => setModalBalanzaVisible(false)}>
                 Cerrar
               </CButton>
             </CModalFooter>
@@ -4000,19 +4381,21 @@ const conectarBalanza = async () => {
             className="modal-95vw"
           >
             <CModalHeader>
-              <CModalTitle>{modalTitle} {balanzaConectada && (
-                <CBadge color="success" className="ms-2">
-                  Balanza Conectada
-                </CBadge>
-              )}</CModalTitle>
+              <CModalTitle>
+                {modalTitle}{' '}
+                {balanzaConectada && (
+                  <CBadge color="success" className="ms-2">
+                    Balanza Conectada
+                  </CBadge>
+                )}
+              </CModalTitle>
             </CModalHeader>
-            <CModalBody >
+            <CModalBody>
               {formErrors.api && (
                 <CAlert color="danger" className="mb-3">
                   {formErrors.api}
                 </CAlert>
               )}
-
 
               <CRow className="mb-4">
                 <CCol md={6}>
@@ -4031,13 +4414,17 @@ const conectarBalanza = async () => {
                         <div className="d-flex">
                           <Select
                             id="orden_pesaje"
-                            value={ordenesPendientes.find(orden => orden.id === ordenSeleccionada) ? {
-                              value: ordenSeleccionada,
-                              label: `${ordenesPendientes.find(orden => orden.id === ordenSeleccionada).codigo_lote} - ${ordenesPendientes.find(orden => orden.id === ordenSeleccionada).cliente?.razon_social}${ordenesPendientes.find(orden => orden.id === ordenSeleccionada).fecha_entrega ? ` (${(ordenesPendientes.find(orden => orden.id === ordenSeleccionada).numero_orden)})` : ''}`
-                            } : null}
+                            value={
+                              ordenesPendientes.find((orden) => orden.id === ordenSeleccionada)
+                                ? {
+                                    value: ordenSeleccionada,
+                                    label: `${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).codigo_lote} - ${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).cliente?.razon_social}${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).fecha_entrega ? ` (${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).numero_orden})` : ''}`,
+                                  }
+                                : null
+                            }
                             onChange={(selectedOption) => {
-                              const ordenId = selectedOption ? selectedOption.value : '';
-                              setOrdenSeleccionada(ordenId);
+                              const ordenId = selectedOption ? selectedOption.value : ''
+                              setOrdenSeleccionada(ordenId)
 
                               // // Si no estás editando, o si cambias de orden, carga los productos de la nueva orden
                               // if (!editingId || ordenId !== currentIngreso.detalle_orden_id) {
@@ -4050,9 +4437,9 @@ const conectarBalanza = async () => {
                               //   }
                               // }
                             }}
-                            options={ordenesPendientes.map(orden => ({
+                            options={ordenesPendientes.map((orden) => ({
                               value: orden.id,
-                              label: `${orden.codigo_lote} - ${orden.cliente?.razon_social}${orden.fecha_entrega ? ` ( ${(orden.numero_orden)} )` : ''}`
+                              label: `${orden.codigo_lote} - ${orden.cliente?.razon_social}${orden.fecha_entrega ? ` ( ${orden.numero_orden} )` : ''}`,
                             }))}
                             placeholder={
                               cargandoOrdenes
@@ -4069,7 +4456,7 @@ const conectarBalanza = async () => {
                             onInputChange={(inputValue, { action }) => {
                               // Solo actualizar el searchTermOrdenes si el usuario está escribiendo
                               if (action === 'input-change') {
-                                setSearchTermOrdenes(inputValue);
+                                setSearchTermOrdenes(inputValue)
                               }
                             }}
                             className={`basic-single me-2 ${formErrors.orden_id ? 'is-invalid' : ''}`}
@@ -4077,39 +4464,47 @@ const conectarBalanza = async () => {
                             styles={{
                               control: (provided, state) => ({
                                 ...provided,
-                                borderColor: formErrors.orden_id ? '#dc3545' : (state.isFocused ? '#321fdb' : provided.borderColor),
-                                boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(50, 31, 219, 0.25)' : provided.boxShadow,
-                                backgroundColor: camposBloqueados ? '#f8f9fa' : provided.backgroundColor,
+                                borderColor: formErrors.orden_id
+                                  ? '#dc3545'
+                                  : state.isFocused
+                                    ? '#321fdb'
+                                    : provided.borderColor,
+                                boxShadow: state.isFocused
+                                  ? '0 0 0 0.2rem rgba(50, 31, 219, 0.25)'
+                                  : provided.boxShadow,
+                                backgroundColor: camposBloqueados
+                                  ? '#f8f9fa'
+                                  : provided.backgroundColor,
                                 cursor: camposBloqueados ? 'not-allowed' : 'default',
                                 '&:hover': {
-                                  borderColor: camposBloqueados ? provided.borderColor : '#321fdb'
-                                }
+                                  borderColor: camposBloqueados ? provided.borderColor : '#321fdb',
+                                },
                               }),
                               container: (provided) => ({
                                 ...provided,
-                                flex: 1
+                                flex: 1,
                               }),
                               placeholder: (provided) => ({
                                 ...provided,
-                                color: camposBloqueados ? '#6c757d' : provided.color
+                                color: camposBloqueados ? '#6c757d' : provided.color,
                               }),
                               singleValue: (provided) => ({
                                 ...provided,
-                                color: camposBloqueados ? '#6c757d' : provided.color
-                              })
+                                color: camposBloqueados ? '#6c757d' : provided.color,
+                              }),
                             }}
                             noOptionsMessage={({ inputValue }) =>
-                              cargandoOrdenes ? "Buscando órdenes..." :
-                                inputValue ? `No se encontraron órdenes que coincidan con "${inputValue}"` : "No se encontraron órdenes pendientes"
+                              cargandoOrdenes
+                                ? 'Buscando órdenes...'
+                                : inputValue
+                                  ? `No se encontraron órdenes que coincidan con "${inputValue}"`
+                                  : 'No se encontraron órdenes pendientes'
                             }
-                            loadingMessage={() => "Cargando órdenes..."}
+                            loadingMessage={() => 'Cargando órdenes...'}
                           />
-
                         </div>
                         {formErrors.orden_id && (
-                          <div className="invalid-feedback d-block">
-                            {formErrors.orden_id}
-                          </div>
+                          <div className="invalid-feedback d-block">{formErrors.orden_id}</div>
                         )}
                         {ordenesPendientes.length === 0 && !cargandoOrdenes && (
                           <small className="text-warning">
@@ -4124,27 +4519,29 @@ const conectarBalanza = async () => {
                         <small className="text-muted d-block">
                           {camposBloqueados
                             ? 'No se puede modificar mientras hay pesajes registrados'
-                            : 'Busque por código de lote, número de orden o razón social del cliente'
-                          }
+                            : 'Busque por código de lote, número de orden o razón social del cliente'}
                         </small>
-
                       </div>
 
                       <div className="mb-3">
                         <CFormLabel htmlFor="socio_pesaje">Socio:</CFormLabel>
                         <Select
                           id="socio_pesaje"
-                          value={socios.find(socio => socio.id === socioSeleccionado) ? {
-                            value: socioSeleccionado,
-                            label: `${socios.find(socio => socio.id === socioSeleccionado).codigo} - ${socios.find(socio => socio.id === socioSeleccionado).nombres} ${socios.find(socio => socio.id === socioSeleccionado).apellidos}`
-                          } : null}
+                          value={
+                            socios.find((socio) => socio.id === socioSeleccionado)
+                              ? {
+                                  value: socioSeleccionado,
+                                  label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).nombres} ${socios.find((socio) => socio.id === socioSeleccionado).apellidos}`,
+                                }
+                              : null
+                          }
                           onChange={(selectedOption) => {
-                            const socioId = selectedOption ? selectedOption.value : '';
-                            setSocioSeleccionado(socioId);
+                            const socioId = selectedOption ? selectedOption.value : ''
+                            setSocioSeleccionado(socioId)
                           }}
-                          options={socios.map(socio => ({
+                          options={socios.map((socio) => ({
                             value: socio.id,
-                            label: `${socio.codigo} - ${socio.nombres} ${socio.apellidos}`
+                            label: `${socio.codigo} - ${socio.nombres} ${socio.apellidos}`,
                           }))}
                           placeholder="Buscar y seleccionar socio..."
                           isClearable
@@ -4154,7 +4551,7 @@ const conectarBalanza = async () => {
                           onInputChange={(inputValue, { action }) => {
                             // Solo actualizar el searchTerm si el usuario está escribiendo
                             if (action === 'input-change') {
-                              setSearchTermSocios(inputValue);
+                              setSearchTermSocios(inputValue)
                             }
                           }}
                           className={`basic-single ${formErrors.socio_id ? 'is-invalid' : ''}`}
@@ -4162,26 +4559,34 @@ const conectarBalanza = async () => {
                           styles={{
                             control: (provided, state) => ({
                               ...provided,
-                              borderColor: formErrors.socio_id ? '#dc3545' : (state.isFocused ? '#321fdb' : provided.borderColor),
-                              boxShadow: state.isFocused ? '0 0 0 0.2rem rgba(50, 31, 219, 0.25)' : provided.boxShadow,
+                              borderColor: formErrors.socio_id
+                                ? '#dc3545'
+                                : state.isFocused
+                                  ? '#321fdb'
+                                  : provided.borderColor,
+                              boxShadow: state.isFocused
+                                ? '0 0 0 0.2rem rgba(50, 31, 219, 0.25)'
+                                : provided.boxShadow,
                               '&:hover': {
-                                borderColor: '#321fdb'
-                              }
-                            })
+                                borderColor: '#321fdb',
+                              },
+                            }),
                           }}
                           noOptionsMessage={({ inputValue }) =>
-                            cargandoSocios ? "Buscando socios..." :
-                              inputValue ? `No se encontraron socios que coincidan con "${inputValue}"` : "No se encontraron socios"
+                            cargandoSocios
+                              ? 'Buscando socios...'
+                              : inputValue
+                                ? `No se encontraron socios que coincidan con "${inputValue}"`
+                                : 'No se encontraron socios'
                           }
-                          loadingMessage={() => "Cargando socios..."}
+                          loadingMessage={() => 'Cargando socios...'}
                         />
                         {formErrors.socio_id && (
-                          <div className="invalid-feedback d-block">
-                            {formErrors.socio_id}
-                          </div>
+                          <div className="invalid-feedback d-block">{formErrors.socio_id}</div>
                         )}
                         <small className="text-muted">
-                          Busque por código, nombre o apellido del socio. El socio se vinculará al crear el ingreso.
+                          Busque por código, nombre o apellido del socio. El socio se vinculará al
+                          crear el ingreso.
                         </small>
                       </div>
                       {/* Campos de Peso por Jaba y Número de Jabas */}
@@ -4212,8 +4617,7 @@ const conectarBalanza = async () => {
                             <small className="text-muted">
                               {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
-                                : 'Peso estándar de cada jaba vacía'
-                              }
+                                : 'Peso estándar de cada jaba vacía'}
                             </small>
                           </div>
                         </CCol>
@@ -4238,7 +4642,7 @@ const conectarBalanza = async () => {
                                 className={`${formErrors.num_jabas ? 'is-invalid' : ''} bg-light`}
                                 style={{
                                   cursor: 'not-allowed',
-                                  backgroundColor: '#f8f9fa'
+                                  backgroundColor: '#f8f9fa',
                                 }}
                               />
 
@@ -4277,8 +4681,7 @@ const conectarBalanza = async () => {
                             <small className="text-muted">
                               {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
-                                : 'Precio por kilogramo de producto'
-                              }
+                                : 'Precio por kilogramo de producto'}
                             </small>
                           </div>
                         </CCol>
@@ -4309,8 +4712,7 @@ const conectarBalanza = async () => {
                             <small className="text-muted">
                               {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
-                                : 'Porcentaje de impuesto aplicable'
-                              }
+                                : 'Porcentaje de impuesto aplicable'}
                             </small>
                           </div>
                         </CCol>
@@ -4335,7 +4737,7 @@ const conectarBalanza = async () => {
                                 className={`${formErrors.descuento_merma ? 'is-invalid' : ''} bg-light`}
                                 style={{
                                   cursor: 'not-allowed',
-                                  backgroundColor: '#f8f9fa'
+                                  backgroundColor: '#f8f9fa',
                                 }}
                               />
 
@@ -4378,18 +4780,17 @@ const conectarBalanza = async () => {
                             <small className="text-muted">
                               {camposBloqueados
                                 ? 'No se puede modificar mientras hay pesajes registrados'
-                                : 'Porcentaje del peso neto que se destinará al pago de transporte'
-                              }
+                                : 'Porcentaje del peso neto que se destinará al pago de transporte'}
                             </small>
                           </div>
                         </CCol>
 
-
-
-
                         <CCol md={6}>
                           <div className="mb-3">
-                            <CFormLabel htmlFor="aplicar_precio_jaba" className="fw-bold text-success">
+                            <CFormLabel
+                              htmlFor="aplicar_precio_jaba"
+                              className="fw-bold text-success"
+                            >
                               Aplicar Precio por Jaba
                             </CFormLabel>
                             <CFormCheck
@@ -4405,11 +4806,11 @@ const conectarBalanza = async () => {
                       {camposBloqueados && (
                         <CAlert color="info" className="mt-3">
                           <CIcon icon={cilInfo} className="me-2" />
-                          <strong>Configuración bloqueada:</strong> Para modificar el peso por jaba, precio de venta o impuesto,
-                          primero debe eliminar todos los pesajes registrados usando el botón "Limpiar Todo".
+                          <strong>Configuración bloqueada:</strong> Para modificar el peso por jaba,
+                          precio de venta o impuesto, primero debe eliminar todos los pesajes
+                          registrados usando el botón "Limpiar Todo".
                         </CAlert>
                       )}
-
                     </CCardBody>
                   </CCard>
                 </CCol>
@@ -4437,9 +4838,7 @@ const conectarBalanza = async () => {
                         <CCol md={4}>
                           <div className="text-center p-3 border rounded bg-light">
                             <div className="text-muted small">Jabas</div>
-                            <div className="h5 mb-0">
-                              {currentIngreso.num_jabas || 0}
-                            </div>
+                            <div className="h5 mb-0">{currentIngreso.num_jabas || 0}</div>
                           </div>
                         </CCol>
                         <CCol md={4}>
@@ -4478,10 +4877,12 @@ const conectarBalanza = async () => {
                           <div className="text-center p-3 border rounded bg-light">
                             <div className="text-muted small">Pago Transporte</div>
                             <div className="h5 mb-0 text-danger">
-                              S/ {(() => {
-                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
-                                const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                                return (pesoNeto * porcentajeTransporte).toFixed(2);
+                              S/{' '}
+                              {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0)
+                                const porcentajeTransporte =
+                                  parseFloat(currentIngreso.pago_transporte || 0) / 100
+                                return (pesoNeto * porcentajeTransporte).toFixed(2)
                               })()}
                             </div>
                           </div>
@@ -4490,10 +4891,12 @@ const conectarBalanza = async () => {
                           <div className="text-center p-3 border rounded bg-light">
                             <div className="text-muted small">Ingreso Cooperativa</div>
                             <div className="h5 mb-0 text-primary">
-                              S/ {(() => {
-                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
-                                const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                                return (pesoNeto * porcentajeImpuesto).toFixed(2);
+                              S/{' '}
+                              {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0)
+                                const porcentajeImpuesto =
+                                  parseFloat(currentIngreso.impuesto || 0) / 100
+                                return (pesoNeto * porcentajeImpuesto).toFixed(2)
                               })()}
                             </div>
                           </div>
@@ -4502,17 +4905,25 @@ const conectarBalanza = async () => {
                           <div className="text-center p-3 border rounded bg-light">
                             <div className="text-muted small">Pago al Socio</div>
                             <div className="h5 mb-0 text-success">
-                              S/ {(() => {
-                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0);
-                                const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-                                const subtotal = pesoNeto * precioKg;
-                                const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                                const pagoTransporte = pesoNeto * porcentajeTransporte;
-                                const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                                const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
-                                const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (currentIngreso.num_jabas || 0) * 1.00 : 0;
-                                const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
-                                return pagoSocio.toFixed(2);
+                              S/{' '}
+                              {(() => {
+                                const pesoNeto = parseFloat(currentIngreso.peso_neto || 0)
+                                const precioKg = parseFloat(
+                                  currentIngreso.precio_venta_kg || precioVentaKg || 0,
+                                )
+                                const subtotal = pesoNeto * precioKg
+                                const porcentajeTransporte =
+                                  parseFloat(currentIngreso.pago_transporte || 0) / 100
+                                const pagoTransporte = pesoNeto * porcentajeTransporte
+                                const porcentajeImpuesto =
+                                  parseFloat(currentIngreso.impuesto || 0) / 100
+                                const ingresoCooperativa = pesoNeto * porcentajeImpuesto
+                                const precioPorJaba = currentIngreso.aplicarPrecioJaba
+                                  ? (currentIngreso.num_jabas || 0) * 1.0
+                                  : 0
+                                const pagoSocio =
+                                  subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba
+                                return pagoSocio.toFixed(2)
                               })()}
                             </div>
                           </div>
@@ -4523,7 +4934,10 @@ const conectarBalanza = async () => {
                       <CRow className="mt-3">
                         <CCol md={3}>
                           <small className="text-muted">
-                            <strong>Precio por kg:</strong> S/ {parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0).toFixed(2)}
+                            <strong>Precio por kg:</strong> S/{' '}
+                            {parseFloat(
+                              currentIngreso.precio_venta_kg || precioVentaKg || 0,
+                            ).toFixed(2)}
                           </small>
                         </CCol>
                         <CCol md={3}>
@@ -4538,7 +4952,8 @@ const conectarBalanza = async () => {
                         </CCol>
                         <CCol md={3}>
                           <small className="text-muted">
-                            <strong>Pago transporte:</strong> {parseFloat(currentIngreso.pago_transporte || 0).toFixed(1)}%
+                            <strong>Pago transporte:</strong>{' '}
+                            {parseFloat(currentIngreso.pago_transporte || 0).toFixed(1)}%
                           </small>
                         </CCol>
                       </CRow>
@@ -4566,10 +4981,7 @@ const conectarBalanza = async () => {
                                 Iniciar Monitor
                               </CButton>
                             ) : (
-                              <CButton
-                                color="danger"
-                                onClick={detenerMonitoreoRealTime}
-                              >
+                              <CButton color="danger" onClick={detenerMonitoreoRealTime}>
                                 <CIcon icon={cilMediaStop} className="me-2" />
                                 Detener Monitor
                               </CButton>
@@ -4587,7 +4999,9 @@ const conectarBalanza = async () => {
                             <CButton
                               color="info"
                               onClick={guardarPesajeAutomatico}
-                              disabled={!monitorActivo || !pesajeRealTime.stable || !currentIngreso.id}
+                              disabled={
+                                !monitorActivo || !pesajeRealTime.stable || !currentIngreso.id
+                              }
                             >
                               <CIcon icon={cilSave} className="me-2" />
                               Guardar Pesaje
@@ -4602,7 +5016,7 @@ const conectarBalanza = async () => {
                             style={{
                               backgroundColor: '#f8f9fa',
                               border: `3px solid ${pesajeRealTime.statusColor || '#6c757d'}`,
-                              transition: 'all 0.3s ease'
+                              transition: 'all 0.3s ease',
                             }}
                           >
                             {/* Peso Principal */}
@@ -4611,7 +5025,7 @@ const conectarBalanza = async () => {
                               style={{
                                 color: pesajeRealTime.statusColor || '#6c757d',
                                 fontFamily: 'monospace',
-                                textShadow: '2px 2px 4px rgba(0,0,0,0.1)'
+                                textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
                               }}
                             >
                               {monitorActivo ? (pesajeRealTime.weight || 0).toFixed(3) : '0.000'}
@@ -4621,10 +5035,18 @@ const conectarBalanza = async () => {
                             {/* Estado */}
                             <div className="mb-3">
                               <CBadge
-                                color={pesajeRealTime.stable ? 'success' : (monitorActivo ? 'warning' : 'secondary')}
+                                color={
+                                  pesajeRealTime.stable
+                                    ? 'success'
+                                    : monitorActivo
+                                      ? 'warning'
+                                      : 'secondary'
+                                }
                                 className="fs-6 px-3 py-2"
                               >
-                                {monitorActivo ? (pesajeRealTime.status || 'LEYENDO...') : 'DESCONECTADO'}
+                                {monitorActivo
+                                  ? pesajeRealTime.status || 'LEYENDO...'
+                                  : 'DESCONECTADO'}
                               </CBadge>
                             </div>
 
@@ -4632,20 +5054,20 @@ const conectarBalanza = async () => {
                             <CRow className="text-start">
                               <CCol sm={6}>
                                 <small className="text-muted">
-                                  <strong>Última lectura:</strong><br />
-                                  {pesajeRealTime.timestamp ?
-                                    new Date(pesajeRealTime.timestamp).toLocaleTimeString() :
-                                    'N/A'
-                                  }
+                                  <strong>Última lectura:</strong>
+                                  <br />
+                                  {pesajeRealTime.timestamp
+                                    ? new Date(pesajeRealTime.timestamp).toLocaleTimeString()
+                                    : 'N/A'}
                                 </small>
                               </CCol>
                               <CCol sm={6}>
                                 <small className="text-muted">
-                                  <strong>Datos originales:</strong><br />
-                                  {pesajeRealTime.rawData ?
-                                    pesajeRealTime.rawData.substring(0, 20) + '...' :
-                                    'N/A'
-                                  }
+                                  <strong>Datos originales:</strong>
+                                  <br />
+                                  {pesajeRealTime.rawData
+                                    ? pesajeRealTime.rawData.substring(0, 20) + '...'
+                                    : 'N/A'}
                                 </small>
                               </CCol>
                             </CRow>
@@ -4659,7 +5081,7 @@ const conectarBalanza = async () => {
                                     width: '12px',
                                     height: '12px',
                                     backgroundColor: pesajeRealTime.stable ? '#28a745' : '#ffc107',
-                                    animation: pesajeRealTime.stable ? 'none' : 'pulse 1s infinite'
+                                    animation: pesajeRealTime.stable ? 'none' : 'pulse 1s infinite',
                                   }}
                                 ></div>
                                 <small className="text-muted">
@@ -4686,32 +5108,36 @@ const conectarBalanza = async () => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {pesajes.slice(-2).reverse().map((pesaje, index) => (
-                                  <tr key={pesaje.id || index}>
-                                    <td>{index + 1}</td>
-                                    <td>
-                                      <span className="fw-bold text-primary">
-                                        {(pesaje.peso || 0).toFixed(3)} kg
-                                      </span>
-                                    </td>
-                                    <td>
-                                      <small className="text-muted">
-                                        {pesaje.fecha_pesaje||pesaje.timestamp ?
-                                          new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleTimeString() :
-                                          new Date().toLocaleTimeString()
-                                        }
-                                      </small>
-                                    </td>
-                                    <td>
-                                      <CBadge
-                                        color={pesaje.stable ? 'success' : 'warning'}
-                                        className="px-2"
-                                      >
-                                        {pesaje.stable ? 'ESTABLE' : 'INESTABLE'}
-                                      </CBadge>
-                                    </td>
-                                  </tr>
-                                ))}
+                                {pesajes
+                                  .slice(-2)
+                                  .reverse()
+                                  .map((pesaje, index) => (
+                                    <tr key={pesaje.id || index}>
+                                      <td>{index + 1}</td>
+                                      <td>
+                                        <span className="fw-bold text-primary">
+                                          {(pesaje.peso || 0).toFixed(3)} kg
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <small className="text-muted">
+                                          {pesaje.fecha_pesaje || pesaje.timestamp
+                                            ? new Date(
+                                                pesaje.fecha_pesaje || pesaje.timestamp,
+                                              ).toLocaleTimeString()
+                                            : new Date().toLocaleTimeString()}
+                                        </small>
+                                      </td>
+                                      <td>
+                                        <CBadge
+                                          color={pesaje.stable ? 'success' : 'warning'}
+                                          className="px-2"
+                                        >
+                                          {pesaje.stable ? 'ESTABLE' : 'INESTABLE'}
+                                        </CBadge>
+                                      </td>
+                                    </tr>
+                                  ))}
                                 {pesajes.length === 0 && (
                                   <tr>
                                     <td colSpan="4" className="text-center text-muted py-3">
@@ -4726,7 +5152,6 @@ const conectarBalanza = async () => {
                       )}
                     </CCardBody>
                   </CCard>
-
                 </CCol>
               </CRow>
 
@@ -4765,12 +5190,14 @@ const conectarBalanza = async () => {
                                   <tbody>
                                     {productosOrden.map((producto) => {
                                       if (!producto || typeof producto.cantidad === 'undefined') {
-                                        console.error('Invalid producto:', producto);
-                                        return null; // or handle the error appropriately
+                                        console.error('Invalid producto:', producto)
+                                        return null // or handle the error appropriately
                                       }
-                                      const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(producto);
-                                      const progresoActualizado = calcularProgresoActualizado(producto);
-                                      const isCompleto = cantidadPendienteActualizada <= 0;
+                                      const cantidadPendienteActualizada =
+                                        calcularCantidadPendienteActualizada(producto)
+                                      const progresoActualizado =
+                                        calcularProgresoActualizado(producto)
+                                      const isCompleto = cantidadPendienteActualizada <= 0
 
                                       return (
                                         <tr
@@ -4781,13 +5208,19 @@ const conectarBalanza = async () => {
                                             <strong>{producto.producto_nombre}</strong>
                                           </td>
                                           <td>
-                                            <span className="badge bg-info">{producto.tipo_fruta_nombre}</span>
+                                            <span className="badge bg-info">
+                                              {producto.tipo_fruta_nombre}
+                                            </span>
                                           </td>
                                           <td>
-                                            <span className="fw-bold">{(producto.cantidad || 0).toFixed(2)} kg</span>
+                                            <span className="fw-bold">
+                                              {(producto.cantidad || 0).toFixed(2)} kg
+                                            </span>
                                           </td>
                                           <td>
-                                            <span className={`fw-bold ${isCompleto ? 'text-success' : 'text-warning'}`}>
+                                            <span
+                                              className={`fw-bold ${isCompleto ? 'text-success' : 'text-warning'}`}
+                                            >
                                               {cantidadPendienteActualizada.toFixed(2)} kg
                                             </span>
                                             {isCompleto && (
@@ -4813,18 +5246,32 @@ const conectarBalanza = async () => {
                                           <td>
                                             <CButton
                                               size="sm"
-                                              color={productoSeleccionadoPesaje === producto.producto_id ? 'success' : 'primary'}
-                                              variant={productoSeleccionadoPesaje === producto.producto_id ? 'solid' : 'outline'}
+                                              color={
+                                                productoSeleccionadoPesaje === producto.producto_id
+                                                  ? 'success'
+                                                  : 'primary'
+                                              }
+                                              variant={
+                                                productoSeleccionadoPesaje === producto.producto_id
+                                                  ? 'solid'
+                                                  : 'outline'
+                                              }
                                               onClick={() => {
-                                                if (productoSeleccionadoPesaje === producto.producto_id) {
-                                                  setProductoSeleccionadoPesaje('');
+                                                if (
+                                                  productoSeleccionadoPesaje ===
+                                                  producto.producto_id
+                                                ) {
+                                                  setProductoSeleccionadoPesaje('')
                                                 } else {
-                                                  setProductoSeleccionadoPesaje(producto.producto_id);
+                                                  setProductoSeleccionadoPesaje(
+                                                    producto.producto_id,
+                                                  )
                                                 }
                                               }}
                                               disabled={isCompleto}
                                             >
-                                              {productoSeleccionadoPesaje === producto.producto_id ? (
+                                              {productoSeleccionadoPesaje ===
+                                              producto.producto_id ? (
                                                 <>
                                                   <CIcon icon={cilCheckCircle} className="me-1" />
                                                   Seleccionado
@@ -4843,7 +5290,7 @@ const conectarBalanza = async () => {
                                             </CButton>
                                           </td>
                                         </tr>
-                                      );
+                                      )
                                     })}
                                   </tbody>
                                 </table>
@@ -4853,9 +5300,14 @@ const conectarBalanza = async () => {
                               {productoSeleccionadoPesaje && (
                                 <div className="mt-3 p-3 bg-primary bg-opacity-10 border border-primary rounded">
                                   {(() => {
-                                    const productoActual = productosOrden.find(p => p.producto_id === productoSeleccionadoPesaje);
-                                    const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(productoActual);
-                                    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(productoSeleccionadoPesaje);
+                                    const productoActual = productosOrden.find(
+                                      (p) => p.producto_id === productoSeleccionadoPesaje,
+                                    )
+                                    const cantidadPendienteActualizada =
+                                      calcularCantidadPendienteActualizada(productoActual)
+                                    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(
+                                      productoSeleccionadoPesaje,
+                                    )
 
                                     return (
                                       <div>
@@ -4865,8 +5317,11 @@ const conectarBalanza = async () => {
                                         </h6>
                                         <div className="row">
                                           <div className="col-md-6">
-                                            <strong>Producto:</strong> {productoActual?.producto_nombre}<br />
-                                            <strong>Tipo Fruta:</strong> {productoActual?.tipo_fruta_nombre}
+                                            <strong>Producto:</strong>{' '}
+                                            {productoActual?.producto_nombre}
+                                            <br />
+                                            <strong>Tipo Fruta:</strong>{' '}
+                                            {productoActual?.tipo_fruta_nombre}
                                           </div>
                                           <div className="col-md-6">
                                             <strong>Cantidad Pendiente:</strong>
@@ -4876,14 +5331,15 @@ const conectarBalanza = async () => {
                                             {pesoNetoIngresado > 0 && (
                                               <div>
                                                 <small className="text-info">
-                                                  <strong>Peso neto ingresado:</strong> {pesoNetoIngresado.toFixed(2)} kg
+                                                  <strong>Peso neto ingresado:</strong>{' '}
+                                                  {pesoNetoIngresado.toFixed(2)} kg
                                                 </small>
                                               </div>
                                             )}
                                           </div>
                                         </div>
                                       </div>
-                                    );
+                                    )
                                   })()}
                                 </div>
                               )}
@@ -4936,7 +5392,6 @@ const conectarBalanza = async () => {
                   </CCardHeader>
                   <CCardBody>
                     <div className="table-responsive">
-
                       <CTable hover size="sm">
                         <CTableHead>
                           <CTableRow>
@@ -4959,24 +5414,32 @@ const conectarBalanza = async () => {
                         </CTableHead>
                         <CTableBody>
                           {pesajesTemporales.map((pesaje, index) => {
-
-                            const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) - parseFloat(pesaje.descuento_merma || 0);
-                            const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-                            const subtotal = pesoNeto * precioKg;
+                            const pesoNeto =
+                              parseFloat(pesaje.peso_bruto || 0) -
+                              parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0) -
+                              parseFloat(pesaje.descuento_merma || 0)
+                            const precioKg = parseFloat(
+                              currentIngreso.precio_venta_kg || precioVentaKg || 0,
+                            )
+                            const subtotal = pesoNeto * precioKg
 
                             // Calcular pagos basados en porcentajes
-                            const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                            const pagoTransporte = (pesoNeto * porcentajeTransporte);
+                            const porcentajeTransporte =
+                              parseFloat(currentIngreso.pago_transporte || 0) / 100
+                            const pagoTransporte = pesoNeto * porcentajeTransporte
 
                             // El ingreso a la cooperativa es el peso neto * el porcentaje de impuesto
-                            const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                            const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+                            const porcentajeImpuesto =
+                              parseFloat(currentIngreso.impuesto || 0) / 100
+                            const ingresoCooperativa = pesoNeto * porcentajeImpuesto
 
-                            const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje || pesaje.num_jabas || 0) * 1.00 : 0;
+                            const precioPorJaba = currentIngreso.aplicarPrecioJaba
+                              ? (pesaje.num_jabas_pesaje || pesaje.num_jabas || 0) * 1.0
+                              : 0
 
                             // Ajustar el pago al socio
-                            const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
-
+                            const pagoSocio =
+                              subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba
 
                             return (
                               <CTableRow key={pesaje.id}>
@@ -5001,11 +5464,12 @@ const conectarBalanza = async () => {
                                   </CBadge>
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  {parseFloat(pesaje.peso_jaba || pesaje.peso_total_jabas || 0).toFixed(3)} kg
+                                  {parseFloat(
+                                    pesaje.peso_jaba || pesaje.peso_total_jabas || 0,
+                                  ).toFixed(3)}{' '}
+                                  kg
                                   <br />
-                                  <small className="text-muted">
-                                    ({pesoJaba} kg/jaba)
-                                  </small>
+                                  <small className="text-muted">({pesoJaba} kg/jaba)</small>
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   {pesaje.descuento_merma ? (
@@ -5015,7 +5479,13 @@ const conectarBalanza = async () => {
                                       </span>
                                       <br />
                                       <small className="text-muted">
-                                        ({((parseFloat(pesaje.descuento_merma) / parseFloat(pesaje.peso_bruto)) * 100).toFixed(1)}%)
+                                        (
+                                        {(
+                                          (parseFloat(pesaje.descuento_merma) /
+                                            parseFloat(pesaje.peso_bruto)) *
+                                          100
+                                        ).toFixed(1)}
+                                        %)
                                       </small>
                                     </>
                                   ) : (
@@ -5023,19 +5493,13 @@ const conectarBalanza = async () => {
                                   )}
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  <strong className="text-success">
-                                    {pesoNeto.toFixed(3)} kg
-                                  </strong>
+                                  <strong className="text-success">{pesoNeto.toFixed(3)} kg</strong>
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  <span className="text-warning">
-                                    S/ {precioKg.toFixed(2)}
-                                  </span>
+                                  <span className="text-warning">S/ {precioKg.toFixed(2)}</span>
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  <strong className="text-info">
-                                    S/ {subtotal.toFixed(2)}
-                                  </strong>
+                                  <strong className="text-info">S/ {subtotal.toFixed(2)}</strong>
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <div className="text-center">
@@ -5061,8 +5525,10 @@ const conectarBalanza = async () => {
                                   <strong
                                     className={`text-success ${currentIngreso.aplicarPrecioJaba ? 'bg-warning' : ''}`}
                                     style={{
-                                      backgroundColor: currentIngreso.aplicarPrecioJaba ? '#fff3cd' : 'transparent',
-                                      transition: 'background-color 0.3s ease'
+                                      backgroundColor: currentIngreso.aplicarPrecioJaba
+                                        ? '#fff3cd'
+                                        : 'transparent',
+                                      transition: 'background-color 0.3s ease',
                                     }}
                                   >
                                     S/ {pagoSocio.toFixed(2)}
@@ -5075,8 +5541,13 @@ const conectarBalanza = async () => {
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <small>
-                                    {new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleDateString()}<br />
-                                    {new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleTimeString()}
+                                    {new Date(
+                                      pesaje.fecha_pesaje || pesaje.timestamp,
+                                    ).toLocaleDateString()}
+                                    <br />
+                                    {new Date(
+                                      pesaje.fecha_pesaje || pesaje.timestamp,
+                                    ).toLocaleTimeString()}
                                   </small>
                                 </CTableDataCell>
                                 <CTableDataCell>
@@ -5159,11 +5630,11 @@ const conectarBalanza = async () => {
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Peso Neto:</small>
-                                                          <strong class="text-success" id="preview-peso-neto">${(parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)).toFixed(3)} kg</strong>
+                                                          <strong class="text-success" id="preview-peso-neto">${(parseFloat(pesaje.peso_bruto) - pesaje.num_jabas_pesaje * pesoJaba - (pesaje.descuento_merma || 0)).toFixed(3)} kg</strong>
                                                         </div>
                                                         <div class="col-6 col-sm-3">
                                                           <small class="text-muted d-block">Subtotal:</small>
-                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - (pesaje.num_jabas_pesaje * pesoJaba) - (pesaje.descuento_merma || 0)) * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0)).toFixed(2)}</strong>
+                                                          <strong class="text-primary" id="preview-subtotal">S/ ${((parseFloat(pesaje.peso_bruto) - pesaje.num_jabas_pesaje * pesoJaba - (pesaje.descuento_merma || 0)) * parseFloat(currentIngreso.precio_venta_kg || precioVentaKg || 0)).toFixed(2)}</strong>
                                                         </div>
                                                       </div>
                                                     </div>
@@ -5178,94 +5649,160 @@ const conectarBalanza = async () => {
                                           confirmButtonColor: '#321fdb',
                                           didOpen: () => {
                                             // OBTENER REFERENCIAS A LOS ELEMENTOS
-                                            const pesoInput = document.getElementById('edit-peso');
-                                            const jabasInput = document.getElementById('edit-jabas');
-                                            const mermaInput = document.getElementById('edit-merma');
-                                            const previewPesoJabas = document.getElementById('preview-peso-jabas');
-                                            const previewMerma = document.getElementById('preview-merma');
-                                            const previewPesoNeto = document.getElementById('preview-peso-neto');
-                                            const previewSubtotal = document.getElementById('preview-subtotal');
+                                            const pesoInput = document.getElementById('edit-peso')
+                                            const jabasInput = document.getElementById('edit-jabas')
+                                            const mermaInput = document.getElementById('edit-merma')
+                                            const previewPesoJabas =
+                                              document.getElementById('preview-peso-jabas')
+                                            const previewMerma =
+                                              document.getElementById('preview-merma')
+                                            const previewPesoNeto =
+                                              document.getElementById('preview-peso-neto')
+                                            const previewSubtotal =
+                                              document.getElementById('preview-subtotal')
 
                                             // FUNCIÓN PARA ACTUALIZAR LA VISTA PREVIA
                                             const updatePreview = () => {
-                                              const peso = parseFloat(pesoInput.value) || 0;
-                                              const jabas = parseInt(jabasInput.value) || 0;
-                                              const merma = parseFloat(mermaInput.value) || 0;
-                                              const pesoJabas = jabas * pesoJaba; // Sin ${} aquí
-                                              const pesoNeto = Math.max(0, peso - pesoJabas - merma);
-                                              const subtotal = pesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0); // Sin ${} aquí
+                                              const peso = parseFloat(pesoInput.value) || 0
+                                              const jabas = parseInt(jabasInput.value) || 0
+                                              const merma = parseFloat(mermaInput.value) || 0
+                                              const pesoJabas = jabas * pesoJaba // Sin ${} aquí
+                                              const pesoNeto = Math.max(0, peso - pesoJabas - merma)
+                                              const subtotal =
+                                                pesoNeto *
+                                                parseFloat(
+                                                  currentIngreso.precio_venta_kg ||
+                                                    precioVentaKg ||
+                                                    0,
+                                                ) // Sin ${} aquí
 
                                               // ACTUALIZAR LOS ELEMENTOS DE VISTA PREVIA
-                                              previewPesoJabas.textContent = pesoJabas.toFixed(3) + ' kg';
-                                              previewMerma.textContent = merma.toFixed(3) + ' kg';
-                                              previewPesoNeto.textContent = pesoNeto.toFixed(3) + ' kg';
-                                              previewSubtotal.textContent = 'S/ ' + subtotal.toFixed(2);
-                                            };
+                                              previewPesoJabas.textContent =
+                                                pesoJabas.toFixed(3) + ' kg'
+                                              previewMerma.textContent = merma.toFixed(3) + ' kg'
+                                              previewPesoNeto.textContent =
+                                                pesoNeto.toFixed(3) + ' kg'
+                                              previewSubtotal.textContent =
+                                                'S/ ' + subtotal.toFixed(2)
+                                            }
 
                                             // AGREGAR EVENT LISTENERS PARA ACTUALIZACIÓN EN TIEMPO REAL
-                                            pesoInput.addEventListener('input', updatePreview);
-                                            jabasInput.addEventListener('input', updatePreview);
-                                            mermaInput.addEventListener('input', updatePreview);
+                                            pesoInput.addEventListener('input', updatePreview)
+                                            jabasInput.addEventListener('input', updatePreview)
+                                            mermaInput.addEventListener('input', updatePreview)
 
                                             // CALCULAR VALORES INICIALES
-                                            updatePreview();
+                                            updatePreview()
                                           },
                                           preConfirm: () => {
-                                            const peso = parseFloat(document.getElementById('edit-peso').value);
-                                            const jabas = parseInt(document.getElementById('edit-jabas').value);
-                                            const merma = parseFloat(document.getElementById('edit-merma').value) || 0;
-                                            const observacion = document.getElementById('edit-observacion').value;
+                                            const peso = parseFloat(
+                                              document.getElementById('edit-peso').value,
+                                            )
+                                            const jabas = parseInt(
+                                              document.getElementById('edit-jabas').value,
+                                            )
+                                            const merma =
+                                              parseFloat(
+                                                document.getElementById('edit-merma').value,
+                                              ) || 0
+                                            const observacion =
+                                              document.getElementById('edit-observacion').value
 
                                             if (!peso || peso <= 0) {
-                                              Swal.showValidationMessage('El peso debe ser mayor a 0');
-                                              return false;
+                                              Swal.showValidationMessage(
+                                                'El peso debe ser mayor a 0',
+                                              )
+                                              return false
                                             }
                                             if (!jabas || jabas <= 0) {
-                                              Swal.showValidationMessage('El número de jabas debe ser mayor a 0');
-                                              return false;
+                                              Swal.showValidationMessage(
+                                                'El número de jabas debe ser mayor a 0',
+                                              )
+                                              return false
                                             }
 
-                                            return { peso, jabas, merma, observacion };
-                                          }
+                                            return { peso, jabas, merma, observacion }
+                                          },
                                         }).then((result) => {
                                           if (result.isConfirmed) {
-                                            const { peso, jabas, merma, observacion } = result.value;
+                                            const { peso, jabas, merma, observacion } = result.value
 
                                             // Actualizar el pesaje temporal
-                                            setPesajesTemporales(prev => {
-                                              const updatedPesajes = prev.map(p =>
+                                            setPesajesTemporales((prev) => {
+                                              const updatedPesajes = prev.map((p) =>
                                                 p.id === pesaje.id
                                                   ? {
-                                                    ...p,
-                                                    peso_bruto: peso,
-                                                    num_jabas: jabas,
-                                                    num_jabas_pesaje: jabas,
-                                                    peso_jaba: jabas * pesoJaba,
-                                                    descuento_merma: merma,
-                                                    peso_neto: Math.max(0, peso - (jabas * pesoJaba) - merma), // Calcular peso neto
-                                                    observacion: observacion
-                                                  }
-                                                  : p
-                                              );
+                                                      ...p,
+                                                      peso_bruto: peso,
+                                                      num_jabas: jabas,
+                                                      num_jabas_pesaje: jabas,
+                                                      peso_jaba: jabas * pesoJaba,
+                                                      descuento_merma: merma,
+                                                      peso_neto: Math.max(
+                                                        0,
+                                                        peso - jabas * pesoJaba - merma,
+                                                      ), // Calcular peso neto
+                                                      observacion: observacion,
+                                                    }
+                                                  : p,
+                                              )
 
                                               // SINCRONIZAR TOTALES DEL INGRESO DESPUÉS DE LA EDICIÓN
-                                              const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-                                              const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
-                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas)   || 0), 0);
-                                              const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
-                                              const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
+                                              const totalPesoBruto = updatedPesajes.reduce(
+                                                (sum, p) => sum + (parseFloat(p.peso_bruto) || 0),
+                                                0,
+                                              )
+                                              const totalJabas = updatedPesajes.reduce(
+                                                (sum, p) =>
+                                                  sum + (parseInt(p.num_jabas_pesaje) || 0),
+                                                0,
+                                              )
+                                              const totalPesoJabas = updatedPesajes.reduce(
+                                                (sum, p) =>
+                                                  sum +
+                                                  (parseFloat(p.peso_jaba) ||
+                                                    parseFloat(p.peso_total_jabas) ||
+                                                    0),
+                                                0,
+                                              )
+                                              const totalDescuentoMerma = updatedPesajes.reduce(
+                                                (sum, p) =>
+                                                  sum + (parseFloat(p.descuento_merma) || 0),
+                                                0,
+                                              )
+                                              const totalPesoNeto = updatedPesajes.reduce(
+                                                (sum, p) => sum + (parseFloat(p.peso_neto) || 0),
+                                                0,
+                                              )
 
                                               // Calcular el precio por jaba y el pago al socio
-                                              const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (totalJabas || 0) * 1.00 : 0;
-                                              const subtotal = totalPesoNeto * parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-                                              const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                                              const pagoTransporte = totalPesoNeto * porcentajeTransporte;
-                                              const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                                              const ingresoCooperativa = totalPesoNeto * porcentajeImpuesto;
-                                              const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
+                                              const precioPorJaba = currentIngreso.aplicarPrecioJaba
+                                                ? (totalJabas || 0) * 1.0
+                                                : 0
+                                              const subtotal =
+                                                totalPesoNeto *
+                                                parseFloat(
+                                                  currentIngreso.precio_venta_kg ||
+                                                    precioVentaKg ||
+                                                    0,
+                                                )
+                                              const porcentajeTransporte =
+                                                parseFloat(currentIngreso.pago_transporte || 0) /
+                                                100
+                                              const pagoTransporte =
+                                                totalPesoNeto * porcentajeTransporte
+                                              const porcentajeImpuesto =
+                                                parseFloat(currentIngreso.impuesto || 0) / 100
+                                              const ingresoCooperativa =
+                                                totalPesoNeto * porcentajeImpuesto
+                                              const pagoSocio =
+                                                subtotal -
+                                                pagoTransporte -
+                                                ingresoCooperativa -
+                                                precioPorJaba
 
                                               // Actualizar el currentIngreso con los nuevos totales
-                                              setCurrentIngreso(prev => ({
+                                              setCurrentIngreso((prev) => ({
                                                 ...prev,
                                                 peso_bruto: totalPesoBruto.toFixed(3),
                                                 num_jabas_pesaje: totalJabas,
@@ -5275,11 +5812,11 @@ const conectarBalanza = async () => {
                                                 descuento_merma: totalDescuentoMerma.toFixed(3),
                                                 peso_neto: totalPesoNeto.toFixed(3),
                                                 total: subtotal.toFixed(2),
-                                                pago_socio: pagoSocio.toFixed(2) // Actualizar el pago al socio
-                                              }));
+                                                pago_socio: pagoSocio.toFixed(2), // Actualizar el pago al socio
+                                              }))
 
-                                              return updatedPesajes;
-                                            });
+                                              return updatedPesajes
+                                            })
 
                                             Swal.fire({
                                               icon: 'success',
@@ -5287,10 +5824,10 @@ const conectarBalanza = async () => {
                                               text: 'El pesaje ha sido actualizado correctamente.',
                                               confirmButtonColor: '#321fdb',
                                               timer: 1500,
-                                              timerProgressBar: true
-                                            });
+                                              timerProgressBar: true,
+                                            })
                                           }
-                                        });
+                                        })
                                       }}
                                       disabled={submitting}
                                       title="Editar pesaje"
@@ -5309,7 +5846,7 @@ const conectarBalanza = async () => {
                                   </CButtonGroup>
                                 </CTableDataCell>
                               </CTableRow>
-                            );
+                            )
                           })}
                         </CTableBody>
                         <CTableHead>
@@ -5319,80 +5856,144 @@ const conectarBalanza = async () => {
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-primary">
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0).toFixed(3)} kg
+                                {pesajesTemporales
+                                  .reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0)
+                                  .toFixed(3)}{' '}
+                                kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0), 0)} jabas
+                                {pesajesTemporales.reduce(
+                                  (sum, p) =>
+                                    sum +
+                                    (parseInt(p.num_jabas_pesaje) || parseInt(p.num_jabas) || 0),
+                                  0,
+                                )}{' '}
+                                jabas
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong>
-                                {pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0).toFixed(3)} kg
+                                {pesajesTemporales
+                                  .reduce(
+                                    (sum, p) =>
+                                      sum +
+                                      (parseFloat(p.peso_jaba) ||
+                                        parseFloat(p.peso_total_jabas) ||
+                                        0),
+                                    0,
+                                  )
+                                  .toFixed(3)}{' '}
+                                kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-danger">
-                                -{pesajesTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0).toFixed(3)} kg
+                                -
+                                {pesajesTemporales
+                                  .reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0)
+                                  .toFixed(3)}{' '}
+                                kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-success">
-                                {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
-                                  return sum + pesoNeto;
-                                }, 0).toFixed(3)} kg
+                                {pesajesTemporales
+                                  .reduce((sum, p) => {
+                                    const pesoNeto =
+                                      parseFloat(p.peso_bruto || 0) -
+                                      parseFloat(p.peso_jaba || p.peso_total_jabas || 0) -
+                                      parseFloat(p.descuento_merma || 0)
+                                    return sum + pesoNeto
+                                  }, 0)
+                                  .toFixed(3)}{' '}
+                                kg
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>-</CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-info">
-                                S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
-                                  const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-                                  return sum + (pesoNeto * precioKg);
-                                }, 0).toFixed(2)}
+                                S/{' '}
+                                {pesajesTemporales
+                                  .reduce((sum, p) => {
+                                    const pesoNeto =
+                                      parseFloat(p.peso_bruto || 0) -
+                                      parseFloat(p.peso_jaba || p.peso_total_jabas || 0) -
+                                      parseFloat(p.descuento_merma || 0)
+                                    const precioKg = parseFloat(
+                                      currentIngreso.precio_venta_kg || precioVentaKg || 0,
+                                    )
+                                    return sum + pesoNeto * precioKg
+                                  }, 0)
+                                  .toFixed(2)}
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-danger">
-                                S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
-                                  const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                                  return sum + (pesoNeto * porcentajeTransporte);
-                                }, 0).toFixed(2)}
+                                S/{' '}
+                                {pesajesTemporales
+                                  .reduce((sum, p) => {
+                                    const pesoNeto =
+                                      parseFloat(p.peso_bruto || 0) -
+                                      parseFloat(p.peso_jaba || p.peso_total_jabas || 0) -
+                                      parseFloat(p.descuento_merma || 0)
+                                    const porcentajeTransporte =
+                                      parseFloat(currentIngreso.pago_transporte || 0) / 100
+                                    return sum + pesoNeto * porcentajeTransporte
+                                  }, 0)
+                                  .toFixed(2)}
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell>
                               <strong className="text-primary">
-                                S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
-                                  const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                                  return sum + (pesoNeto * porcentajeImpuesto);
-                                }, 0).toFixed(2)}
+                                S/{' '}
+                                {pesajesTemporales
+                                  .reduce((sum, p) => {
+                                    const pesoNeto =
+                                      parseFloat(p.peso_bruto || 0) -
+                                      parseFloat(p.peso_jaba || p.peso_total_jabas || 0) -
+                                      parseFloat(p.descuento_merma || 0)
+                                    const porcentajeImpuesto =
+                                      parseFloat(currentIngreso.impuesto || 0) / 100
+                                    return sum + pesoNeto * porcentajeImpuesto
+                                  }, 0)
+                                  .toFixed(2)}
                               </strong>
                             </CTableHeaderCell>
 
                             <CTableHeaderCell>
                               <strong className="text-success">
-                                S/ {pesajesTemporales.reduce((sum, p) => {
-                                  const pesoNeto = parseFloat(p.peso_bruto || 0) - parseFloat(p.peso_jaba || p.peso_total_jabas || 0) - parseFloat(p.descuento_merma || 0);
-                                  const precioKg = parseFloat((currentIngreso.precio_venta_kg || precioVentaKg) || 0);
-                                  const subtotal = pesoNeto * precioKg;
-                                  const porcentajeTransporte = parseFloat(currentIngreso.pago_transporte || 0) / 100;
-                                  const pagoTransporte = pesoNeto * porcentajeTransporte;
-                                  const porcentajeImpuesto = parseFloat(currentIngreso.impuesto || 0) / 100;
-                                  const ingresoCooperativa = pesoNeto * porcentajeImpuesto;
+                                S/{' '}
+                                {pesajesTemporales
+                                  .reduce((sum, p) => {
+                                    const pesoNeto =
+                                      parseFloat(p.peso_bruto || 0) -
+                                      parseFloat(p.peso_jaba || p.peso_total_jabas || 0) -
+                                      parseFloat(p.descuento_merma || 0)
+                                    const precioKg = parseFloat(
+                                      currentIngreso.precio_venta_kg || precioVentaKg || 0,
+                                    )
+                                    const subtotal = pesoNeto * precioKg
+                                    const porcentajeTransporte =
+                                      parseFloat(currentIngreso.pago_transporte || 0) / 100
+                                    const pagoTransporte = pesoNeto * porcentajeTransporte
+                                    const porcentajeImpuesto =
+                                      parseFloat(currentIngreso.impuesto || 0) / 100
+                                    const ingresoCooperativa = pesoNeto * porcentajeImpuesto
 
-                                  // Calcular el precio por jaba
-                                  const precioPorJaba = currentIngreso.aplicarPrecioJaba ? (p.num_jabas_pesaje || p.num_jabas || 0) * 1.00 : 0;
+                                    // Calcular el precio por jaba
+                                    const precioPorJaba = currentIngreso.aplicarPrecioJaba
+                                      ? (p.num_jabas_pesaje || p.num_jabas || 0) * 1.0
+                                      : 0
 
-                                  // Ajustar el pago al socio
-                                  const pagoSocio = subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba;
+                                    // Ajustar el pago al socio
+                                    const pagoSocio =
+                                      subtotal - pagoTransporte - ingresoCooperativa - precioPorJaba
 
-                                  return sum + pagoSocio;
-                                }, 0).toFixed(2)}
+                                    return sum + pagoSocio
+                                  }, 0)
+                                  .toFixed(2)}
                               </strong>
                             </CTableHeaderCell>
                             <CTableHeaderCell colSpan={3}>-</CTableHeaderCell>
@@ -5416,13 +6017,9 @@ const conectarBalanza = async () => {
                   </CCardBody>
                 </CCard>
               )}
-
             </CModalBody>
             <CModalFooter>
-              <CButton
-                color="secondary"
-                onClick={() => setShowModal(false)}
-              >
+              <CButton color="secondary" onClick={() => setShowModal(false)}>
                 Cancelar
               </CButton>
 
@@ -5448,30 +6045,21 @@ const conectarBalanza = async () => {
           </CModal>
 
           {/* Modal de confirmación para eliminar */}
-          <CModal
-            visible={showDeleteModal}
-            onClose={() => setShowDeleteModal(false)}
-          >
+          <CModal visible={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
             <CModalHeader>
               <CModalTitle>Confirmar Eliminación</CModalTitle>
             </CModalHeader>
             <CModalBody>
-              ¿Está seguro que desea eliminar el ingreso <strong>{ingresoToDelete?.numero_ingreso}</strong>?
+              ¿Está seguro que desea eliminar el ingreso{' '}
+              <strong>{ingresoToDelete?.numero_ingreso}</strong>?
               <br />
               <small className="text-muted">Esta acción no se puede deshacer.</small>
             </CModalBody>
             <CModalFooter>
-              <CButton
-                color="secondary"
-                onClick={() => setShowDeleteModal(false)}
-              >
+              <CButton color="secondary" onClick={() => setShowDeleteModal(false)}>
                 Cancelar
               </CButton>
-              <CButton
-                color="danger"
-                onClick={confirmDelete}
-                disabled={loading}
-              >
+              <CButton color="danger" onClick={confirmDelete} disabled={loading}>
                 {loading ? (
                   <>
                     <CSpinner size="sm" className="me-2" />
@@ -5485,8 +6073,22 @@ const conectarBalanza = async () => {
           </CModal>
         </CRow>
       </CContainer>
+      {showPdfModal && (
+        <CModal visible={showPdfModal} onClose={() => setShowPdfModal(false)} size="lg">
+          <CModalHeader>
+            <CModalTitle>PDF Preview</CModalTitle>
+          </CModalHeader>
+          <CModalBody>
+            <iframe src={pdfData} width="100%" height="500px" title="PDF Preview"></iframe>
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => setShowPdfModal(false)}>
+              Close
+            </CButton>
+          </CModalFooter>
+        </CModal>
+      )}
     </>
-
   )
 }
 

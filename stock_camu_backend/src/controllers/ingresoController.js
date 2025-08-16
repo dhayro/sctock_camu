@@ -105,7 +105,7 @@ exports.getAllIngresos = async (req, res) => {
         {
           model: Socio,
           as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni']
+          attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
         },
         {
           model: DetalleOrdenCompra,
@@ -190,7 +190,7 @@ exports.searchIngresos = async (req, res) => {
         { 
           model: Socio, 
           as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni']
+          attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
         },
         {
           model: DetalleOrdenCompra,
@@ -439,7 +439,7 @@ exports.createIngreso = async (req, res) => {
         { 
           model: Socio, 
           as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni']
+          attributes: ['id', 'nombres', 'apellidos', 'dni','codigo']
         },
         {
           model: DetalleOrdenCompra,
