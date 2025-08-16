@@ -228,7 +228,7 @@ const Ingresos = () => {
   useEffect(() => {
     localStorage.setItem('balanzaConectada', JSON.stringify(balanzaConectada));
   }, [balanzaConectada]);
-  
+
 
   // Agregar estos estados adicionales después de los estados existentes
 
@@ -339,7 +339,8 @@ const Ingresos = () => {
       observacion: observacionPesaje || '',
       fecha_pesaje: new Date().toISOString(),
       estable: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      peso_jaba: pesoJaba
     };
 
     setPesajesTemporales(prev => [...prev, nuevoPesaje]);
@@ -396,7 +397,7 @@ const Ingresos = () => {
         // Inicializar cantidades pendientes (toda la cantidad está pendiente inicialmente)
         const cantidadesPendientes = {};
         productosFormateados.forEach(producto => {
-          cantidadesPendientes[producto.id] = producto.cantidad;
+          cantidadesPendientes[producto.producto_id] = producto.cantidad;
         });
         setCantidadPendientePorProducto(cantidadesPendientes);
 
@@ -734,7 +735,7 @@ const Ingresos = () => {
           // Calcular los totales de los pesajes temporales
           const totalPesoBruto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
           const totalJabas = nuevosTemporales.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
-          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
+          const totalPesoJabas = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0), 0);
           const totalDescuentoMerma = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
           const totalPesoNeto = nuevosTemporales.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -843,7 +844,7 @@ const Ingresos = () => {
 
 
 
-  
+
 
 
   const cargarOrdenesPendientes = async (searchTerm = '') => {
@@ -965,83 +966,11 @@ const Ingresos = () => {
 
     return () => clearTimeout(timeoutId);
   }, [searchTerm]); // Remover socioSeleccionado de las dependencias
-  const exportarDatosPesaje = async () => {
-    try {
-      if (!currentIngreso.id) {
-        toast.warning('Debe seleccionar un ingreso para exportar los datos de pesaje');
-        return;
-      }
-
-      setSubmitting(true);
-
-      // Obtener los datos de pesaje del ingreso actual
-      const pesajesData = await balanzaService.getPesajes(currentIngreso.id);
-
-      if (!pesajesData || pesajesData.length === 0) {
-        toast.warning('No hay datos de pesaje para exportar');
-        return;
-      }
-
-      // Preparar los datos para exportar
-      const datosExportar = {
-        ingreso: {
-          numero_ingreso: currentIngreso.numero_ingreso,
-          fecha: currentIngreso.fecha,
-          socio: socios.find(s => s.id === parseInt(currentIngreso.socio_id))?.nombres + ' ' +
-            socios.find(s => s.id === parseInt(currentIngreso.socio_id))?.apellidos,
-          peso_neto_total: currentIngreso.peso_neto,
-          total_pesajes: pesajesData.length
-        },
-        pesajes: pesajesData.map((pesaje, index) => ({
-          numero: index + 1,
-          peso: pesaje.peso,
-          fecha_hora: pesaje.created_at || pesaje.timestamp,
-          observacion: pesaje.observacion || ''
-        }))
-      };
-
-      // Crear contenido CSV
-      let csvContent = "data:text/csv;charset=utf-8,";
-
-      // Encabezados del ingreso
-      csvContent += "DATOS DEL INGRESO\n";
-      csvContent += `Número de Ingreso,${datosExportar.ingreso.numero_ingreso}\n`;
-      csvContent += `Fecha,${datosExportar.ingreso.fecha}\n`;
-      csvContent += `Socio,${datosExportar.ingreso.socio}\n`;
-      csvContent += `Peso Neto Total,${datosExportar.ingreso.peso_neto_total} kg\n`;
-      csvContent += `Total de Pesajes,${datosExportar.ingreso.total_pesajes}\n\n`;
-
-      // Encabezados de pesajes
-      csvContent += "DETALLE DE PESAJES\n";
-      csvContent += "Número,Peso (kg),Fecha y Hora,Observación\n";
-
-      // Datos de pesajes
-      datosExportar.pesajes.forEach(pesaje => {
-        csvContent += `${pesaje.numero},${pesaje.peso},${pesaje.fecha_hora},${pesaje.observacion}\n`;
-      });
-
-      // Crear y descargar el archivo
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `pesajes_${currentIngreso.numero_ingreso}_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success('Datos de pesaje exportados correctamente');
-
-    } catch (error) {
-      console.error('Error al exportar datos de pesaje:', error);
-      toast.error('Error al exportar los datos: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
 
 
-  
+
+
 const conectarBalanza = async () => {
   if (!puertoSeleccionado) {
       toast.warning('Por favor, seleccione un puerto');
@@ -1502,7 +1431,7 @@ const conectarBalanza = async () => {
   const sincronizarTotalesIngreso = (pesajesActualizados) => {
     const totalPesoBruto = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
     const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0);
-    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_jabas) || 0), 0); //kong
+    const totalPesoJabas = pesajesActualizados.reduce((sum, p) => sum + (parseFloat(p.peso_jabas) || parseFloat(p.peso_total_jabas) || 0), 0); //kong
 
     setCurrentIngreso(prev => ({
       ...prev,
@@ -1541,7 +1470,7 @@ const conectarBalanza = async () => {
     return pesajesTemporales
       .filter(pesaje => pesaje.producto_id === productoId)
       .reduce((sum, pesaje) => {
-        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jabas || 0);
+        const pesoNeto = parseFloat(pesaje.peso_bruto || 0) - parseFloat(pesaje.peso_jabas || parseFloat(pesaje.peso_total_jabas)  || 0);
         return sum + pesoNeto;
       }, 0);
   };
@@ -1554,7 +1483,7 @@ const conectarBalanza = async () => {
     }
     const cantidadTotal = producto.cantidad || 0;
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id);
     const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado;
 
     // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
@@ -1564,7 +1493,7 @@ const conectarBalanza = async () => {
   const calcularProgresoActualizado = (producto) => {
     const cantidadTotal = producto.cantidad || 0;
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id);
     const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado;
 
     return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0;
@@ -1597,30 +1526,30 @@ const conectarBalanza = async () => {
             </div>
           </div>
         </div>
-        
+
         <div class="row g-3">
           <div class="col-12 col-md-6">
             <label for="swal-jabas" class="form-label fw-semibold">
               <i class="fas fa-box me-1"></i>
               Número de jabas:
             </label>
-            <input type="number" id="swal-jabas" class="form-control" 
-                   min="1" max="50" step="1" 
-                   value="${Math.round(pesoBruto / (pesoJaba || 2))}" 
+            <input type="number" id="swal-jabas" class="form-control"
+                   min="1" max="50" step="1"
+                   value="${Math.round(pesoBruto / (pesoJaba || 2))}"
                    placeholder="Número de jabas">
           </div>
-          
+
           <div class="col-12 col-md-6">
             <label for="swal-merma" class="form-label fw-semibold">
               <i class="fas fa-minus-circle me-1"></i>
               Descuento por merma (kg):
             </label>
-            <input type="number" id="swal-merma" class="form-control" 
-                   min="0" step="0.001" 
+            <input type="number" id="swal-merma" class="form-control"
+                   min="0" step="0.001"
                    value="0" placeholder="0.000">
           </div>
         </div>
-        
+
         <div class="row mt-4">
           <div class="col-12">
             <div class="card border-info">
@@ -1716,7 +1645,7 @@ const conectarBalanza = async () => {
     const pesoNeto = pesoBruto - pesoTotalJabas - descuentoMerma;
 
     // Buscar el producto seleccionado en la lista de productos de la orden
-    const productoOrden = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
+    const productoOrden = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
     if (!productoOrden) {
       toast.error('No se encontró el producto seleccionado en la orden');
       return;
@@ -1736,6 +1665,7 @@ const conectarBalanza = async () => {
       tipo_fruta_nombre: productoOrden.tipo_fruta_nombre,
       // Información del pesaje
       peso_bruto: pesoBruto,
+      peso_jaba: pesoJaba,
       num_jabas: jabasIngresadas,
       peso_total_jabas: pesoTotalJabas,
       descuento_merma: descuentoMerma, // ← NUEVO CAMPO
@@ -1768,6 +1698,7 @@ const conectarBalanza = async () => {
         peso_bruto: totalPesoBruto.toFixed(3),
         num_jabas: totalJabas,
         peso_total_jabas: totalPesoJabas.toFixed(3),
+        peso_jaba: totalPesoJabas.toFixed(3),
         descuento_merma: totalDescuentoMerma.toFixed(3),
         peso_neto: totalPesoNeto.toFixed(3),
         // Recalcular el total basado en el nuevo peso neto
@@ -1850,7 +1781,7 @@ const conectarBalanza = async () => {
   //   const pesoTotalJabas = jabasIngresadas * pesoJaba;
 
   //   // Buscar el producto seleccionado en la lista de productos de la orden
-  //   const productoOrden = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
+  //   const productoOrden = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
   //   if (!productoOrden) {
   //     toast.error('No se encontró el producto seleccionado en la orden');
   //     return;
@@ -1908,7 +1839,7 @@ const conectarBalanza = async () => {
   //   }]);
 
   //   toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto con ${jabasIngresadas} jabas`);
-  // }; 
+  // };
 
   // Modificar la función aplicarPesoRealTime para incluir logs de debug
   // const aplicarPesoRealTime = () => {
@@ -2016,7 +1947,7 @@ const conectarBalanza = async () => {
 
       // Recalcular todos los totales después de eliminar
       const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
-      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
+      const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas) || parseInt(p.num_jabas_pesaje) || 0), 0);
       const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
       const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
       const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
@@ -2077,7 +2008,7 @@ const conectarBalanza = async () => {
     const nuevoPesaje = {
       id: Date.now(),
       producto_id: productoSeleccionadoPesaje,
-      producto_nombre: productosOrden.find(p => p.id === productoSeleccionadoPesaje)?.producto_nombre || '',
+      producto_nombre: productosOrden.find(p => p.producto_id === productoSeleccionadoPesaje)?.producto_nombre || '',
       peso_bruto: pesajeRealTime.weight,
       num_jabas: currentIngreso.num_jabas,
       impuesto: currentIngreso.impuesto,
@@ -2085,7 +2016,8 @@ const conectarBalanza = async () => {
       peso_neto: pesoNeto,
       fecha_pesaje: new Date().toISOString(),
       observacion: currentIngreso.observacion || '',
-      estable: pesajeRealTime.stable
+      estable: pesajeRealTime.stable,peso_jaba: pesoJaba,
+      peso_jaba: pesoJaba
     };
 
     // Agregar a pesajes temporales
@@ -2111,7 +2043,7 @@ const conectarBalanza = async () => {
 
   // Función para calcular el progreso de un producto
   const calcularProgresoProducto = (productoId) => {
-    const producto = productosOrden.find(p => p.id === productoId);
+    const producto = productosOrden.find(p => p.producto_id === productoId);
     if (!producto || !producto.cantidad) return { porcentaje: 0, pesado: 0, pendiente: producto?.cantidad || 0 };
 
     const pesado = pesajesTemporales
@@ -2166,17 +2098,7 @@ const conectarBalanza = async () => {
 
 
 
-  // También agregar la función para actualizar historial de pesajes si no existe:
-  const actualizarHistorialPesajes = async () => {
-    if (!currentIngreso.id) return;
 
-    try {
-      const response = await balanzaService.getPesajes(currentIngreso.id);
-      setPesajes(response || []);
-    } catch (error) {
-      console.error('Error al actualizar historial de pesajes:', error);
-    }
-  };
 
   // Función para limpiar datos del monitor
   const limpiarDatosMonitor = () => {
@@ -2207,7 +2129,7 @@ const conectarBalanza = async () => {
       const csvContent = [
         headers.join(','),
         ...pesajes.map(pesaje => [
-          new Date(pesaje.timestamp).toLocaleString(),
+          new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString(),
           pesaje.peso.toFixed(3),
           pesaje.stable ? 'Estable' : 'Inestable',
           `"${pesaje.rawData || ''}"`
@@ -2345,8 +2267,7 @@ const conectarBalanza = async () => {
 
       await balanzaService.saveWeight(pesajeData);
 
-      // Actualizar lista de pesajes
-      await fetchPesajes(currentIngreso.id);
+
 
       Swal.fire({
         icon: 'success',
@@ -2396,13 +2317,13 @@ const conectarBalanza = async () => {
         <p><strong>Peso interpretado:</strong> ${peso.toFixed(3)} kg</p>
         <p><strong>Estado:</strong> <span style="color: ${esEstable ? 'green' : 'orange'}">${esEstable ? 'Estable' : 'Inestable'}</span></p>
         <p><strong>Timestamp:</strong> ${new Date(timestamp).toLocaleString()}</p>
-        
+
         <h4>Datos Originales</h4>
         <p><strong>Datos crudos:</strong></p>
         <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 5px 0;">
           ${datosOriginales}
         </div>
-        
+
         <h4>Proceso de Interpretación</h4>
         <p>• Los datos crudos son procesados por el algoritmo de interpretación</p>
         <p>• Se extraen los valores numéricos relevantes</p>
@@ -2415,137 +2336,9 @@ const conectarBalanza = async () => {
     });
   };
 
-  // Función para confirmar pesajes temporales
-  // const confirmarPesajesTemporales = async () => {
-  //   if (pesajesTemporales.length === 0) {
-  //     toast.warning('No hay pesajes temporales para confirmar');
-  //     return;
-  //   }
-
-  //   try {
-  //     const result = await Swal.fire({
-  //       title: 'Confirmar Pesajes',
-  //       html: `
-  //       <div style="text-align: left;">
-  //         <p>¿Está seguro de confirmar los siguientes pesajes?</p>
-  //         <ul>
-  //           ${pesajesTemporales.map(pesaje =>
-  //         `<li>Pesaje #${pesaje.numero}: ${pesaje.peso_neto.toFixed(3)} kg - ${pesaje.producto_nombre}</li>`
-  //       ).join('')}
-  //         </ul>
-  //         <p><strong>Total de pesajes:</strong> ${pesajesTemporales.length}</p>
-  //         <p><strong>Peso total:</strong> ${pesajesTemporales.reduce((total, p) => total + p.peso_neto, 0).toFixed(3)} kg</p>
-  //       </div>
-  //     `,
-  //       icon: 'question',
-  //       showCancelButton: true,
-  //       confirmButtonColor: '#28a745',
-  //       cancelButtonColor: '#dc3545',
-  //       confirmButtonText: 'Sí, confirmar',
-  //       cancelButtonText: 'Cancelar'
-  //     });
-
-  //     if (!result.isConfirmed) return;
-
-  //     setSubmitting(true);
-
-  //     // Guardar cada pesaje temporal como pesaje confirmado
-  //     for (const pesajeTemporal of pesajesTemporales) {
-  //       const pesajeData = {
-  //         ingreso_id: currentIngreso.id,
-  //         producto_id: pesajeTemporal.producto_id,
-  //         numero_pesaje: pesajeTemporal.numero,
-  //         peso_bruto: pesajeTemporal.peso_bruto,
-  //         peso_neto: pesajeTemporal.peso_neto,
-  //         peso_jaba: pesoJaba,
-  //         num_jabas: currentIngreso.num_jabas || 0,
-  //         datos_originales: pesajeTemporal.rawData,
-  //         es_estable: pesajeTemporal.stable,
-  //         timestamp: pesajeTemporal.timestamp,
-  //         observacion: `Pesaje confirmado desde monitor - ${pesajeTemporal.producto_nombre}`
-  //       };
-
-  //       await balanzaService.saveWeight(pesajeData);
-  //     }
-
-  //     // Actualizar historial de pesajes
-  //     await fetchPesajes(currentIngreso.id);
-
-  //     // Limpiar pesajes temporales
-  //     limpiarPesajesTemporales();
-
-  //     toast.success(`${pesajesTemporales.length} pesajes confirmados correctamente`);
-
-  //   } catch (error) {
-  //     console.error('Error al confirmar pesajes:', error);
-  //     toast.error('Error al confirmar los pesajes: ' + (error.response?.data?.error || error.message));
-  //   } finally {
-  //     setSubmitting(false);
-  //   }
-  // };
 
 
-  const confirmarPesajesTemporales = async () => {
-    if (pesajesTemporales.length === 0) {
-      toast.warning('No hay pesajes temporales para confirmar');
-      return;
-    }
 
-    try {
-      setSubmitting(true);
-
-      // Confirmar con el usuario
-      const result = await Swal.fire({
-        title: 'Confirmar Pesajes',
-        html: `
-        <div style="text-align: left;">
-          <p>¿Está seguro de que desea confirmar ${pesajesTemporales.length} pesajes temporales?</p>
-          <p><strong>Total peso neto:</strong> ${pesajesTemporales.reduce((total, p) => total + p.peso_neto, 0).toFixed(3)} kg</p>
-        </div>
-      `,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#321fdb'
-      });
-
-      if (!result.isConfirmed) {
-        return;
-      }
-
-      // Guardar cada pesaje temporal
-      for (const pesajeTemporal of pesajesTemporales) {
-        const pesajeData = {
-          ingreso_id: currentIngreso.id,
-          numero_pesaje: pesajeTemporal.numero,
-          peso: pesajeTemporal.peso_neto,
-          peso_bruto: pesajeTemporal.peso_bruto,
-          num_jabas: pesajeTemporal.num_jabas,
-          peso_jaba: pesajeTemporal.peso_jaba,
-          observacion: `Pesaje confirmado - Producto: ${pesajeTemporal.producto_nombre}`,
-          datos_originales: pesajeTemporal.rawData,
-          producto_id: pesajeTemporal.producto_id
-        };
-
-        await balanzaService.savePesaje(pesajeData);
-      }
-
-      // Limpiar pesajes temporales
-      limpiarPesajesTemporales();
-
-      // Actualizar historial
-      await actualizarHistorialPesajes();
-
-      toast.success(`${pesajesTemporales.length} pesajes confirmados correctamente`);
-
-    } catch (error) {
-      console.error('Error al confirmar pesajes:', error);
-      toast.error('Error al confirmar los pesajes: ' + (error.response?.data?.error || error.message));
-    } finally {
-      setSubmitting(false);
-    }
-  };
   // Función para mostrar detalles de un pesaje
   const mostrarDetallesPesaje = (pesaje) => {
     Swal.fire({
@@ -2555,25 +2348,25 @@ const conectarBalanza = async () => {
         <h5>Información del Pesaje</h5>
         <p><strong>Peso:</strong> ${pesaje.peso?.toFixed(3) || '0.000'} kg</p>
         <p><strong>Estado:</strong> <span style="color: ${pesaje.es_estable ? 'green' : 'orange'}">${pesaje.es_estable ? 'Estable' : 'Inestable'}</span></p>
-        <p><strong>Fecha/Hora:</strong> ${pesaje.timestamp ? new Date(pesaje.timestamp).toLocaleString() : 'N/A'}</p>
-        
+        <p><strong>Fecha/Hora:</strong> ${pesaje.fecha_pesaje||pesaje.timestamp ? new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString() : 'N/A'}</p>
+
         ${pesaje.peso_bruto ? `<p><strong>Peso Bruto:</strong> ${pesaje.peso_bruto.toFixed(3)} kg</p>` : ''}
         ${pesaje.peso_neto ? `<p><strong>Peso Neto:</strong> ${pesaje.peso_neto.toFixed(3)} kg</p>` : ''}
         ${pesaje.peso_jaba ? `<p><strong>Peso Jaba:</strong> ${pesaje.peso_jaba.toFixed(3)} kg</p>` : ''}
-        
-        
+
+
         ${pesaje.observacion ? `
           <h5>Observaciones</h5>
           <p>${pesaje.observacion}</p>
         ` : ''}
-        
+
         ${pesaje.datos_originales ? `
           <h5>Datos Originales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
             <code>${pesaje.datos_originales}</code>
           </div>
         ` : ''}
-        
+
         ${pesaje.datos_hex ? `
           <h5>Datos Hexadecimales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
@@ -2589,18 +2382,7 @@ const conectarBalanza = async () => {
     });
   };
 
-  // Función para obtener pesajes del ingreso actual
-  const fetchPesajes = async (ingresoId) => {
-    if (!ingresoId) return;
 
-    try {
-      const response = await balanzaService.getPesajes(ingresoId);
-      setPesajes(response || []);
-    } catch (error) {
-      console.error('Error al obtener pesajes:', error);
-      setPesajes([]);
-    }
-  };
 
   // Función para resetear el estado cuando se cambia de ingreso
   const resetearEstadoPesajes = () => {
@@ -2611,18 +2393,11 @@ const conectarBalanza = async () => {
     // setProductoSeleccionadoPesaje('');
   };
 
-  // Llamar esta función cuando se selecciona un nuevo ingreso
-  useEffect(() => {
-    if (currentIngreso.id) {
-      fetchPesajes(currentIngreso.id);
-      resetearEstadoPesajes();
-    }
-  }, [currentIngreso.id]);
 
   // Función para validar si todos los productos están completos
   const validarProductosCompletos = () => {
     const productosIncompletos = productosOrden.filter(producto => {
-      const progreso = calcularProgresoProducto(producto.id);
+      const progreso = calcularProgresoProducto(producto.producto_id);
       return progreso.porcentaje < 100;
     });
 
@@ -2643,18 +2418,18 @@ const conectarBalanza = async () => {
       <h5>Resumen de Pesajes</h5>
       <p><strong>Total de pesajes:</strong> ${totalPesajes}</p>
       <p><strong>Peso total:</strong> ${pesoTotal.toFixed(3)} kg</p>
-      
+
       <h6>Productos:</h6>
       <ul>
   `;
 
     productosOrden.forEach(producto => {
-      const progreso = calcularProgresoProducto(producto.id);
+      const progreso = calcularProgresoProducto(producto.producto_id);
       const estado = progreso.porcentaje >= 100 ? '✅' : '⚠️';
       mensaje += `
       <li>
-        ${estado} ${producto.producto?.nombre}: 
-        ${progreso.pesado.toFixed(3)}/${producto.cantidad} kg 
+        ${estado} ${producto.producto?.nombre}:
+        ${progreso.pesado.toFixed(3)}/${producto.cantidad} kg
         (${progreso.porcentaje.toFixed(1)}%)
       </li>
     `;
@@ -2675,35 +2450,6 @@ const conectarBalanza = async () => {
     return mensaje;
   };
 
-  // Modificar la función confirmarPesajesTemporales para incluir el resumen
-  const confirmarPesajesTemporalesConResumen = async () => {
-    if (pesajesTemporales.length === 0) {
-      toast.warning('No hay pesajes temporales para confirmar');
-      return;
-    }
-
-    try {
-      const result = await Swal.fire({
-        title: 'Confirmar Pesajes',
-        html: mostrarResumenPesajes(),
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#28a745',
-        cancelButtonColor: '#dc3545',
-        confirmButtonText: 'Sí, confirmar',
-        cancelButtonText: 'Cancelar',
-        width: '600px'
-      });
-
-      if (!result.isConfirmed) return;
-
-      await confirmarPesajesTemporales();
-
-    } catch (error) {
-      console.error('Error al confirmar pesajes:', error);
-      toast.error('Error al confirmar los pesajes');
-    }
-  };
 
   // Función para exportar pesajes temporales a CSV
   const exportarPesajesTemporales = () => {
@@ -2730,7 +2476,7 @@ const conectarBalanza = async () => {
           `"${pesaje.producto_nombre}"`,
           pesaje.peso_bruto.toFixed(3),
           pesaje.peso_neto.toFixed(3),
-          `"${new Date(pesaje.timestamp).toLocaleString()}"`,
+          `"${new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleString()}"`,
           pesaje.stable ? 'Estable' : 'Inestable',
           `"${pesaje.rawData || ''}"`
         ].join(','))
@@ -2990,7 +2736,7 @@ const conectarBalanza = async () => {
   }))
 
   const productoOptions = productos.map(producto => ({
-    value: producto.id,
+    value: producto.producto_id,
     label: producto.nombre
   }))
 
@@ -3062,53 +2808,6 @@ const conectarBalanza = async () => {
     }
   };
 
-  const sincronizarPesos = async () => {
-    if (!currentIngreso.id) {
-      toast.warning('Debe guardar el ingreso antes de sincronizar pesos');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      // Obtener todos los pesajes del ingreso
-      const pesajesResponse = await balanzaService.getPesajes(currentIngreso.id);
-      const pesajesData = pesajesResponse || [];
-
-      if (pesajesData.length === 0) {
-        toast.warning('No hay pesajes registrados para sincronizar');
-        return;
-      }
-
-      // Calcular el peso total de todos los pesajes
-      const pesoTotal = pesajesData.reduce((total, pesaje) => {
-        return total + (parseFloat(pesaje.peso) || 0);
-      }, 0);
-
-      // Actualizar el peso neto en el formulario
-      setCurrentIngreso(prev => ({
-        ...prev,
-        peso_neto: pesoTotal.toFixed(3)
-      }));
-
-      // Recalcular totales automáticamente
-      const event = {
-        target: {
-          name: 'peso_neto',
-          value: pesoTotal.toFixed(3)
-        }
-      };
-      handleInputChange(event);
-
-      toast.success(`Peso sincronizado: ${pesoTotal.toFixed(3)} kg (${pesajesData.length} pesajes)`);
-
-    } catch (error) {
-      console.error('Error al sincronizar pesos:', error);
-      toast.error('Error al sincronizar los pesos');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
 
   const exportarPesajesExcel = () => {
@@ -3440,7 +3139,7 @@ const conectarBalanza = async () => {
       }
 
       // Obtener el producto seleccionado para obtener sus datos
-      const productoSeleccionado = productosOrden.find(p => p.id === parseInt(productoSeleccionadoPesaje));
+      const productoSeleccionado = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
 
       if (!productoSeleccionado) {
         Swal.fire({
@@ -3460,7 +3159,7 @@ const conectarBalanza = async () => {
       }, 0);
 
       const numJabasTotal = pesajesTemporales.reduce((total, pesaje) => {
-        return total + parseInt(pesaje.num_jabas_pesaje || 0);
+        return total + parseInt(pesaje.num_jabas_pesaje || pesaje.num_jabas || 0);
       }, 0);
 
       const pesoBrutoTotal = pesajesTemporales.reduce((total, pesaje) => {
@@ -3543,7 +3242,7 @@ const conectarBalanza = async () => {
           try {
             const detallePesajeData = {
               ingreso_id: ingresoCreado.id,
-              numero_pesaje: (i + 1), //pesaje.numero_pesaje || 
+              numero_pesaje: (i + 1), //pesaje.numero_pesaje ||
               peso_bruto: parseFloat(pesaje.peso_bruto) || 0,
               peso_jaba: parseFloat(pesaje.peso_jaba) || 0,
               descuento_merma: parseFloat(pesaje.descuento_merma) || 0,
@@ -3555,7 +3254,7 @@ const conectarBalanza = async () => {
               detalle_orden_id: parseInt(productoSeleccionadoPesaje),
               rawData: (pesaje.rawData || '').toString(),
               observacion: pesaje.observacion || '',
-              fecha_pesaje: (pesaje.fecha_pesaje || pesaje.timestamp),
+              fecha_pesaje: (pesaje.fecha_pesaje || pesaje.fecha_pesaje||pesaje.timestamp),
               producto_nombre: pesaje.producto_nombre,
               tipo_fruta_nombre: pesaje.tipo_fruta_nombre,
               usuario_pesaje_id: user?.id
@@ -4340,16 +4039,16 @@ const conectarBalanza = async () => {
                               const ordenId = selectedOption ? selectedOption.value : '';
                               setOrdenSeleccionada(ordenId);
 
-                              // Si no estás editando, o si cambias de orden, carga los productos de la nueva orden
-                              if (!editingId || ordenId !== currentIngreso.detalle_orden_id) {
-                                if (ordenId) {
-                                  cargarProductosDeOrden(ordenId);
-                                } else {
-                                  setProductosOrden([]);
-                                  setCantidadPendientePorProducto({});
-                                  setProductoSeleccionadoPesaje('');
-                                }
-                              }
+                              // // Si no estás editando, o si cambias de orden, carga los productos de la nueva orden
+                              // if (!editingId || ordenId !== currentIngreso.detalle_orden_id) {
+                              //   if (ordenId) {
+                              //     cargarProductosDeOrden(ordenId);
+                              //   } else {
+                              //     setProductosOrden([]);
+                              //     setCantidadPendientePorProducto({});
+                              //     setProductoSeleccionadoPesaje('');
+                              //   }
+                              // }
                             }}
                             options={ordenesPendientes.map(orden => ({
                               value: orden.id,
@@ -4997,8 +4696,8 @@ const conectarBalanza = async () => {
                                     </td>
                                     <td>
                                       <small className="text-muted">
-                                        {pesaje.timestamp ?
-                                          new Date(pesaje.timestamp).toLocaleTimeString() :
+                                        {pesaje.fecha_pesaje||pesaje.timestamp ?
+                                          new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleTimeString() :
                                           new Date().toLocaleTimeString()
                                         }
                                       </small>
@@ -5075,8 +4774,8 @@ const conectarBalanza = async () => {
 
                                       return (
                                         <tr
-                                          key={producto.id}
-                                          className={`${isCompleto ? 'table-success' : ''} ${productoSeleccionadoPesaje === producto.id ? 'table-primary' : ''}`}
+                                          key={producto.producto_id}
+                                          className={`${isCompleto ? 'table-success' : ''} ${productoSeleccionadoPesaje === producto.producto_id ? 'table-primary' : ''}`}
                                         >
                                           <td>
                                             <strong>{producto.producto_nombre}</strong>
@@ -5089,7 +4788,7 @@ const conectarBalanza = async () => {
                                           </td>
                                           <td>
                                             <span className={`fw-bold ${isCompleto ? 'text-success' : 'text-warning'}`}>
-                                              {calcularCantidadPendienteActualizada(producto).toFixed(2)} kg
+                                              {cantidadPendienteActualizada.toFixed(2)} kg
                                             </span>
                                             {isCompleto && (
                                               <CBadge color="success" className="ms-2" size="sm">
@@ -5114,18 +4813,18 @@ const conectarBalanza = async () => {
                                           <td>
                                             <CButton
                                               size="sm"
-                                              color={productoSeleccionadoPesaje === producto.id ? 'success' : 'primary'}
-                                              variant={productoSeleccionadoPesaje === producto.id ? 'solid' : 'outline'}
+                                              color={productoSeleccionadoPesaje === producto.producto_id ? 'success' : 'primary'}
+                                              variant={productoSeleccionadoPesaje === producto.producto_id ? 'solid' : 'outline'}
                                               onClick={() => {
-                                                if (productoSeleccionadoPesaje === producto.id) {
+                                                if (productoSeleccionadoPesaje === producto.producto_id) {
                                                   setProductoSeleccionadoPesaje('');
                                                 } else {
-                                                  setProductoSeleccionadoPesaje(producto.id);
+                                                  setProductoSeleccionadoPesaje(producto.producto_id);
                                                 }
                                               }}
                                               disabled={isCompleto}
                                             >
-                                              {productoSeleccionadoPesaje === producto.id ? (
+                                              {productoSeleccionadoPesaje === producto.producto_id ? (
                                                 <>
                                                   <CIcon icon={cilCheckCircle} className="me-1" />
                                                   Seleccionado
@@ -5154,7 +4853,7 @@ const conectarBalanza = async () => {
                               {productoSeleccionadoPesaje && (
                                 <div className="mt-3 p-3 bg-primary bg-opacity-10 border border-primary rounded">
                                   {(() => {
-                                    const productoActual = productosOrden.find(p => p.id === productoSeleccionadoPesaje);
+                                    const productoActual = productosOrden.find(p => p.producto_id === productoSeleccionadoPesaje);
                                     const cantidadPendienteActualizada = calcularCantidadPendienteActualizada(productoActual);
                                     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(productoSeleccionadoPesaje);
 
@@ -5376,8 +5075,8 @@ const conectarBalanza = async () => {
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   <small>
-                                    {new Date(pesaje.timestamp).toLocaleDateString()}<br />
-                                    {new Date(pesaje.timestamp).toLocaleTimeString()}
+                                    {new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleDateString()}<br />
+                                    {new Date(pesaje.fecha_pesaje||pesaje.timestamp).toLocaleTimeString()}
                                   </small>
                                 </CTableDataCell>
                                 <CTableDataCell>
@@ -5404,7 +5103,7 @@ const conectarBalanza = async () => {
                                                     <i class="fas fa-weight me-1"></i>
                                                     Peso Bruto (kg):
                                                   </label>
-                                                  <input type="number" id="edit-peso" class="form-control" 
+                                                  <input type="number" id="edit-peso" class="form-control"
                                                          value="${pesaje.peso_bruto}" step="0.001" min="0"
                                                          placeholder="0.000">
                                                 </div>
@@ -5413,7 +5112,7 @@ const conectarBalanza = async () => {
                                                     <i class="fas fa-box me-1"></i>
                                                     Número de Jabas:
                                                   </label>
-                                                  <input type="number" id="edit-jabas" class="form-control" 
+                                                  <input type="number" id="edit-jabas" class="form-control"
                                                          value="${pesaje.num_jabas_pesaje || pesaje.num_jabas}" min="1" max="50"
                                                          placeholder="1">
                                                 </div>
@@ -5422,7 +5121,7 @@ const conectarBalanza = async () => {
                                                     <i class="fas fa-minus-circle me-1"></i>
                                                     Descuento por Merma (kg):
                                                   </label>
-                                                  <input type="number" id="edit-merma" class="form-control" 
+                                                  <input type="number" id="edit-merma" class="form-control"
                                                          value="${pesaje.descuento_merma || 0}" step="0.001" min="0"
                                                          placeholder="0.000">
                                                   <small class="form-text text-muted">
@@ -5438,7 +5137,7 @@ const conectarBalanza = async () => {
                                                             placeholder="Observaciones adicionales (opcional)">${pesaje.observacion || ''}</textarea>
                                                 </div>
                                               </div>
-                                              
+
                                               <div class="row mt-3">
                                                 <div class="col-12">
                                                   <div class="card border-info">
@@ -5552,7 +5251,7 @@ const conectarBalanza = async () => {
                                               // SINCRONIZAR TOTALES DEL INGRESO DESPUÉS DE LA EDICIÓN
                                               const totalPesoBruto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_bruto) || 0), 0);
                                               const totalJabas = updatedPesajes.reduce((sum, p) => sum + (parseInt(p.num_jabas_pesaje) || 0), 0);
-                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || 0), 0);
+                                              const totalPesoJabas = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas)   || 0), 0);
                                               const totalDescuentoMerma = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.descuento_merma) || 0), 0);
                                               const totalPesoNeto = updatedPesajes.reduce((sum, p) => sum + (parseFloat(p.peso_neto) || 0), 0);
 
@@ -5703,7 +5402,7 @@ const conectarBalanza = async () => {
                     </div>
                     {/* Botones de acción para pesajes temporales */}
                     {/* <div className="mt-3 d-flex gap-2">
-                      
+
                       <CButton
                         color="success"
                         size="sm"
@@ -5787,7 +5486,7 @@ const conectarBalanza = async () => {
         </CRow>
       </CContainer>
     </>
-    
+
   )
 }
 

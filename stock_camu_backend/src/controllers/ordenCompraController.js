@@ -109,6 +109,9 @@ exports.getOrdenCompraById = async (req, res) => {
   }
 };
 // Crear una nueva orden de compra
+
+// ... existing code
+
 exports.createOrdenCompra = async (req, res) => {
   try {
     const { tipo_lote, tipo_pago, cliente_id, numero_orden, fecha_emision, fecha_entrega, lugar_entrega, estado, observacion, forma_pago, usuario_creacion_id } = req.body;
@@ -146,7 +149,7 @@ exports.createOrdenCompra = async (req, res) => {
 
       if (lastOrganicOrder && lastOrganicOrder.codigo_lote) {
         const lastCodigoLote = lastOrganicOrder.codigo_lote;
-        const match = lastCodigoLote.match(/COOPAY(\d{2})(\d{3})/);
+        const match = lastCodigoLote.match(/COOPAY(\d{2})(\d{4})/);
 
         if (match) {
           const lastYear = match[1];
@@ -231,6 +234,8 @@ exports.createOrdenCompra = async (req, res) => {
     res.status(500).json({ message: 'Error al crear orden de compra' });
   }
 };
+
+// ... existing code
 
 // Actualizar una orden de compra existente
 exports.updateOrdenCompra = async (req, res) => {
