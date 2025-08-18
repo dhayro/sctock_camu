@@ -3,6 +3,7 @@ const {
   Cliente,
   Usuario,
   DetalleOrdenCompra,
+  TipoFruta,
 } = require("../models");
 const { Op } = require("sequelize");
 
@@ -430,11 +431,17 @@ exports.getOrdenesPendientes = async (req, res) => {
         attributes: ["id", "usuario"],
         required: false,
       },
-      {
-        model: DetalleOrdenCompra,
-        as: "detalles",
-        required: false,
-      },
+        {
+          model: DetalleOrdenCompra,
+          as: "detalles",
+          include: [
+            {
+              model: TipoFruta,
+              as: "tipo_fruta", // Asegúrate de que el alias coincida con el definido en el modelo
+              attributes: ["id", "nombre"], // Incluye los atributos que necesitas
+            },
+          ],
+        },
     ];
 
     // Si hay término de búsqueda, modificar la estrategia
