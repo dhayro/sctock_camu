@@ -239,224 +239,348 @@ const Ingresos = () => {
         doc.text(cell, x + cellPadding, textY, { baseline: 'middle' })
       })
     })
-  };
+  }
 
- 
+  const calculateCellHeight = (doc, text, cellWidth, cellPadding, fontSize, lineHeight) => {
+    const textLines = doc.splitTextToSize(text, cellWidth - cellPadding * 2)
+    return textLines.length * fontSize * lineHeight
+  }
 
-const calculateCellHeight = (doc, text, cellWidth, cellPadding, fontSize, lineHeight) => {
-  const textLines = doc.splitTextToSize(text, cellWidth - cellPadding * 2);
-  return textLines.length * fontSize * lineHeight;
-};
+  const drawPesajesTable = (doc, headers, data, startY, format, fontSize = 10) => {
+    const cellPadding = 2 // Padding inside each cell
+    const lineHeight = 1.2 // Adjusted line height for text
+    const headerHeight = 8 // Fixed height for header cells
 
-const drawPesajesTable = (doc, headers, data, startY, format, fontSize = 10) => {
-  const cellPadding = 2; // Padding inside each cell
-  const lineHeight = 1.2; // Adjusted line height for text
-  const headerHeight = 8; // Fixed height for header cells
+    // Set the font size
+    doc.setFontSize(fontSize)
 
-  // Set the font size
-  doc.setFontSize(fontSize);
+    // Function to calculate the width of a cell based on its text
+    const calculateCellWidth = (text) => {
+      return doc.getTextWidth(text) + cellPadding * 2
+    }
 
-  // Function to calculate the width of a cell based on its text
-  const calculateCellWidth = (text) => {
-    return doc.getTextWidth(text) + cellPadding * 2;
-  };
+    // Calculate the maximum width for each column
+    const columnWidths = headers.map((header, index) => {
+      const headerWidth = calculateCellWidth(header)
+      const maxDataWidth = data.reduce((maxWidth, row) => {
+        const cellWidth = calculateCellWidth(row[index].toString())
+        return Math.max(maxWidth, cellWidth)
+      }, 0)
+      return Math.max(headerWidth, maxDataWidth)
+    })
 
-  // Calculate the maximum width for each column
-  const columnWidths = headers.map((header, index) => {
-    const headerWidth = calculateCellWidth(header);
-    const maxDataWidth = data.reduce((maxWidth, row) => {
-      const cellWidth = calculateCellWidth(row[index].toString());
-      return Math.max(maxWidth, cellWidth);
-    }, 0);
-    return Math.max(headerWidth, maxDataWidth);
-  });
+    // Calculate total table width
+    const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0)
 
-  // Calculate total table width
-  const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+    // Calculate starting X position based on format
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const startX = (pageWidth - totalTableWidth) / 2 // Center the table
 
-  // Calculate starting X position based on format
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const startX = (pageWidth - totalTableWidth) / 2; // Center the table
+    // Draw the table headers with borders
+    headers.forEach((header, index) => {
+      const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0)
+      const y = startY
 
-  // Draw the table headers with borders
-  headers.forEach((header, index) => {
-    const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0);
-    const y = startY;
+      // Draw header cell border with fixed height
+      const cellWidth = columnWidths[index]
+      doc.rect(x, y, cellWidth, headerHeight).stroke()
 
-    // Draw header cell border with fixed height
-    const cellWidth = columnWidths[index];
-    doc.rect(x, y, cellWidth, headerHeight).stroke();
+      // Add text to header cell, centered vertically
+      const textY = y + headerHeight / 2 + cellPadding / 2 // Center text vertically
+      const textX = x + (cellWidth - doc.getTextWidth(header)) / 2 // Center text horizontally
+      doc.text(header, textX, textY, { baseline: 'middle' })
+    })
 
-    // Add text to header cell, centered vertically
-    const textY = y + headerHeight / 2 + cellPadding / 2; // Center text vertically
-    const textX = x + (cellWidth - doc.getTextWidth(header)) / 2; // Center text horizontally
-    doc.text(header, textX, textY, { baseline: 'middle' });
-  });
+    // Draw the table data
+    data.forEach((row, rowIndex) => {
+      row.forEach((cell, cellIndex) => {
+        const cellWidth = columnWidths[cellIndex]
+        const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0)
+        const y = startY + headerHeight + rowIndex * fontSize * lineHeight // Adjust Y position for each row
 
-  // Draw the table data
-  data.forEach((row, rowIndex) => {
-    row.forEach((cell, cellIndex) => {
-      const cellWidth = columnWidths[cellIndex];
-      const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0);
-      const y = startY + headerHeight + rowIndex * fontSize * lineHeight; // Adjust Y position for each row
+        // Calculate cell height based on text
+        const cellHeight = calculateCellHeight(
+          doc,
+          cell.toString(),
+          cellWidth,
+          cellPadding,
+          fontSize,
+          lineHeight,
+        )
 
-      // Calculate cell height based on text
-      const cellHeight = calculateCellHeight(doc, cell.toString(), cellWidth, cellPadding, fontSize, lineHeight);
+        // Draw cell border
+        doc.rect(x, y, cellWidth, cellHeight).stroke()
 
-      // Draw cell border
-      doc.rect(x, y, cellWidth, cellHeight).stroke();
+        // Add text to cell, centered vertically and horizontally
+        const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2)
+        textLines.forEach((line, lineIndex) => {
+          const textY = y + cellPadding + lineIndex * fontSize * lineHeight
+          const textX = x + (cellWidth - doc.getTextWidth(line)) / 2 // Center text horizontally
+          doc.text(line, textX, textY, { baseline: 'top' })
+        })
+      })
+    })
+  }
 
-      // Add text to cell, centered vertically and horizontally
-      const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2);
-      textLines.forEach((line, lineIndex) => {
-        const textY = y + cellPadding + lineIndex * fontSize * lineHeight;
-        const textX = x + (cellWidth - doc.getTextWidth(line)) / 2; // Center text horizontally
-        doc.text(line, textX, textY, { baseline: 'top' });
-      });
-    });
-  });
-};
+  const drawPesajesList = (doc, headers, data, startY, fontSize = 10) => {
+    const lineHeight = 0.5 // Adjusted line height for text
+    const cellPadding = 5 // Padding inside each cell
 
-const handleGeneratePDF = async (ingreso, format) => {
-  try {
-    // Fetch pesajes temporales using the ingreso ID
-    const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id);
+    // Set the font size
+    doc.setFontSize(fontSize)
 
-    const pesajesTableData = pesajesTemporales.map(pesaje => ([
-      new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
-      `${pesaje.producto_nombre || 'Producto no especificado'} - ${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
-      parseFloat(pesaje.peso_bruto || 0).toFixed(3),
-      pesaje.num_jabas_pesaje || 0,
-      parseFloat(pesaje.peso_jaba || 0).toFixed(3),
-      parseFloat(pesaje.peso_neto || 0).toFixed(3),
-      parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
-      (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
-      parseFloat(ingreso.pago_transporte || 0).toFixed(2),
-      parseFloat(ingreso.ingreso_cooperativa || 0).toFixed(2),
-      parseFloat(ingreso.pago_socio || 0).toFixed(2),
-      pesaje.observacion || ''
-    ]));
+    // Calculate starting X position
+    const startX = 10 // Margin from the left
 
-    const doc = new jsPDF({
-      orientation: format === 'a4' || format === 'a5' ? 'landscape' : 'portrait',
-      unit: 'mm',
-      format: format === 'ticket' ? [80, 297] : format, // Use custom size for ticket
-    });
+    // Draw the list headers and data
+    data.forEach((row, rowIndex) => {
+      let y = startY + rowIndex * fontSize * lineHeight * headers.length
 
-    // Define positions for different formats
-    const imgWidth = format === 'ticket' ? 40 : format === 'a5' ? 30 : 35;
-    const imgHeight = format === 'ticket' ? 30 : format === 'a5' ? 25 : 25;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const xPosImage = pageWidth - imgWidth - 20; // Image position on the right with margin
-    const yPosImage = 5; // Top position for image
-
-    // Calculate available width for text
-    const availableWidth = xPosImage - 20; // 20mm margin for text
-    const xPosText = 10; // Text position with margin
-    const yPosText = format === 'ticket' ? yPosImage + imgHeight - 10 : yPosImage + 10; // Adjust for ticket
-
-    // Convert image to base64 and add to PDF
-    const imageUrl = '/img/coopay.png';
-    const img = new Image();
-    img.src = imageUrl;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const base64Image = canvas.toDataURL('image/png');
-      doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight);
-
-      // Set font size based on format
-      const fontSize = format === 'ticket' ? 8 : 12;
-      doc.setFontSize(fontSize);
-
-      // Center the text
-      const notaIngresoText = 'NOTA DE INGRESO';
-      const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA';
-      const coopaySubText = 'COOPAY';
-      const notaIngresoWidth = doc.getTextWidth(notaIngresoText);
-      const coopayWidth = doc.getTextWidth(coopayText);
-      const coopaySubWidth = doc.getTextWidth(coopaySubText);
-      const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2;
-      const centerXCoopay = (pageWidth - coopayWidth) / 2;
-      const centerXCoopaySub = (pageWidth - coopaySubWidth) / 2;
-
-      doc.text(notaIngresoText, centerXNotaIngreso, yPosText + 10);
-      if (format === 'ticket') {
-        doc.text(coopayText, centerXCoopay, yPosText + 15);
-        doc.text(coopaySubText, centerXCoopaySub, yPosText + 20);
+      // Add "TOTAL:" label for the last row
+      if (rowIndex === data.length - 1) {
+        doc.text('TOTAL:', startX, y + 5, { baseline: 'top' })
+        y += 6 // Move Y position for the next header
       } else {
-        // Center the combined text for A4 and A5 formats
-        const combinedText = `${coopayText} - ${coopaySubText}`;
-        const combinedTextWidth = doc.getTextWidth(combinedText);
-        const centerXCombined = (pageWidth - combinedTextWidth) / 2;
-        doc.text(combinedText, centerXCombined, yPosText + 20);
+        // Add "DETALLE X" label for each row except the last one
+        doc.text(`DETALLE ${rowIndex + 1}:`, startX, y + 5, { baseline: 'top' })
+        y += 6 // Move Y position for the next header
       }
 
-      // Add the table
-      const tableData = [
-        ['Nro registro', ingreso.numero_ingreso],
-        ['Apellidos del socio', ingreso.socio.apellidos],
-        ['Nombre del socio', ingreso.socio.nombres],
-        ['Código del socio', ingreso.socio.codigo],
-      ];
+      headers.forEach((header, headerIndex) => {
+        // Skip certain headers for individual rows, but include them for the totals row
+        if (
+          rowIndex < data.length - 1 &&
+          [
+            'Precio de Venta',
+            'Subtotal',
+            'Pago Transporte',
+            'Ingreso Cooperativa',
+            'Pago al Socio',
+          ].includes(header)
+        ) {
+          return
+        }
 
-      // Replace autoTable with a custom table drawing function
-      drawTable(doc, tableData, yPosText + 25, format);
+        // Skip "Fecha", "Producto", and "Observación" for the last row
+        if (rowIndex === data.length - 1 && ['Fecha', 'Producto', 'Observación'].includes(header)) {
+          return
+        }
 
-      // Add the new table for pesajesTemporales
-      const detailText = 'DETALLE DE LA NOTA DE INGRESO:';
-      const detailTextYPos = yPosText + (format === 'ticket' ? 25 : 30) + tableData.length * (format === 'ticket' ? 6 : 7) + 5; // Adjust Y position based on table height
-      doc.text(detailText, xPosText, detailTextYPos);
+        const text = `${header}: ${row[headerIndex]}`
+        doc.text(text, startX, y + 5, { baseline: 'top' })
+        y += 5 // Move Y position for the next header
+      })
 
-      // Prepare pesajes table data
-      const pesajesTableHeaders = [
-        'Fecha', 'Producto', 'Peso Bruto', 'Jabas', 'Dscto Peso Jabas', 'Peso Neto',
-        'Precio de Venta', 'Subtotal', 'Pago Transporte', 'Ingreso Cooperativa', 'Pago al Socio', 'Observación'
-      ];
-
-      // Draw the pesajes table
-      drawPesajesTable(doc, pesajesTableHeaders, pesajesTableData, detailTextYPos + 10, format, 8);
-
-      // Add signature placeholders
-     // Add signature placeholders
-const signatureYPos = detailTextYPos + 10 + pesajesTableData.length * 10 + 20; // Adjust Y position based on table height
-const signatureWidth = pageWidth / 2 - 20; // Width for each signature column
-const signatureXPosLeft = 125; // Left margin
-const signatureXPosRight = pageWidth - signatureWidth + 70; // Right column start
-
-doc.setFontSize(10);
-
-// Center the text within each column
-const emisorText = `FIRMA DEL EMISOR DE NOTA DE INGRESO\nNombre:  \nDNI:  \n\n\n_____________________________________`;
-const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI:  \n\n\n_____________________________`;
-const emisorTextWidth = doc.getTextWidth(emisorText);
-const socioTextWidth = doc.getTextWidth(socioText);
-
-const centerXEmisor = signatureXPosLeft + (signatureWidth - emisorTextWidth) / 2;
-const centerXSocio = signatureXPosRight + (signatureWidth - socioTextWidth) / 2;
-
-doc.text(emisorText, centerXEmisor, signatureYPos, { align: 'center' });
-doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
-
-      // Generate PDF data
-      const pdfBlob = doc.output('blob');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      setPdfData(pdfUrl);
-      setShowPdfModal(true);
-    };
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Failed to generate PDF. Please try again.',
-      confirmButtonColor: '#321fdb',
-    });
+      // Draw a separator line after each row
+      const separatorY = y + cellPadding // Adjust separator position
+      doc.setDrawColor(0) // Set color for the line
+      doc.setLineWidth(0.5) // Set line width
+      doc.line(startX, separatorY, doc.internal.pageSize.getWidth() - startX, separatorY) // Draw line across the page
+    })
   }
-};
+
+  const handleGeneratePDF = async (ingreso, format) => {
+    try {
+      // Fetch pesajes temporales using the ingreso ID
+      const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id)
+
+      const pesajesTableData = pesajesTemporales.map((pesaje) => [
+        new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
+        `${pesaje.producto_nombre || 'Producto no especificado'} - ${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
+        parseFloat(pesaje.peso_bruto || 0).toFixed(3),
+        pesaje.num_jabas_pesaje || 0,
+        parseFloat(pesaje.peso_jaba || 0).toFixed(3),
+        parseFloat(pesaje.peso_neto || 0).toFixed(3),
+        parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
+        (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
+        (
+          (parseFloat(ingreso.pago_transporte || 0) / 100) *
+          parseFloat(pesaje.peso_neto || 0)
+        ).toFixed(2),
+        ((parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0)).toFixed(2),
+        (
+          parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
+          (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+          (parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+          (ingreso.aplicarPrecioJaba ? numJabasTotal * 1.0 : 0)
+        ).toFixed(2),
+        pesaje.observacion || '',
+      ])
+
+      const totals = pesajesTableData.reduce((acc, row) => {
+        acc[1] += parseFloat(row[2]) || 0 // Peso Bruto
+        acc[2] += parseInt(row[3]) || 0 // Jabas
+        acc[3] += parseFloat(row[4]) || 0 // Dscto Peso Jabas
+        acc[4] += parseFloat(row[5]) || 0 // Peso Neto
+        acc[5] += parseFloat(row[7]) || 0 // Subtotal
+        acc[6] += parseFloat(row[8]) || 0 // Pago Transporte
+        acc[7] += parseFloat(row[9]) || 0 // Ingreso Cooperativa
+        acc[8] += parseFloat(row[10]) || 0 // Pago al Socio
+        acc[9] = parseFloat(row[6]) || 0 // Pago al Socio
+        return acc
+      }, Array(9).fill(0))
+
+      // Append totals row
+      pesajesTableData.push([
+        'Total',
+        '',
+        totals[1].toFixed(3),
+        totals[2],
+        totals[3].toFixed(3),
+        totals[4].toFixed(3),
+        totals[9].toFixed(2),
+        totals[5].toFixed(2),
+        totals[6].toFixed(2),
+        totals[7].toFixed(2),
+        totals[8].toFixed(2),
+        '',
+      ])
+
+      const lineHeight = 50 // Adjust this value as needed
+      const totalHeight = pesajesTableData.length * lineHeight + 120 // Add extra space for headers and footers
+
+      const doc = new jsPDF({
+        orientation: format === 'a4' || format === 'a5' ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: format === 'ticket' ? [80, totalHeight] : format, // Use custom size for ticket
+      })
+
+      // Define positions for different formats
+      const imgWidth = format === 'ticket' ? 40 : format === 'a5' ? 30 : 35
+      const imgHeight = format === 'ticket' ? 30 : format === 'a5' ? 25 : 25
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const xPosImage = pageWidth - imgWidth - 20 // Image position on the right with margin
+      const yPosImage = 5 // Top position for image
+
+      // Calculate available width for text
+      const availableWidth = xPosImage - 20 // 20mm margin for text
+      const xPosText = 10 // Text position with margin
+      const yPosText = format === 'ticket' ? yPosImage + imgHeight - 10 : yPosImage + 10 // Adjust for ticket
+
+      // Convert image to base64 and add to PDF
+      const imageUrl = '/img/coopay.png'
+      const img = new Image()
+      img.src = imageUrl
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const base64Image = canvas.toDataURL('image/png')
+        doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight)
+
+        // Set font size based on format
+        const fontSize = format === 'ticket' ? 8 : 12
+        doc.setFontSize(fontSize)
+
+        // Center the text
+        const notaIngresoText = 'NOTA DE INGRESO'
+        const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA'
+        const coopaySubText = 'COOPAY'
+        const notaIngresoWidth = doc.getTextWidth(notaIngresoText)
+        const coopayWidth = doc.getTextWidth(coopayText)
+        const coopaySubWidth = doc.getTextWidth(coopaySubText)
+        const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2
+        const centerXCoopay = (pageWidth - coopayWidth) / 2
+        const centerXCoopaySub = (pageWidth - coopaySubWidth) / 2
+
+        doc.text(notaIngresoText, centerXNotaIngreso, yPosText + 10)
+        if (format === 'ticket') {
+          doc.text(coopayText, centerXCoopay, yPosText + 15)
+          doc.text(coopaySubText, centerXCoopaySub, yPosText + 20)
+        } else {
+          // Center the combined text for A4 and A5 formats
+          const combinedText = `${coopayText} - ${coopaySubText}`
+          const combinedTextWidth = doc.getTextWidth(combinedText)
+          const centerXCombined = (pageWidth - combinedTextWidth) / 2
+          doc.text(combinedText, centerXCombined, yPosText + 20)
+        }
+
+        // Add the table
+        const tableData = [
+          ['Nro registro', ingreso.numero_ingreso],
+          ['Apellidos del socio', ingreso.socio.apellidos],
+          ['Nombre del socio', ingreso.socio.nombres],
+          ['Código del socio', ingreso.socio.codigo],
+        ]
+
+        // Replace autoTable with a custom table drawing function
+        drawTable(doc, tableData, yPosText + 25, format)
+
+        // Add the new table for pesajesTemporales
+        const detailText = 'DETALLE DE LA NOTA DE INGRESO:'
+        const detailTextYPos =
+          yPosText +
+          (format === 'ticket' ? 25 : 30) +
+          tableData.length * (format === 'ticket' ? 6 : 7) +
+          5 // Adjust Y position based on table height
+        doc.text(detailText, xPosText, detailTextYPos)
+
+        // Prepare pesajes table data
+        const pesajesTableHeaders = [
+          'Fecha',
+          'Producto',
+          'Peso Bruto',
+          'Jabas',
+          'Dscto Peso Jabas',
+          'Peso Neto',
+          'Precio de Venta',
+          'Subtotal',
+          'Pago Transporte',
+          'Ingreso Cooperativa',
+          'Pago al Socio',
+          'Observación',
+        ]
+
+        if (format === 'ticket') {
+          drawPesajesList(doc, pesajesTableHeaders, pesajesTableData, detailTextYPos, 8)
+        } else {
+          // Draw the pesajes table
+          drawPesajesTable(
+            doc,
+            pesajesTableHeaders,
+            pesajesTableData,
+            detailTextYPos + 10,
+            format,
+            8,
+          )
+          const signatureYPos = detailTextYPos + 10 + pesajesTableData.length * 10 + 20 // Adjust Y position based on table height
+          const signatureWidth = pageWidth / 2 - 20 // Width for each signature column
+          const signatureXPosLeft = 125 // Left margin
+          const signatureXPosRight = pageWidth - signatureWidth + 70 // Right column start
+
+          doc.setFontSize(10)
+
+          // Center the text within each column
+          const emisorText = `FIRMA DEL EMISOR DE NOTA DE INGRESO\nNombre:  \nDNI:  \n\n\n_____________________________________`
+          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI:  \n\n\n_____________________________`
+          const emisorTextWidth = doc.getTextWidth(emisorText)
+          const socioTextWidth = doc.getTextWidth(socioText)
+
+          const centerXEmisor = signatureXPosLeft + (signatureWidth - emisorTextWidth) / 2
+          const centerXSocio = signatureXPosRight + (signatureWidth - socioTextWidth) / 2
+
+          doc.text(emisorText, centerXEmisor, signatureYPos, { align: 'center' })
+          doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' })
+        }
+
+        // Generate PDF data
+        const pdfBlob = doc.output('blob')
+        const pdfUrl = URL.createObjectURL(pdfBlob)
+        setPdfData(pdfUrl)
+        setShowPdfModal(true)
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to generate PDF. Please try again.',
+        confirmButtonColor: '#321fdb',
+      })
+    }
+  }
   const handleSearchChange = (e) => {
     setSearchTermIngresos(e.target.value)
   }
@@ -586,6 +710,8 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
 
   const [productosOrden, setProductosOrden] = useState([])
   const [productoSeleccionadoPesaje, setProductoSeleccionadoPesaje] = useState('')
+  const [detalleOrdenSeleccionado, setDetalleOrdenSeleccionado] = useState(null);
+
   const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({})
   const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false)
 
@@ -615,6 +741,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     const nuevoPesaje = {
       id: `temp_${Date.now()}`,
       producto_id: productoSeleccionadoPesaje, // Agregar el ID del producto
+      detalle_orden_id: detalleOrdenSeleccionado,
       peso_bruto: pesajeRealTime.weight,
       num_jabas: parseInt(numJabas) || 0,
       peso_total_jabas: (parseInt(numJabas) || 0) * pesoJaba,
@@ -922,6 +1049,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     setProductosOrden([])
     setCantidadPendientePorProducto({})
     setProductoSeleccionadoPesaje('')
+    setDetalleOrdenSeleccionado(null)
 
     // // Limpiar pesajes temporales
     // if (typeof setPesajesTemporales !== 'undefined') {
@@ -998,6 +1126,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
 
         if (ingreso.detalle_orden.producto_id) {
           setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id)
+          setDetalleOrdenSeleccionado(ingreso.detalle_orden.id)
         }
 
         setPesajesTemporales((prev) => {
@@ -1051,9 +1180,9 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
       setEditingId(null) // No hay ingreso en edición
       setPesajesTemporales([]) // Limpiar pesajes temporales
 
-      // Luego cargar datos iniciales
-      cargarSocios('')
-      cargarOrdenesPendientes('')
+      // // Luego cargar datos iniciales
+      // cargarSocios('')
+      // cargarOrdenesPendientes('')
     }
 
     setShowModal(true)
@@ -1177,10 +1306,10 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     }, 300),
   ).current
 
-  // useEffect para cargar órdenes al inicio
-  useEffect(() => {
-    cargarSocios() // Cargar órdenes pendientes al inicio
-  }, [])
+  // // useEffect para cargar órdenes al inicio
+  // useEffect(() => {
+  //   cargarSocios() // Cargar órdenes pendientes al inicio
+  // }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
@@ -1196,10 +1325,10 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     }, 300),
   ).current
 
-  // useEffect para cargar órdenes al inicio
-  useEffect(() => {
-    fetchIngresos() // Cargar órdenes pendientes al inicio
-  }, [])
+  // // useEffect para cargar órdenes al inicio
+  // useEffect(() => {
+  //   fetchIngresos() // Cargar órdenes pendientes al inicio
+  // }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
@@ -1215,10 +1344,10 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     }, 300),
   ).current
 
-  // useEffect para cargar órdenes al inicio
-  useEffect(() => {
-    cargarOrdenesPendientes() // Cargar órdenes pendientes al inicio
-  }, [])
+  // // // useEffect para cargar órdenes al inicio
+  // // useEffect(() => {
+  // //   cargarOrdenesPendientes() // Cargar órdenes pendientes al inicio
+  // // }, [])
 
   // useEffect para búsqueda dinámica de órdenes
   useEffect(() => {
@@ -1227,23 +1356,23 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     }
   }, [searchTermOrdenes, debouncedCargarOrdenes])
   // Agregar un useEffect que recargue los datos cuando cambie el searchTerm
-  useEffect(() => {
-    // Debounce para evitar demasiadas llamadas al API
-    const timeoutId = setTimeout(() => {
-      if (searchTerm.trim() !== '') {
-        // Recargar socios con el nuevo término de búsqueda
-        cargarSocios(searchTerm)
-        // Recargar órdenes con el término de búsqueda
-        cargarOrdenesPendientes()
-      } else {
-        // Si no hay término de búsqueda, cargar todos los datos
-        cargarSocios('')
-        cargarOrdenesPendientes('')
-      }
-    }, 300) // Esperar 300ms después de que el usuario deje de escribir
+  // useEffect(() => {
+  //   // Debounce para evitar demasiadas llamadas al API
+  //   const timeoutId = setTimeout(() => {
+  //     if (searchTerm.trim() !== '') {
+  //       // Recargar socios con el nuevo término de búsqueda
+  //       cargarSocios(searchTerm)
+  //       // Recargar órdenes con el término de búsqueda
+  //       cargarOrdenesPendientes()
+  //     } else {
+  //       // Si no hay término de búsqueda, cargar todos los datos
+  //       cargarSocios('')
+  //       cargarOrdenesPendientes('')
+  //     }
+  //   }, 300) // Esperar 300ms después de que el usuario deje de escribir
 
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm]) // Remover socioSeleccionado de las dependencias
+  //   return () => clearTimeout(timeoutId)
+  // }, [searchTerm]) // Remover socioSeleccionado de las dependencias
 
   const conectarBalanza = async () => {
     if (!puertoSeleccionado) {
@@ -1753,7 +1882,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
   // Asegúrate de que estas funciones estén definidas ANTES del return del componente
   const calcularPesoNetoIngresadoPorProducto = (productoId) => {
     return pesajesTemporales
-      .filter((pesaje) => pesaje.producto_id === productoId)
+      .filter((pesaje) => pesaje.id === productoId)
       .reduce((sum, pesaje) => {
         const pesoNeto =
           parseFloat(pesaje.peso_bruto || 0) -
@@ -1769,7 +1898,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     }
     const cantidadTotal = producto.cantidad || 0
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id)
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
     const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
 
     // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
@@ -1779,7 +1908,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
   const calcularProgresoActualizado = (producto) => {
     const cantidadTotal = producto.cantidad || 0
     const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.producto_id)
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
     const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
 
     return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0
@@ -1932,7 +2061,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
 
     // Buscar el producto seleccionado en la lista de productos de la orden
     const productoOrden = productosOrden.find(
-      (p) => p.producto_id === parseInt(productoSeleccionadoPesaje),
+      (p) => p.id === parseInt(detalleOrdenSeleccionado),
     )
     if (!productoOrden) {
       toast.error('No se encontró el producto seleccionado en la orden')
@@ -1945,7 +2074,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
       numero_pesaje: contadorPesajes,
       // Información del producto
       producto_id: parseInt(productoSeleccionadoPesaje),
-      detalle_orden_id: productoOrden.id,
+      detalle_orden_id: detalleOrdenSeleccionado,
       producto_nombre: productoOrden.producto_nombre,
       tipo_fruta_id: productoOrden.tipo_fruta_id,
       tipo_fruta_nombre: productoOrden.tipo_fruta_nombre,
@@ -2028,155 +2157,6 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
       `Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto, ${jabasIngresadas} jabas${descuentoMerma > 0 ? `, merma ${descuentoMerma.toFixed(3)} kg` : ''} = ${pesoNeto.toFixed(3)} kg neto`,
     )
   }
-
-  // const aplicarPesoRealTime = async () => {
-  //   if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
-  //     toast.error('El peso debe estar estabilizado para aplicarlo');
-  //     return;
-  //   }
-
-  //   const pesoBruto = pesajeRealTime.weight;
-
-  //   // Verificar que hay un producto seleccionado
-  //   if (!productoSeleccionadoPesaje) {
-  //     toast.warning('Debe seleccionar un producto antes de aplicar el peso');
-  //     return;
-  //   }
-
-  //   // Preguntar cuántas jabas corresponden a este peso
-  //   const { value: numJabas } = await Swal.fire({
-  //     title: 'Número de Jabas',
-  //     html: `
-  //     <div style="text-align: left; margin-bottom: 15px;">
-  //       <p><strong>Peso bruto detectado:</strong> ${pesoBruto.toFixed(3)} kg</p>
-  //       <p><strong>¿Cuántas jabas corresponden a este peso?</strong></p>
-  //     </div>
-  //   `,
-  //     input: 'number',
-  //     inputAttributes: {
-  //       min: 1,
-  //       max: 50,
-  //       step: 1,
-  //       placeholder: 'Número de jabas'
-  //     },
-  //     inputValue: Math.round(pesoBruto / (pesoJaba || 25)), // Sugerencia basada en peso promedio
-  //     showCancelButton: true,
-  //     confirmButtonText: 'Aplicar',
-  //     cancelButtonText: 'Cancelar',
-  //     confirmButtonColor: '#321fdb',
-  //     cancelButtonColor: '#6c757d',
-  //     inputValidator: (value) => {
-  //       if (!value || value <= 0) {
-  //         return 'Debe ingresar un número válido de jabas';
-  //       }
-  //       if (value > 50) {
-  //         return 'El número de jabas no puede ser mayor a 50';
-  //       }
-  //     }
-  //   });
-
-  //   // Si el usuario canceló o no ingresó un valor válido
-  //   if (!numJabas) {
-  //     return;
-  //   }
-
-  //   const jabasIngresadas = parseInt(numJabas);
-  //   const pesoTotalJabas = jabasIngresadas * pesoJaba;
-
-  //   // Buscar el producto seleccionado en la lista de productos de la orden
-  //   const productoOrden = productosOrden.find(p => p.producto_id === parseInt(productoSeleccionadoPesaje));
-  //   if (!productoOrden) {
-  //     toast.error('No se encontró el producto seleccionado en la orden');
-  //     return;
-  //   }
-
-  //   // Crear el pesaje temporal (solo con peso bruto, el neto se calculará después)
-  //   const nuevoPesajeTemporal = {
-  //     id: Date.now(), // ID temporal único
-  //     numero: contadorPesajes,
-  //     producto_id: productoOrden.producto_id,
-  //     producto_nombre: productoOrden.producto_nombre,
-  //     tipo_fruta_id: productoOrden.tipo_fruta_id,
-  //     tipo_fruta_nombre: productoOrden.tipo_fruta_nombre,
-  //     peso_bruto: pesoBruto,
-  //     num_jabas: jabasIngresadas,
-  //     peso_total_jabas: pesoTotalJabas,
-  //     // El peso neto se calculará después en el procesamiento final
-  //     peso_neto: 0, // Por ahora en 0, se calculará después
-  //     precio_kg: productoOrden.precio || 0,
-  //     subtotal: 0, // Se calculará después cuando se determine el peso neto
-  //     timestamp: new Date().toISOString(),
-  //     observacion: `Pesaje automático - ${new Date().toLocaleTimeString()}`
-  //   };
-
-  //   // Agregar el pesaje a la lista temporal
-  //   setPesajesTemporales(prev => [...prev, nuevoPesajeTemporal]);
-
-  //   setProductosOrden(prev => [...prev]);
-
-  //   // Incrementar el contador para el próximo pesaje
-  //   setContadorPesajes(prev => prev + 1);
-
-  //   // Actualizar el formulario principal con los totales acumulados (solo peso bruto por ahora)
-  //   const nuevosPesajes = [...pesajesTemporales, nuevoPesajeTemporal];
-  //   const pesoBrutoTotal = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_bruto, 0);
-  //   const jabasTotales = nuevosPesajes.reduce((total, pesaje) => total + pesaje.num_jabas, 0);
-  //   const pesoTotalJabasAcumulado = nuevosPesajes.reduce((total, pesaje) => total + pesaje.peso_total_jabas, 0);
-
-  //   // Actualizar el formulario principal (solo peso bruto y jabas)
-  //   setCurrentIngreso(prev => ({
-  //     ...prev,
-  //     peso_bruto: pesoBrutoTotal.toFixed(3),
-  //     num_jabas: jabasTotales,
-  //     peso_total_jabas: pesoTotalJabasAcumulado.toFixed(3),
-  //     // El peso neto y totales se calcularán en el procesamiento final
-  //     peso_neto: 0, // Se calculará después
-  //     total: 0 // Se calculará después
-  //   }));
-
-  //   // Agregar al historial de pesajes
-  //   setHistorialPesajes(prev => [...prev, {
-  //     ...nuevoPesajeTemporal,
-  //     fecha_hora: new Date().toLocaleString()
-  //   }]);
-
-  //   toast.success(`Pesaje agregado: ${pesoBruto.toFixed(3)} kg bruto con ${jabasIngresadas} jabas`);
-  // };
-
-  // Modificar la función aplicarPesoRealTime para incluir logs de debug
-  // const aplicarPesoRealTime = () => {
-  //   if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
-  //     toast.error('El peso no está estabilizado');
-  //     return;
-  //   }
-
-  //   if (!productoSeleccionadoPesaje) {
-  //     toast.error('Debe seleccionar un producto para el pesaje');
-  //     return;
-  //   }
-
-  //   const nuevoPesaje = {
-  //     id: Date.now(),
-  //     producto_id: productoSeleccionadoPesaje,
-  //     peso_bruto: pesajeRealTime.weight,
-  //     peso_total_jabas: pesoJaba * Math.ceil(pesajeRealTime.weight / pesoJaba),
-  //     num_jabas: Math.ceil(pesajeRealTime.weight / pesoJaba),
-  //     timestamp: new Date().toISOString(),
-  //     stable: pesajeRealTime.stable,
-  //     rawData: pesajeRealTime.rawData
-  //   };
-
-  //   console.log('Aplicando peso:', nuevoPesaje);
-  //   console.log('Pesajes temporales antes:', pesajesTemporales);
-
-  //   setPesajesTemporales(prev => {
-  //     const nuevosTemporales = [...prev, nuevoPesaje];
-  //     console.log('Pesajes temporales después:', nuevosTemporales);
-  //     return nuevosTemporales;
-  //   });
-
-  //   toast.success(`Peso aplicado: ${pesajeRealTime.weight.toFixed(3)} kg`);
-  // };
 
   const limpiarPesajesTemporales = async () => {
     if (pesajesTemporales.length === 0) {
@@ -2333,8 +2313,9 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
     const nuevoPesaje = {
       id: Date.now(),
       producto_id: productoSeleccionadoPesaje,
+      detalle_orden_id: detalleOrdenSeleccionado,
       producto_nombre:
-        productosOrden.find((p) => p.producto_id === productoSeleccionadoPesaje)?.producto_nombre ||
+        productosOrden.find((p) => p.id === detalleOrdenSeleccionado)?.producto_nombre ||
         '',
       peso_bruto: pesajeRealTime.weight,
       num_jabas: currentIngreso.num_jabas,
@@ -2671,35 +2652,32 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
         ${pesaje.peso_jaba ? `<p><strong>Peso Jaba:</strong> ${pesaje.peso_jaba.toFixed(3)} kg</p>` : ''}
 
 
-        ${
-          pesaje.observacion
-            ? `
+        ${pesaje.observacion
+          ? `
           <h5>Observaciones</h5>
           <p>${pesaje.observacion}</p>
         `
-            : ''
+          : ''
         }
 
-        ${
-          pesaje.datos_originales
-            ? `
+        ${pesaje.datos_originales
+          ? `
           <h5>Datos Originales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
             <code>${pesaje.datos_originales}</code>
           </div>
         `
-            : ''
+          : ''
         }
 
-        ${
-          pesaje.datos_hex
-            ? `
+        ${pesaje.datos_hex
+          ? `
           <h5>Datos Hexadecimales</h5>
           <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0;">
             <code>${pesaje.datos_hex}</code>
           </div>
         `
-            : ''
+          : ''
         }
       </div>
     `,
@@ -2880,6 +2858,23 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
           apellidos: ingresoDetalles.socio.apellidos,
         }
         setSocios((prevSocios) => [...prevSocios, nuevoSocio])
+      }
+
+      const ordenExistente = ordenesPendientes.find(
+        (orden) => orden.id === ingresoDetalles.detalle_orden.orden_compra_id,
+      )
+
+      if (!ordenExistente) {
+        const nuevaOrden = {
+          id: ingresoDetalles.detalle_orden.orden_compra_id,
+          codigo_lote: ingresoDetalles.detalle_orden.orden_compra.codigo_lote,
+          numero_orden: ingresoDetalles.detalle_orden.orden_compra.numero_orden,
+          cliente: ingresoDetalles.detalle_orden.orden_compra.cliente, // Asegúrate de que este campo esté disponible
+          razon_social: ingresoDetalles.detalle_orden.orden_compra.cliente?.razon_social || 'Sin Razon Social', // Agregar razon_social
+          fecha_entrega: ingresoDetalles.detalle_orden.orden_compra.fecha_entrega, // Asegúrate de que este campo esté disponible
+          // Agrega otros campos necesarios aquí
+        }
+        setOrdenesPendientes((prevOrdenes) => [...prevOrdenes, nuevaOrden])
       }
 
       // Establecer el estado con los detalles del ingreso
@@ -3515,7 +3510,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
       // Preparar datos del ingreso consolidado
       const ingresoData = {
         socio_id: parseInt(socioSeleccionado),
-        detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+        detalle_orden_id: parseInt(detalleOrdenSeleccionado),
         peso_bruto: pesoBrutoTotal,
         peso_total_jabas: pesoTotalJabas,
         num_jabas: numJabasTotal,
@@ -3579,7 +3574,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
               // observacion_pesaje: pesaje.observacion || '',
               producto_id: productoSeleccionado.producto_id,
               tipo_fruta_id: productoSeleccionado.tipo_fruta_id,
-              detalle_orden_id: parseInt(productoSeleccionadoPesaje),
+              detalle_orden_id: parseInt(detalleOrdenSeleccionado),
               rawData: (pesaje.rawData || '').toString(),
               observacion: pesaje.observacion || '',
               fecha_pesaje: pesaje.fecha_pesaje || pesaje.fecha_pesaje || pesaje.timestamp,
@@ -3686,6 +3681,9 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
   const handleCreate = () => {
     verificarEstadoBalanza()
     setEditingId(null)
+
+    cargarOrdenesPendientes()
+    cargarSocios()
     setCurrentIngreso({
       numero_ingreso: '',
       cliente_id: '',
@@ -3707,6 +3705,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
 
     setPesajesTemporales([])
     setFormErrors({})
+    cargarOrdenesPendientes()
     setShowModal(true)
   }
 
@@ -4016,11 +4015,7 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                         >
                                           A4
                                         </CDropdownItem>
-                                        <CDropdownItem
-                                          onClick={() => handleGeneratePDF(ingreso, 'a5')}
-                                        >
-                                          A5
-                                        </CDropdownItem>
+
                                         <CDropdownItem
                                           onClick={() => handleGeneratePDF(ingreso, 'ticket')}
                                         >
@@ -4417,9 +4412,9 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                             value={
                               ordenesPendientes.find((orden) => orden.id === ordenSeleccionada)
                                 ? {
-                                    value: ordenSeleccionada,
-                                    label: `${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).codigo_lote} - ${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).cliente?.razon_social}${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).fecha_entrega ? ` (${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).numero_orden})` : ''}`,
-                                  }
+                                  value: ordenSeleccionada,
+                                  label: `${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).codigo_lote} - ${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).cliente?.razon_social}${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).fecha_entrega ? ` (${ordenesPendientes.find((orden) => orden.id === ordenSeleccionada).numero_orden})` : ''}`,
+                                }
                                 : null
                             }
                             onChange={(selectedOption) => {
@@ -4530,9 +4525,9 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                           value={
                             socios.find((socio) => socio.id === socioSeleccionado)
                               ? {
-                                  value: socioSeleccionado,
-                                  label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).nombres} ${socios.find((socio) => socio.id === socioSeleccionado).apellidos}`,
-                                }
+                                value: socioSeleccionado,
+                                label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).nombres} ${socios.find((socio) => socio.id === socioSeleccionado).apellidos}`,
+                              }
                               : null
                           }
                           onChange={(selectedOption) => {
@@ -5123,8 +5118,8 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                         <small className="text-muted">
                                           {pesaje.fecha_pesaje || pesaje.timestamp
                                             ? new Date(
-                                                pesaje.fecha_pesaje || pesaje.timestamp,
-                                              ).toLocaleTimeString()
+                                              pesaje.fecha_pesaje || pesaje.timestamp,
+                                            ).toLocaleTimeString()
                                             : new Date().toLocaleTimeString()}
                                         </small>
                                       </td>
@@ -5201,8 +5196,8 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
 
                                       return (
                                         <tr
-                                          key={producto.producto_id}
-                                          className={`${isCompleto ? 'table-success' : ''} ${productoSeleccionadoPesaje === producto.producto_id ? 'table-primary' : ''}`}
+                                          key={producto.id}
+                                          className={`${isCompleto ? 'table-success' : ''} ${detalleOrdenSeleccionado === producto.id ? 'table-primary' : ''}`}
                                         >
                                           <td>
                                             <strong>{producto.producto_nombre}</strong>
@@ -5247,31 +5242,35 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                             <CButton
                                               size="sm"
                                               color={
-                                                productoSeleccionadoPesaje === producto.producto_id
+                                                detalleOrdenSeleccionado === producto.id
                                                   ? 'success'
                                                   : 'primary'
                                               }
                                               variant={
-                                                productoSeleccionadoPesaje === producto.producto_id
-                                                  ? 'solid'
+                                                detalleOrdenSeleccionado === producto.id
+                                                  ? 'outline'
                                                   : 'outline'
                                               }
                                               onClick={() => {
                                                 if (
-                                                  productoSeleccionadoPesaje ===
-                                                  producto.producto_id
+                                                  detalleOrdenSeleccionado ===
+                                                  producto.id
                                                 ) {
                                                   setProductoSeleccionadoPesaje('')
+                                                  setDetalleOrdenSeleccionado(null)
                                                 } else {
                                                   setProductoSeleccionadoPesaje(
                                                     producto.producto_id,
+                                                  )
+                                                  setDetalleOrdenSeleccionado(
+                                                    producto.id,
                                                   )
                                                 }
                                               }}
                                               disabled={isCompleto}
                                             >
-                                              {productoSeleccionadoPesaje ===
-                                              producto.producto_id ? (
+                                              {detalleOrdenSeleccionado ===
+                                                producto.id ? (
                                                 <>
                                                   <CIcon icon={cilCheckCircle} className="me-1" />
                                                   Seleccionado
@@ -5297,16 +5296,16 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                               </div>
 
                               {/* Información del producto seleccionado */}
-                              {productoSeleccionadoPesaje && (
+                              {detalleOrdenSeleccionado && (
                                 <div className="mt-3 p-3 bg-primary bg-opacity-10 border border-primary rounded">
                                   {(() => {
                                     const productoActual = productosOrden.find(
-                                      (p) => p.producto_id === productoSeleccionadoPesaje,
+                                      (p) => p.id === detalleOrdenSeleccionado,
                                     )
                                     const cantidadPendienteActualizada =
                                       calcularCantidadPendienteActualizada(productoActual)
                                     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(
-                                      productoSeleccionadoPesaje,
+                                      detalleOrdenSeleccionado,
                                     )
 
                                     return (
@@ -5672,8 +5671,8 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                                 pesoNeto *
                                                 parseFloat(
                                                   currentIngreso.precio_venta_kg ||
-                                                    precioVentaKg ||
-                                                    0,
+                                                  precioVentaKg ||
+                                                  0,
                                                 ) // Sin ${} aquí
 
                                               // ACTUALIZAR LOS ELEMENTOS DE VISTA PREVIA
@@ -5732,18 +5731,18 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                               const updatedPesajes = prev.map((p) =>
                                                 p.id === pesaje.id
                                                   ? {
-                                                      ...p,
-                                                      peso_bruto: peso,
-                                                      num_jabas: jabas,
-                                                      num_jabas_pesaje: jabas,
-                                                      peso_jaba: jabas * pesoJaba,
-                                                      descuento_merma: merma,
-                                                      peso_neto: Math.max(
-                                                        0,
-                                                        peso - jabas * pesoJaba - merma,
-                                                      ), // Calcular peso neto
-                                                      observacion: observacion,
-                                                    }
+                                                    ...p,
+                                                    peso_bruto: peso,
+                                                    num_jabas: jabas,
+                                                    num_jabas_pesaje: jabas,
+                                                    peso_jaba: jabas * pesoJaba,
+                                                    descuento_merma: merma,
+                                                    peso_neto: Math.max(
+                                                      0,
+                                                      peso - jabas * pesoJaba - merma,
+                                                    ), // Calcular peso neto
+                                                    observacion: observacion,
+                                                  }
                                                   : p,
                                               )
 
@@ -5783,8 +5782,8 @@ doc.text(socioText, centerXSocio, signatureYPos, { align: 'center' });
                                                 totalPesoNeto *
                                                 parseFloat(
                                                   currentIngreso.precio_venta_kg ||
-                                                    precioVentaKg ||
-                                                    0,
+                                                  precioVentaKg ||
+                                                  0,
                                                 )
                                               const porcentajeTransporte =
                                                 parseFloat(currentIngreso.pago_transporte || 0) /

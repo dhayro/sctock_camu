@@ -13,31 +13,58 @@ const {
 // Importar Op por separado desde Sequelize
 const { Op } = require('sequelize');
 
-async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
-  const ingresosRelacionados = await Ingreso.findAll({
-    where: { detalle_orden_id: detalleOrdenId },
-    include: [
-      {
-        model: DetallePesaje,
-        as: 'pesajes',
-        where: { estado: true },
-        required: false
-      }
-    ],
-    transaction
-  });
 
-  const totalPesoNeto = ingresosRelacionados.reduce((sum, ingresoRelacionado) => {
-    return sum + ingresoRelacionado.pesajes.reduce((pesajeSum, pesaje) => {
-      return pesajeSum + parseFloat(pesaje.peso_neto_pesaje || 0);
-    }, 0);
-  }, 0);
 
-  const detalleOrden = await DetalleOrdenCompra.findByPk(detalleOrdenId, { transaction });
-  if (detalleOrden) {
-    await detalleOrden.update({ cantidad_ingresada: totalPesoNeto }, { transaction });
-  }
+async function actualizarCantidadIngresada(detalleOrdenIds, transaction) {
+    // Asegúrate de que detalleOrdenIds es un array
+    if (!Array.isArray(detalleOrdenIds)) {
+        detalleOrdenIds = [detalleOrdenIds]; // Convertir a array si no lo es
+    }
+
+    // Procesar cada detalleOrdenId
+    await Promise.all(detalleOrdenIds.map(async (detalleOrdenId) => {
+        // Obtener todos los DetallePesaje activos asociados al mismo detalle_orden_id
+        const pesajesRelacionados = await DetallePesaje.findAll({
+            where: { detalle_orden_id: detalleOrdenId, estado: true },
+            transaction
+        });
+
+        // Recalcular la cantidad ingresada sumando todos los pesos netos de los pesajes activos
+        const totalPesoNeto = pesajesRelacionados.reduce((sum, pesaje) => {
+            return sum + parseFloat(pesaje.peso_neto || 0);
+        }, 0);
+
+        // Actualizar la cantidad ingresada en el detalle de orden
+        const detalleOrden = await DetalleOrdenCompra.findByPk(detalleOrdenId, { transaction });
+        if (detalleOrden) {
+            await detalleOrden.update({ cantidad_ingresada: totalPesoNeto }, { transaction });
+
+            // Obtener todos los detalles de la misma orden de compra
+            const detallesOrden = await DetalleOrdenCompra.findAll({
+                where: { orden_compra_id: detalleOrden.orden_compra_id },
+                transaction
+            });
+
+            // Determinar el estado general de la OrdenCompra
+            let newEstado = 'completado';
+            for (const detalle of detallesOrden) {
+                if (detalle.cantidad_ingresada === 0) {
+                    newEstado = 'pendiente';
+                    break;
+                } else if (detalle.cantidad_ingresada < detalle.cantidad) {
+                    newEstado = 'en_proceso';
+                }
+            }
+
+            // Actualizar el estado de la OrdenCompra
+            const ordenCompra = await OrdenCompra.findByPk(detalleOrden.orden_compra_id, { transaction });
+            if (ordenCompra) {
+                await ordenCompra.update({ estado: newEstado }, { transaction });
+            }
+        }
+    }));
 }
+
 
 
 // Obtener todos los ingresos con paginación y filtros
@@ -585,13 +612,16 @@ exports.deleteIngreso = async (req, res) => {
     }
 
     // Obtener el detalle de orden asociado
-    const detalleOrdenId = ingreso.detalle_orden_id;
+    const detalleOrdenId = ingreso.pesajes;
 
     // Eliminar el ingreso
     await ingreso.destroy({ transaction });
 
+    // console.log('Ingreso kong:', detalleOrdenId);
+    const detalleOrdenIds = ingreso.pesajes.map(pesaje => pesaje.detalle_orden_id);
+
     // Actualizar cantidad ingresada
-    await actualizarCantidadIngresada(detalleOrdenId, transaction);
+    await actualizarCantidadIngresada(detalleOrdenIds, transaction);
 
     await transaction.commit();
     res.json({ message: 'Ingreso eliminado exitosamente' });

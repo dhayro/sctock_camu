@@ -1,4 +1,4 @@
-const { DetallePesaje, Ingreso, DetalleOrdenCompra, Usuario, sequelize } = require('../models');
+const { DetallePesaje, Ingreso,OrdenCompra, DetalleOrdenCompra, Usuario, sequelize } = require('../models');
 
 // Obtener todos los detalles de pesaje
 exports.getAllDetallesPesaje = async (req, res) => {
@@ -129,32 +129,48 @@ exports.getDetallesPesajeByIngresoId = async (req, res) => {
 };
 
 // Función para recalcular y actualizar la cantidad ingresada
+
+// Función para recalcular y actualizar la cantidad ingresada
+
 async function actualizarCantidadIngresada(detalleOrdenId, transaction) {
   // Obtener todos los DetallePesaje activos asociados al mismo detalle_orden_id
-  const ingresosRelacionados = await Ingreso.findAll({
-    where: { detalle_orden_id: detalleOrdenId },
-    include: [
-      {
-        model: DetallePesaje,
-        as: 'pesajes',
-        where: { estado: true },
-        required: false
-      }
-    ],
+  const pesajesRelacionados = await DetallePesaje.findAll({
+    where: { detalle_orden_id: detalleOrdenId, estado: true },
     transaction
   });
 
   // Recalcular la cantidad ingresada sumando todos los pesos netos de los pesajes activos
-  const totalPesoNeto = ingresosRelacionados.reduce((sum, ingresoRelacionado) => {
-    return sum + ingresoRelacionado.pesajes.reduce((pesajeSum, pesaje) => {
-      return pesajeSum + parseFloat(pesaje.peso_neto || 0);
-    }, 0);
+  const totalPesoNeto = pesajesRelacionados.reduce((sum, pesaje) => {
+    return sum + parseFloat(pesaje.peso_neto || 0);
   }, 0);
 
   // Actualizar la cantidad ingresada en el detalle de orden
   const detalleOrden = await DetalleOrdenCompra.findByPk(detalleOrdenId, { transaction });
   if (detalleOrden) {
     await detalleOrden.update({ cantidad_ingresada: totalPesoNeto }, { transaction });
+
+    // Obtener todos los detalles de la misma orden de compra
+    const detallesOrden = await DetalleOrdenCompra.findAll({
+      where: { orden_compra_id: detalleOrden.orden_compra_id },
+      transaction
+    });
+
+    // Determinar el estado general de la OrdenCompra
+    let newEstado = 'completado';
+    for (const detalle of detallesOrden) {
+      if (detalle.cantidad_ingresada === 0) {
+        newEstado = 'pendiente';
+        break;
+      } else if (detalle.cantidad_ingresada < detalle.cantidad) {
+        newEstado = 'en_proceso';
+      }
+    }
+
+    // Actualizar el estado de la OrdenCompra
+    const ordenCompra = await OrdenCompra.findByPk(detalleOrden.orden_compra_id, { transaction });
+    if (ordenCompra) {
+      await ordenCompra.update({ estado: newEstado }, { transaction });
+    }
   }
 }
 
@@ -374,9 +390,9 @@ exports.deleteDetallesPesajeByIngresoId = async (req, res) => {
       where: { ingreso_id }
     });
 
-    if (deletedCount === 0) {
-      return res.status(404).json({ error: 'No se encontraron detalles de pesaje para eliminar' });
-    }
+    // if (deletedCount === 0) {
+    //   return res.status(404).json({ error: 'No se encontraron detalles de pesaje para eliminar' });
+    // }
 
     res.json({ message: 'Detalles de pesaje eliminados correctamente', count: deletedCount });
   } catch (error) {

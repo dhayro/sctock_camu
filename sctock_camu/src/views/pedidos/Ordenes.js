@@ -192,28 +192,28 @@ const tableSelectStyles = {
 // Función auxiliar para formatear fechas correctamente
 const formatDateForInput = (dateString) => {
     if (!dateString) return '';
-    
+
     // Si la fecha ya está en formato YYYY-MM-DD, devolverla tal como está
     if (typeof dateString === 'string' && dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
         return dateString;
     }
-    
+
     // Crear fecha local sin conversión UTC
     const date = new Date(dateString);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}`;
 };
 
 // Función auxiliar para formatear fechas para mostrar
 const formatDateForDisplay = (dateString) => {
     if (!dateString) return '';
-    
+
     // Crear fecha local sin conversión UTC
     const date = new Date(dateString + 'T00:00:00'); // Agregar tiempo para evitar conversión UTC
-    
+
     return date.toLocaleDateString('es-PE', {
         day: '2-digit',
         month: '2-digit',
@@ -290,8 +290,8 @@ const fetchDetalles = async () => {
         setCurrentOrden({
             numero_orden: '',
             cliente_id: '',
-            tipo_lote: '', 
-            tipo_pago: '', 
+            tipo_lote: '',
+            tipo_pago: '',
             fecha_emision: '',
             fecha_entrega: '',
             lugar_entrega: '',
@@ -575,6 +575,7 @@ const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete })
                         variant="outline"
                         onClick={() => onEdit(orden)}
                         title="Ver/Editar"
+                        disabled={orden.estado !== 'pendiente'} // Disable edit button if not 'pendiente'
                     >
                         <CIcon icon={cilInfo} />
                     </CButton>
@@ -583,6 +584,7 @@ const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete })
                         variant="outline"
                         onClick={() => onDelete(orden)}
                         title="Eliminar"
+                        disabled={orden.estado !== 'pendiente'} // Disable delete button if not 'pendiente'
                     >
                         <CIcon icon={cilTrash} />
                     </CButton>
@@ -999,7 +1001,7 @@ const OrdenModal = ({ visible, onClose, title, orden, errors, submitting, onChan
                                 <CCol lg={6}>
                                     <div className="mb-3">
                                         <label className="form-label fw-semibold">
-                                            Número de Orden 
+                                            Número de Orden
                                         </label>
                                         <div style={customStyles.inputContainer}>
                                             <CFormInput
@@ -1550,23 +1552,23 @@ const Ordenes = () => {
 
     const validateForm = () => {
         const errors = {};
-        
+
         if (!currentOrden.cliente_id) {
             errors.cliente_id = 'El cliente es obligatorio';
         }
-        
+
         if (!currentOrden.tipo_lote) {
             errors.tipo_lote = 'El tipo de lote es obligatorio';
         }
-        
+
         if (!currentOrden.tipo_pago) {
             errors.tipo_pago = 'El tipo de pago es obligatorio';
         }
-        
+
         if (!currentOrden.fecha_emision) {
             errors.fecha_emision = 'La fecha de emisión es obligatoria';
         }
-        
+
         return errors;
     };
 
