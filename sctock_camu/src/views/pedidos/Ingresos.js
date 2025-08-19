@@ -107,6 +107,7 @@ const modalStyles = {
 }
 
 const Ingresos = () => {
+
   const [expandedRow, setExpandedRow] = useState(null)
   const { user } = useContext(UserContext) // Obtener el usuario del contexto
   const toggleRow = (id) => {
@@ -178,6 +179,9 @@ const Ingresos = () => {
 
   const [pdfData, setPdfData] = useState(null)
   const [showPdfModal, setShowPdfModal] = useState(false)
+
+  const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0);
+
 
   const drawTable = (doc, tableData, startY, format) => {
     const cellPadding = 2 // Padding inside each cell
@@ -1129,6 +1133,9 @@ const Ingresos = () => {
           setDetalleOrdenSeleccionado(ingreso.detalle_orden.id)
         }
 
+        const pesoNeto = calcularPesoNetoIngresadoPorProducto(ingreso.detalle_orden.id);
+        setPesoNetoIngresadotemporal(pesoNeto);
+
         setPesajesTemporales((prev) => {
           const nuevosTemporales = [...prev]
 
@@ -1891,25 +1898,37 @@ const Ingresos = () => {
       }, 0)
   }
 
+  
+
   function calcularCantidadPendienteActualizada(producto, isEditing = false) {
+    // Verifica si el producto es válido y tiene una cantidad definida
     if (!producto || typeof producto.cantidad === 'undefined') {
-        console.error('Invalid producto:', producto);
-        return 0; // or some default value
+        console.error('Producto inválido:', producto);
+        return 0; // Devuelve 0 o un valor por defecto si el producto no es válido
     }
+
+    const valpesoNetoIngresadotemporal=isEditing ? pesoNetoIngresadotemporal :0;
+
+    // Obtiene la cantidad total del producto
     const cantidadTotal = producto.cantidad || 0;
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
+    // Obtiene la cantidad ingresada originalmente
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada-valpesoNetoIngresadotemporal || 0;
+    // Calcula el peso neto ingresado usando los pesajes temporales
     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
 
-    // If editing, do not add the net weight again
-    const cantidadIngresadaTotal = isEditing ? cantidadIngresadaOriginal : cantidadIngresadaOriginal + pesoNetoIngresado;
+    // Si se está editando, no se suma el peso neto nuevamente
+    const cantidadIngresadaTotal =  cantidadIngresadaOriginal + pesoNetoIngresado;
 
-    // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
+    // Calcula la cantidad pendiente restando la cantidad ingresada total de la cantidad total
     return Math.max(0, cantidadTotal - cantidadIngresadaTotal);
 }
 
-  const calcularProgresoActualizado = (producto) => {
+  const calcularProgresoActualizado = (producto,isEditing = false) => {
     const cantidadTotal = producto.cantidad || 0
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
+    const valpesoNetoIngresadotemporal=isEditing ? pesoNetoIngresadotemporal :0;
+
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada - valpesoNetoIngresadotemporal|| 0
+
     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
     const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
 
@@ -2898,6 +2917,8 @@ const Ingresos = () => {
       // Establecer los valores seleccionados para los selectores
       setSocioSeleccionado(ingresoDetalles.socio_id)
       setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id)
+
+      
 
       // Limpiar errores del formulario
       setFormErrors({})
@@ -5193,7 +5214,7 @@ const Ingresos = () => {
                                       const cantidadPendienteActualizada =
                                         calcularCantidadPendienteActualizada(producto, editingId !== null)
                                       const progresoActualizado =
-                                        calcularProgresoActualizado(producto)
+                                        calcularProgresoActualizado(producto,editingId !== null)
                                       const isCompleto = cantidadPendienteActualizada <= 0
 
                                       return (
@@ -5230,13 +5251,13 @@ const Ingresos = () => {
                                             <div className="d-flex align-items-center">
                                               <div className="flex-grow-1 me-2">
                                                 <CProgress
-                                                  value={calcularProgresoActualizado(producto)}
+                                                  value={calcularProgresoActualizado(producto,editingId !== null)}
                                                   color={isCompleto ? 'success' : 'primary'}
                                                   className="mb-1"
                                                 />
                                               </div>
                                               <small className="text-muted">
-                                                {calcularProgresoActualizado(producto).toFixed(1)}%
+                                                {calcularProgresoActualizado(producto,editingId !== null).toFixed(1)}%
                                               </small>
                                             </div>
                                           </td>
