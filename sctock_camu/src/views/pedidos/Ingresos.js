@@ -803,7 +803,7 @@ const Ingresos = () => {
         // Inicializar cantidades pendientes (toda la cantidad está pendiente inicialmente)
         const cantidadesPendientes = {}
         productosFormateados.forEach((producto) => {
-          cantidadesPendientes[producto.producto_id] = producto.cantidad
+          cantidadesPendientes[producto.id] = producto.cantidad
         })
         setCantidadPendientePorProducto(cantidadesPendientes)
 
@@ -1846,7 +1846,7 @@ const Ingresos = () => {
     )
     const totalJabas = pesajesActualizados.reduce((sum, p) => sum + (parseInt(p.num_jabas) || 0), 0)
     const totalPesoJabas = pesajesActualizados.reduce(
-      (sum, p) => sum + (parseFloat(p.peso_jabas) || parseFloat(p.peso_total_jabas) || 0),
+      (sum, p) => sum + (parseFloat(p.peso_jaba) || parseFloat(p.peso_total_jabas) || 0),
       0,
     ) //kong
 
@@ -1882,28 +1882,30 @@ const Ingresos = () => {
   // Asegúrate de que estas funciones estén definidas ANTES del return del componente
   const calcularPesoNetoIngresadoPorProducto = (productoId) => {
     return pesajesTemporales
-      .filter((pesaje) => pesaje.id === productoId)
+      .filter((pesaje) => pesaje.detalle_orden_id === productoId)
       .reduce((sum, pesaje) => {
         const pesoNeto =
           parseFloat(pesaje.peso_bruto || 0) -
-          parseFloat(pesaje.peso_jabas || parseFloat(pesaje.peso_total_jabas) || 0)
+          parseFloat(pesaje.peso_jaba || parseFloat(pesaje.peso_total_jabas) || 0)
         return sum + pesoNeto
       }, 0)
   }
 
-  function calcularCantidadPendienteActualizada(producto) {
+  function calcularCantidadPendienteActualizada(producto, isEditing = false) {
     if (!producto || typeof producto.cantidad === 'undefined') {
-      console.error('Invalid producto:', producto)
-      return 0 // or some default value
+        console.error('Invalid producto:', producto);
+        return 0; // or some default value
     }
-    const cantidadTotal = producto.cantidad || 0
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
-    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
+    const cantidadTotal = producto.cantidad || 0;
+    const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0;
+    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
+
+    // If editing, do not add the net weight again
+    const cantidadIngresadaTotal = isEditing ? cantidadIngresadaOriginal : cantidadIngresadaOriginal + pesoNetoIngresado;
 
     // Calcular la cantidad pendiente restando la cantidad ingresada total de la cantidad total
-    return Math.max(0, cantidadTotal - cantidadIngresadaTotal)
-  }
+    return Math.max(0, cantidadTotal - cantidadIngresadaTotal);
+}
 
   const calcularProgresoActualizado = (producto) => {
     const cantidadTotal = producto.cantidad || 0
@@ -2302,7 +2304,7 @@ const Ingresos = () => {
     }
 
     // Verificar que no exceda la cantidad pendiente
-    const cantidadPendiente = cantidadPendientePorProducto[productoSeleccionadoPesaje] || 0
+    const cantidadPendiente = cantidadPendientePorProducto[detalleOrdenSeleccionado] || 0
     if (pesoNeto > cantidadPendiente) {
       toast.error(
         `El peso neto (${pesoNeto.toFixed(3)} kg) excede la cantidad pendiente (${cantidadPendiente.toFixed(3)} kg)`,
@@ -2332,7 +2334,7 @@ const Ingresos = () => {
     setPesajesTemporales((prev) => [...prev, nuevoPesaje])
 
     // Actualizar progreso del producto
-    actualizarProgresoProducto(productoSeleccionadoPesaje, pesoNeto)
+    actualizarProgresoProducto(detalleOrdenSeleccionado, pesoNeto)
 
     // Limpiar formulario
     setCurrentIngreso((prev) => ({
@@ -3454,7 +3456,7 @@ const Ingresos = () => {
 
       // Obtener el producto seleccionado para obtener sus datos
       const productoSeleccionado = productosOrden.find(
-        (p) => p.producto_id === parseInt(productoSeleccionadoPesaje),
+        (p) => p.id === parseInt(detalleOrdenSeleccionado),
       )
 
       if (!productoSeleccionado) {
@@ -5189,7 +5191,7 @@ const Ingresos = () => {
                                         return null // or handle the error appropriately
                                       }
                                       const cantidadPendienteActualizada =
-                                        calcularCantidadPendienteActualizada(producto)
+                                        calcularCantidadPendienteActualizada(producto, editingId !== null)
                                       const progresoActualizado =
                                         calcularProgresoActualizado(producto)
                                       const isCompleto = cantidadPendienteActualizada <= 0
@@ -5303,7 +5305,7 @@ const Ingresos = () => {
                                       (p) => p.id === detalleOrdenSeleccionado,
                                     )
                                     const cantidadPendienteActualizada =
-                                      calcularCantidadPendienteActualizada(productoActual)
+                                      calcularCantidadPendienteActualizada(productoActual, editingId !== null)
                                     const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(
                                       detalleOrdenSeleccionado,
                                     )
