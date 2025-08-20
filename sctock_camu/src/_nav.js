@@ -20,6 +20,7 @@ import {
   cilTruck,
   cilClipboard,
   cilLockLocked,
+  cilSearch,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -113,7 +114,7 @@ const _nav = [
       {
         component: CNavItem,
         name: 'Clientes',
-        to: '/clientes', // Ensure this matches your route for managing clients
+        to: '/clientes',
       },
     ],
   },
@@ -134,9 +135,25 @@ const _nav = [
         to: '/pedidos/ingresos',
       }
     ],
+  },
+  {
+    component: CNavGroup,
+    name: 'Consultas',
+    to: '/consultas',
+    icon: <CIcon icon={cilSearch} customClassName="nav-icon" />,
+    items: [
+      {
+        component: CNavItem,
+        name: 'Consulta de Socios',
+        to: '/consultas/socios',
+      },
+      {
+        component: CNavItem,
+        name: 'Consulta de Clientes',
+        to: '/consultas/clientes',
+      }
+    ],
   }
-  
-  
 ]
 
 export default _nav

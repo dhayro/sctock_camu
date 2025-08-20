@@ -1,6 +1,7 @@
 
-const { Cliente, PedidoLote, Salida } = require('../models');
+const { Cliente, OrdenCompra, DetalleOrdenCompra, Producto, TipoFruta, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const moment = require('moment-timezone'); // Import moment-timezone
 
 // Obtener todos los clientes con paginación y filtros
 exports.getAllClientes = async (req, res) => {
@@ -134,17 +135,6 @@ exports.deleteCliente = async (req, res) => {
       return res.status(404).json({ error: 'Cliente no encontrado' });
     }
     
-    // Verificar si hay relaciones con otros modelos antes de eliminar
-    const pedidosCount = await PedidoLote.count({ where: { cliente_id: id } });
-    const salidasCount = await Salida.count({ where: { cliente_id: id } });
-    
-    if (pedidosCount > 0 || salidasCount > 0) {
-      return res.status(400).json({ 
-        error: 'No se puede eliminar este cliente porque está siendo utilizado',
-        details: `Tiene ${pedidosCount} pedidos y ${salidasCount} salidas asociados`
-      });
-    }
-    
     await cliente.destroy();
     
     res.json({ message: 'Cliente eliminado correctamente' });
@@ -206,6 +196,101 @@ exports.searchClientes = async (req, res) => {
   } catch (error) {
     console.error('Error al buscar clientes:', error);
     res.status(500).json({ error: 'Error al buscar clientes', details: error.message });
+  }
+};
+
+// Obtener clientes y conteo de órdenes en un rango de fechas
+exports.obtenerClientesConConteoDeOrdenes = async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    if (!fecha_inicio || !fecha_fin) {
+      return res.status(400).json({ error: 'Se requieren las fechas de inicio y fin' });
+    }
+
+    const dateRangeFilter = {
+      fecha_emision: {
+        [Op.between]: [new Date(fecha_inicio), new Date(fecha_fin)]
+      }
+    };
+
+    const clientes = await Cliente.findAll({
+      include: [{
+        model: OrdenCompra,
+        as: 'ordenes',
+        attributes: [],
+        where: dateRangeFilter,
+        required: false
+      }],
+      attributes: {
+        include: [
+          [sequelize.fn('COUNT', sequelize.col('ordenes.id')), 'orderCount']
+        ]
+      },
+      group: ['Cliente.id'],
+      order: [['razon_social', 'ASC']]
+    });
+
+    res.json(clientes);
+  } catch (error) {
+    console.error('Error al obtener clientes con conteo de órdenes:', error);
+    res.status(500).json({ error: 'Error al obtener clientes con conteo de órdenes', details: error.message });
+  }
+};
+
+// Obtener clientes con órdenes y detalles en un rango de fechas
+// Obtener clientes con órdenes y detalles en un rango de fechas
+exports.obtenerClientesConOrdenesYDetalles = async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    if (!fecha_inicio || !fecha_fin) {
+      return res.status(400).json({ error: 'Se requieren las fechas de inicio y fin' });
+    }
+
+    // Use moment-timezone to parse the dates and set the desired timezone
+    const startDate = moment.tz(fecha_inicio, 'YYYY-MM-DD', 'America/Lima').startOf('day').toDate();
+    const endDate = moment.tz(fecha_fin, 'YYYY-MM-DD', 'America/Lima').endOf('day').toDate();
+
+    const dateRangeFilter = {
+      fecha_emision: {
+        [Op.between]: [startDate, endDate]
+      }
+    };
+
+    const clientes = await Cliente.findAll({
+      include: [{
+        model: OrdenCompra,
+        as: 'ordenes',
+        where: dateRangeFilter,
+        required: false,
+        include: [
+          {
+            model: DetalleOrdenCompra,
+            as: 'detalles',
+            required: false,
+            include: [
+              {
+                model: Producto,
+                as: 'producto',
+                attributes: ['id', 'nombre']
+              },
+              {
+                model: TipoFruta,
+                as: 'tipo_fruta',
+                attributes: ['id', 'nombre']
+              }
+            ]
+          }
+        ]
+      }],
+      order: [['razon_social', 'ASC']]
+    });
+
+    res.json(clientes);
+  } catch (error) {
+    console.error('Error al obtener clientes con órdenes y detalles:', error);
+    res.status(500).json({ error: 'Error al obtener clientes con órdenes y detalles', details: error.message });
   }
 };
 

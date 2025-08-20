@@ -1127,7 +1127,10 @@ const Ingresos = () => {
       try {
         const pesajes = await obtenerPesajesTemporales(ingreso.id)
         setPesajesTemporales(pesajes)
-        setPesoNetoIngresadotemporal(pesajes.peso_neto)
+        const totalPesoNeto = pesajes.reduce((sum, pesaje) => {
+          return sum + (parseFloat(pesaje.peso_neto) || 0);
+        }, 0);
+        setPesoNetoIngresadotemporal(totalPesoNeto)
 
         if (ingreso.detalle_orden.producto_id) {
           setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id)

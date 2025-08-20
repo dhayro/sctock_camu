@@ -26,6 +26,12 @@ const Clientes = React.lazy(() => import('./views/clientes/index'))
 const Orden = React.lazy(() => import('./views/pedidos/Ordenes'))
 const Ingreso = React.lazy(() => import('./views/pedidos/Ingresos'))
 
+// Import the ConsultaSocios component
+const ConsultaSocios = React.lazy(() => import('./views/consultas/ConsultaSocios'))
+
+// Import the ConsultaClientes component
+const ConsultaClientes = React.lazy(() => import('./views/consultas/ConsultaClientes'))
+
 // Base
 const Accordion = React.lazy(() => import('./views/base/accordion/Accordion'))
 const Breadcrumbs = React.lazy(() => import('./views/base/breadcrumbs/Breadcrumbs'))
@@ -102,6 +108,12 @@ const routes = [
   { path: '/clientes', name: 'Clientes', element: Clientes },
   { path: '/pedidos/ordenes-compra', name: 'Orden', element: Orden },
   { path: '/pedidos/ingresos', name: 'Ingreso', element: Ingreso },
+
+  // Add the route for Consulta de Socios
+  { path: '/consultas/socios', name: 'Consulta de Socios', element: ConsultaSocios },
+
+  // Add the route for Consulta de Clientes
+  { path: '/consultas/clientes', name: 'Consulta de Clientes', element: ConsultaClientes },
 
   { path: '/base', name: 'Base', element: Cards, exact: true },
   { path: '/base/accordion', name: 'Accordion', element: Accordion },

@@ -1,5 +1,6 @@
-const { Socio } = require('../models');
+const { Socio, Ingreso, DetalleOrdenCompra, OrdenCompra, Producto, TipoFruta, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const moment = require('moment-timezone');
 
 // Helper function to capitalize the first letter of each word
 const capitalize = (str) => {
@@ -192,5 +193,63 @@ exports.deleteSocio = async (req, res) => {
   } catch (error) {
     console.error('Error al eliminar socio:', error);
     res.status(500).json({ error: 'Error al eliminar socio', details: error.message });
+  }
+};
+
+// Obtener contribuciones de socios por fecha
+exports.getSociosContribucionPorFecha = async (req, res) => {
+  try {
+    const { fechaInicio, fechaFin } = req.query;
+
+    if (!fechaInicio || !fechaFin) {
+      return res.status(400).json({ error: 'Se requieren fechas de inicio y fin' });
+    }
+
+    // Convertir fechas a UTC
+    const fechaInicioUTC = moment.tz(fechaInicio, 'YYYY-MM-DD', 'America/Lima').startOf('day').utc().toDate();
+    const fechaFinUTC = moment.tz(fechaFin, 'YYYY-MM-DD', 'America/Lima').endOf('day').utc().toDate();
+
+    // Consultar los ingresos de socios en el rango de fechas
+    const sociosContribuciones = await Ingreso.findAll({
+      where: {
+        fecha: {
+          [Op.between]: [fechaInicioUTC, fechaFinUTC]
+        }
+      },
+      include: [
+        {
+          model: Socio,
+          as: 'socio',
+          attributes: ['id', 'nombres', 'apellidos', 'codigo']
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalle_orden',
+          include: [
+            {
+              model: OrdenCompra,
+              as: 'orden_compra',
+              attributes: ['id', 'codigo_lote', 'numero_orden']
+            },
+            {
+              model: Producto,
+              as: 'producto',
+              attributes: ['id', 'nombre']
+            },
+            {
+              model: TipoFruta,
+              as: 'tipo_fruta',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        }
+      ],
+      order: [['fecha', 'ASC']]
+    });
+
+    res.json(sociosContribuciones);
+  } catch (error) {
+    console.error('Error al obtener contribuciones de socios:', error);
+    res.status(500).json({ error: 'Error al obtener contribuciones de socios', details: error.message });
   }
 };

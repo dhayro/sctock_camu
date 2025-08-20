@@ -47,6 +47,12 @@ const router = express.Router();
 // Aplicar middleware de autenticación a todas las rutas
 router.use(verifyToken);
 
+router.get('/clientes-con-ordenes', clienteController.obtenerClientesConConteoDeOrdenes);
+
+router.get('/clientes-con-ordenes-detalles', clienteController.obtenerClientesConOrdenesYDetalles);
+
+
+
 /**
  * @swagger
  * /api/clientes:

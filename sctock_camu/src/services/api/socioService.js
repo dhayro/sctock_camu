@@ -55,10 +55,24 @@ export const deleteSocio = async (id) => {
   }
 };
 
+// Obtener contribuciones de socios por rango de fechas
+export const getSociosContribucionPorFecha = async (fechaInicio, fechaFin) => {
+  try {
+    const response = await api.get('/socios/contribuciones', {
+      params: { fechaInicio, fechaFin }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener contribuciones de socios:', error);
+    throw error;
+  }
+};
+
 export default {
   getAllSocios,
   getSocioById,
   createSocio,
   updateSocio,
-  deleteSocio
+  deleteSocio,
+  getSociosContribucionPorFecha
 };

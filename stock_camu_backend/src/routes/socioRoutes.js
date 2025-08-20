@@ -60,6 +60,38 @@ const router = express.Router();
 // Aplicar middleware de autenticación a todas las rutas
 router.use(verifyToken);
 
+
+/**
+ * @swagger
+ * /api/socios/contribuciones:
+ *   get:
+ *     summary: Obtiene contribuciones de socios por rango de fechas
+ *     tags: [Socios]
+ *     parameters:
+ *       - in: query
+ *         name: fechaInicio
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: Fecha de inicio en formato YYYY-MM-DD
+ *       - in: query
+ *         name: fechaFin
+ *         schema:
+ *           type: string
+ *           format: date
+ *         required: true
+ *         description: Fecha de fin en formato YYYY-MM-DD
+ *     responses:
+ *       200:
+ *         description: Lista de contribuciones de socios
+ *       400:
+ *         description: Error en los parámetros de entrada
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/contribuciones', socioController.getSociosContribucionPorFecha);
+
 /**
  * @swagger
  * /api/socios:
@@ -367,5 +399,6 @@ router.put('/:id', socioController.updateSocio);
  *                   type: string
  */
 router.delete('/:id', socioController.deleteSocio);
+
 
 module.exports = router;

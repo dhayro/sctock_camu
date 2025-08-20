@@ -1,3 +1,4 @@
+
 import api from '../api'; // Ensure this is the correct path to your Axios instance
 
 // Obtener todos los clientes con paginación y filtros
@@ -55,10 +56,34 @@ export const deleteCliente = async (id) => {
   }
 };
 
+// Obtener clientes con conteo de órdenes en un rango de fechas
+export const obtenerClientesConConteoDeOrdenes = async (params) => {
+  try {
+    const response = await api.get('/clientes/clientes-con-ordenes', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener clientes con conteo de órdenes:', error);
+    throw error;
+  }
+};
+
+// Obtener clientes con órdenes y detalles, incluyendo el conteo de ingresos
+export const obtenerClientesConOrdenesYDetalles = async (params) => {
+  try {
+    const response = await api.get('/clientes/clientes-con-ordenes-detalles', { params });
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener clientes con órdenes y detalles:', error);
+    throw error;
+  }
+};
+
 export default {
   getAllClientes,
   getClienteById,
   createCliente,
   updateCliente,
-  deleteCliente
+  deleteCliente,
+  obtenerClientesConConteoDeOrdenes,
+  obtenerClientesConOrdenesYDetalles
 };
