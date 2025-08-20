@@ -404,7 +404,7 @@ const Ingresos = () => {
           parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
           (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
           (parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
-          (ingreso.aplicarPrecioJaba ? numJabasTotal * 1.0 : 0)
+          (ingreso.aplicarPrecioJaba ? pesaje.num_jabas_pesaje * 1.0 : 0)
         ).toFixed(2),
         pesaje.observacion || '',
       ])
