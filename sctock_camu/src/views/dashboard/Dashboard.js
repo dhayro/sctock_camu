@@ -88,7 +88,7 @@ const Dashboard = () => {
                         className="mt-2"
                       />
                       <span className={`ms-2 text-${colorProgreso}`}>
-                        {porcentajeProgreso.toFixed(2)}%
+                        {porcentajeProgreso.toFixed(2)}% ({(detalle.cantidad - detalle.cantidad_ingresada).toFixed(2)} restantes)
                       </span>
                     </div>
                   )

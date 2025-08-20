@@ -107,7 +107,6 @@ const modalStyles = {
 }
 
 const Ingresos = () => {
-
   const [expandedRow, setExpandedRow] = useState(null)
   const { user } = useContext(UserContext) // Obtener el usuario del contexto
   const toggleRow = (id) => {
@@ -180,8 +179,7 @@ const Ingresos = () => {
   const [pdfData, setPdfData] = useState(null)
   const [showPdfModal, setShowPdfModal] = useState(false)
 
-  const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0);
-
+  const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0)
 
   const drawTable = (doc, tableData, startY, format) => {
     const cellPadding = 2 // Padding inside each cell
@@ -714,12 +712,14 @@ const Ingresos = () => {
 
   const [productosOrden, setProductosOrden] = useState([])
   const [productoSeleccionadoPesaje, setProductoSeleccionadoPesaje] = useState('')
-  const [detalleOrdenSeleccionado, setDetalleOrdenSeleccionado] = useState(null);
+  const [detalleOrdenSeleccionado, setDetalleOrdenSeleccionado] = useState(null)
 
   const [cantidadPendientePorProducto, setCantidadPendientePorProducto] = useState({})
   const [cargandoProductosOrden, setCargandoProductosOrden] = useState(false)
 
-  const [pesajesTemporales, setPesajesTemporales] = useState([]) // Lista de pesajes temporales del producto activo
+  const [pesajesTemporales, setPesajesTemporales] = useState([])
+
+
 
   const agregarPesajeTemporal = () => {
     if (!productoSeleccionadoPesaje) {
@@ -1127,14 +1127,14 @@ const Ingresos = () => {
       try {
         const pesajes = await obtenerPesajesTemporales(ingreso.id)
         setPesajesTemporales(pesajes)
+        setPesoNetoIngresadotemporal(pesajes.peso_neto)
 
         if (ingreso.detalle_orden.producto_id) {
           setProductoSeleccionadoPesaje(ingreso.detalle_orden.producto_id)
           setDetalleOrdenSeleccionado(ingreso.detalle_orden.id)
         }
 
-        const pesoNeto = calcularPesoNetoIngresadoPorProducto(ingreso.detalle_orden.id);
-        setPesoNetoIngresadotemporal(pesoNeto);
+        
 
         setPesajesTemporales((prev) => {
           const nuevosTemporales = [...prev]
@@ -1886,54 +1886,91 @@ const Ingresos = () => {
     }
   }, [pesajesTemporales])
 
-  // Asegúrate de que estas funciones estén definidas ANTES del return del componente
-  const calcularPesoNetoIngresadoPorProducto = (productoId) => {
-    return pesajesTemporales
-      .filter((pesaje) => pesaje.detalle_orden_id === productoId)
-      .reduce((sum, pesaje) => {
-        const pesoNeto =
-          parseFloat(pesaje.peso_bruto || 0) -
-          parseFloat(pesaje.peso_jaba || parseFloat(pesaje.peso_total_jabas) || 0)
-        return sum + pesoNeto
-      }, 0)
-  }
-
   
 
-  function calcularCantidadPendienteActualizada(producto, isEditing = false) {
-    // Verifica si el producto es válido y tiene una cantidad definida
-    if (!producto || typeof producto.cantidad === 'undefined') {
-        console.error('Producto inválido:', producto);
-        return 0; // Devuelve 0 o un valor por defecto si el producto no es válido
-    }
-
-    const valpesoNetoIngresadotemporal=isEditing ? pesoNetoIngresadotemporal :0;
-
-    // Obtiene la cantidad total del producto
-    const cantidadTotal = producto.cantidad || 0;
-    // Obtiene la cantidad ingresada originalmente
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada-valpesoNetoIngresadotemporal || 0;
-    // Calcula el peso neto ingresado usando los pesajes temporales
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id);
-
-    // Si se está editando, no se suma el peso neto nuevamente
-    const cantidadIngresadaTotal =  cantidadIngresadaOriginal + pesoNetoIngresado;
-
-    // Calcula la cantidad pendiente restando la cantidad ingresada total de la cantidad total
-    return Math.max(0, cantidadTotal - cantidadIngresadaTotal);
-}
-
-  const calcularProgresoActualizado = (producto,isEditing = false) => {
-    const cantidadTotal = producto.cantidad || 0
-    const valpesoNetoIngresadotemporal=isEditing ? pesoNetoIngresadotemporal :0;
-
-    const cantidadIngresadaOriginal = producto.cantidad_ingresada - valpesoNetoIngresadotemporal|| 0
-
-    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
-    const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
-
-    return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0
+  // Asegúrate de que estas funciones estén definidas ANTES del return del componente
+ const calcularPesoNetoIngresadoPorProducto = (productoId) => {
+  if (pesajesTemporales.length === 0) {
+    return 0; // Return 0 if there are no pesajesTemporales
   }
+
+  const filteredPesajes = pesajesTemporales.filter(
+    (pesaje) => pesaje.detalle_orden_id === productoId,
+  );
+
+  const totalPesoNeto = filteredPesajes.reduce((sum, pesaje) => {
+    return sum + parseFloat(pesaje.peso_neto || 0);
+  }, 0);
+
+  return totalPesoNeto;
+};
+
+  function calcularCantidadPendienteActualizada(producto, editingId) {
+
+    if (detalleOrdenSeleccionado === producto.id) {
+      const valpesoNetoIngresadotemporal = editingId ? pesoNetoIngresadotemporal : 0
+
+      // Obtiene la cantidad total del producto
+      const cantidadTotal = producto.cantidad || 0
+      // Obtiene la cantidad ingresada originalmente
+      const cantidadIngresadaOriginal =
+        producto.cantidad_ingresada - valpesoNetoIngresadotemporal || 0
+      console.log(
+        `Cantidad ingresada original dhayro1: ${cantidadIngresadaOriginal}, peso neto ingresado: ${valpesoNetoIngresadotemporal}`,
+      )
+      // Calcula el peso neto ingresado usando los pesajes temporales
+      const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
+      console.log(`Peso neto ingresadodhayro2: ${pesoNetoIngresado}`)
+
+      // Si se está editando, no se suma el peso neto nuevamente
+      const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
+
+      // Calcula la cantidad pendiente restando la cantidad ingresada total de la cantidad total
+      return Math.max(0, cantidadTotal - cantidadIngresadaTotal)
+    } else {
+      // Obtiene la cantidad total del producto
+      const cantidadTotal = producto.cantidad || 0
+      // Obtiene la cantidad ingresada originalmente
+      const cantidadIngresadaOriginal = producto.cantidad_ingresada || 0
+      // Calcula el peso neto ingresado usando los pesajes temporales
+      const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
+
+      // Si se está editando, no se suma el peso neto nuevamente
+      const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
+
+      // Calcula la cantidad pendiente restando la cantidad ingresada total de la cantidad total
+      return Math.max(0, cantidadTotal - cantidadIngresadaTotal)
+    }
+  }
+
+  const calcularProgresoActualizado = (producto, editingId) => {
+    if (detalleOrdenSeleccionado === producto.id) {
+      const cantidadTotal = producto.cantidad || 0
+      const valpesoNetoIngresadotemporal = editingId ? pesoNetoIngresadotemporal : 0
+
+      const cantidadIngresadaOriginal =
+        producto.cantidad_ingresada - valpesoNetoIngresadotemporal || 0
+
+      const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
+      const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
+
+      return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0
+    } else {
+
+      const cantidadTotal = producto.cantidad || 0
+
+      const cantidadIngresadaOriginal =
+        producto.cantidad_ingresada || 0
+
+      const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(producto.id)
+      const cantidadIngresadaTotal = cantidadIngresadaOriginal + pesoNetoIngresado
+
+      return cantidadTotal > 0 ? (cantidadIngresadaTotal / cantidadTotal) * 100 : 0
+
+    }
+  }
+
+
 
   const aplicarPesoRealTime = async () => {
     if (!pesajeRealTime.stable || !pesajeRealTime.weight) {
@@ -2081,9 +2118,7 @@ const Ingresos = () => {
     const pesoNeto = pesoBruto - pesoTotalJabas - descuentoMerma
 
     // Buscar el producto seleccionado en la lista de productos de la orden
-    const productoOrden = productosOrden.find(
-      (p) => p.id === parseInt(detalleOrdenSeleccionado),
-    )
+    const productoOrden = productosOrden.find((p) => p.id === parseInt(detalleOrdenSeleccionado))
     if (!productoOrden) {
       toast.error('No se encontró el producto seleccionado en la orden')
       return
@@ -2336,8 +2371,7 @@ const Ingresos = () => {
       producto_id: productoSeleccionadoPesaje,
       detalle_orden_id: detalleOrdenSeleccionado,
       producto_nombre:
-        productosOrden.find((p) => p.id === detalleOrdenSeleccionado)?.producto_nombre ||
-        '',
+        productosOrden.find((p) => p.id === detalleOrdenSeleccionado)?.producto_nombre || '',
       peso_bruto: pesajeRealTime.weight,
       num_jabas: currentIngreso.num_jabas,
       impuesto: currentIngreso.impuesto,
@@ -2862,6 +2896,8 @@ const Ingresos = () => {
       // Cargar los detalles del ingreso desde el servicio
       const ingresoDetalles = await ingresoService.getById(ingreso.id)
 
+      
+
       // Asegúrate de que los datos de socios y órdenes estén cargados
       if (socios.length === 0) {
         await cargarSocios()
@@ -2891,7 +2927,8 @@ const Ingresos = () => {
           codigo_lote: ingresoDetalles.detalle_orden.orden_compra.codigo_lote,
           numero_orden: ingresoDetalles.detalle_orden.orden_compra.numero_orden,
           cliente: ingresoDetalles.detalle_orden.orden_compra.cliente, // Asegúrate de que este campo esté disponible
-          razon_social: ingresoDetalles.detalle_orden.orden_compra.cliente?.razon_social || 'Sin Razon Social', // Agregar razon_social
+          razon_social:
+            ingresoDetalles.detalle_orden.orden_compra.cliente?.razon_social || 'Sin Razon Social', // Agregar razon_social
           fecha_entrega: ingresoDetalles.detalle_orden.orden_compra.fecha_entrega, // Asegúrate de que este campo esté disponible
           // Agrega otros campos necesarios aquí
         }
@@ -2917,8 +2954,6 @@ const Ingresos = () => {
       // Establecer los valores seleccionados para los selectores
       setSocioSeleccionado(ingresoDetalles.socio_id)
       setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id)
-
-      
 
       // Limpiar errores del formulario
       setFormErrors({})
@@ -5212,9 +5247,11 @@ const Ingresos = () => {
                                         return null // or handle the error appropriately
                                       }
                                       const cantidadPendienteActualizada =
-                                        calcularCantidadPendienteActualizada(producto, editingId !== null)
-                                      const progresoActualizado =
-                                        calcularProgresoActualizado(producto,editingId !== null)
+                                        calcularCantidadPendienteActualizada(producto, editingId)
+                                      const progresoActualizado = calcularProgresoActualizado(
+                                        producto,
+                                        editingId,
+                                      )
                                       const isCompleto = cantidadPendienteActualizada <= 0
 
                                       return (
@@ -5251,13 +5288,20 @@ const Ingresos = () => {
                                             <div className="d-flex align-items-center">
                                               <div className="flex-grow-1 me-2">
                                                 <CProgress
-                                                  value={calcularProgresoActualizado(producto,editingId !== null)}
+                                                  value={calcularProgresoActualizado(
+                                                    producto,
+                                                    editingId,
+                                                  )}
                                                   color={isCompleto ? 'success' : 'primary'}
                                                   className="mb-1"
                                                 />
                                               </div>
                                               <small className="text-muted">
-                                                {calcularProgresoActualizado(producto,editingId !== null).toFixed(1)}%
+                                                {calcularProgresoActualizado(
+                                                  producto,
+                                                  editingId,
+                                                ).toFixed(1)}
+                                                %
                                               </small>
                                             </div>
                                           </td>
@@ -5275,25 +5319,19 @@ const Ingresos = () => {
                                                   : 'outline'
                                               }
                                               onClick={() => {
-                                                if (
-                                                  detalleOrdenSeleccionado ===
-                                                  producto.id
-                                                ) {
+                                                if (detalleOrdenSeleccionado === producto.id) {
                                                   setProductoSeleccionadoPesaje('')
                                                   setDetalleOrdenSeleccionado(null)
                                                 } else {
                                                   setProductoSeleccionadoPesaje(
                                                     producto.producto_id,
                                                   )
-                                                  setDetalleOrdenSeleccionado(
-                                                    producto.id,
-                                                  )
+                                                  setDetalleOrdenSeleccionado(producto.id)
                                                 }
                                               }}
                                               disabled={isCompleto}
                                             >
-                                              {detalleOrdenSeleccionado ===
-                                                producto.id ? (
+                                              {detalleOrdenSeleccionado === producto.id ? (
                                                 <>
                                                   <CIcon icon={cilCheckCircle} className="me-1" />
                                                   Seleccionado
@@ -5326,10 +5364,12 @@ const Ingresos = () => {
                                       (p) => p.id === detalleOrdenSeleccionado,
                                     )
                                     const cantidadPendienteActualizada =
-                                      calcularCantidadPendienteActualizada(productoActual, editingId !== null)
-                                    const pesoNetoIngresado = calcularPesoNetoIngresadoPorProducto(
-                                      detalleOrdenSeleccionado,
-                                    )
+                                      calcularCantidadPendienteActualizada(
+                                        productoActual,
+                                        editingId,
+                                      )
+                                    const pesoNetoIngresado =
+                                      calcularPesoNetoIngresadoPorProducto(detalleOrdenSeleccionado)
 
                                     return (
                                       <div>
