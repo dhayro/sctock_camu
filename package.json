@@ -4,5 +4,20 @@
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2"
+  },
+  "name": "sctock_camu",
+  "version": "1.0.0",
+  "description": "Sistema de control de ingreso y salida de productos de camucamu",
+  "main": "index.js",
+  "scripts": {
+    "start:backend": "cd stock_camu_backend && npm run start",
+    "start:frontend": "cd sctock_camu && npm start",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
