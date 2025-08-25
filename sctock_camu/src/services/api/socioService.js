@@ -68,11 +68,25 @@ export const getSociosContribucionPorFecha = async (fechaInicio, fechaFin) => {
   }
 };
 
+export const getSocioContribucionPorFecha = async (socioId, fechaInicio, fechaFin) => {
+  try {
+    const response = await api.get('/socios/socio-contribucion', {
+      params: { socioId, fechaInicio, fechaFin }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error al obtener contribuciones del socio:', error);
+    throw error;
+  }
+};
+
+// Actualiza el objeto de exportación por defecto
 export default {
   getAllSocios,
   getSocioById,
   createSocio,
   updateSocio,
   deleteSocio,
-  getSociosContribucionPorFecha
+  getSociosContribucionPorFecha,
+  getSocioContribucionPorFecha  // Añade esta nueva función
 };

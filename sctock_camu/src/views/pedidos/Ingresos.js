@@ -325,8 +325,8 @@ const Ingresos = () => {
   }
 
   const drawPesajesList = (doc, headers, data, startY, fontSize = 10) => {
-    const lineHeight = 0.5 // Adjusted line height for text
-    const cellPadding = 5 // Padding inside each cell
+    const lineHeight = 0.6 // Adjusted line height for text
+    const cellPadding = 7 // Padding inside each cell
 
     // Set the font size
     doc.setFontSize(fontSize)
@@ -388,7 +388,7 @@ const Ingresos = () => {
 
       const pesajesTableData = pesajesTemporales.map((pesaje) => [
         new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
-        `${pesaje.producto_nombre || 'Producto no especificado'} - ${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
+        `${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
         parseFloat(pesaje.peso_bruto || 0).toFixed(3),
         pesaje.num_jabas_pesaje || 0,
         parseFloat(pesaje.peso_jaba || 0).toFixed(3),
@@ -400,6 +400,8 @@ const Ingresos = () => {
           parseFloat(pesaje.peso_neto || 0)
         ).toFixed(2),
         ((parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0)).toFixed(2),
+        ingreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje * 1.0).toFixed(2) : '0.00', // Nueva columna
+
         (
           parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
           (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
@@ -418,9 +420,10 @@ const Ingresos = () => {
         acc[6] += parseFloat(row[8]) || 0 // Pago Transporte
         acc[7] += parseFloat(row[9]) || 0 // Ingreso Cooperativa
         acc[8] += parseFloat(row[10]) || 0 // Pago al Socio
-        acc[9] = parseFloat(row[6]) || 0 // Pago al Socio
+        acc[9] = parseFloat(row[6]) || 0 // Precio de Venta
+        acc[10] += parseFloat(row[11]) || 0 // Descuento aplicado por jabas
         return acc
-      }, Array(9).fill(0))
+      }, Array(11).fill(0))
 
       // Append totals row
       pesajesTableData.push([
@@ -435,6 +438,7 @@ const Ingresos = () => {
         totals[6].toFixed(2),
         totals[7].toFixed(2),
         totals[8].toFixed(2),
+        totals[10].toFixed(2), // Total de descuento aplicado por jabas
         '',
       ])
 
@@ -442,9 +446,9 @@ const Ingresos = () => {
       const totalHeight = pesajesTableData.length * lineHeight + 120 // Add extra space for headers and footers
 
       const doc = new jsPDF({
-        orientation: format === 'a4' || format === 'a5' ? 'landscape' : 'portrait',
+        orientation:  'portrait',
         unit: 'mm',
-        format: format === 'ticket' ? [80, totalHeight] : format, // Use custom size for ticket
+        format: format === 'ticket' ? [80, totalHeight] : 'a3', // Use custom size for ticket
       })
 
       // Define positions for different formats
@@ -525,13 +529,14 @@ const Ingresos = () => {
           'Producto',
           'Peso Bruto',
           'Jabas',
-          'Dscto Peso Jabas',
+          'Peso Jabas',
           'Peso Neto',
-          'Precio de Venta',
+          'Precio Venta',
           'Subtotal',
           'Pago Transporte',
           'Ingreso Cooperativa',
-          'Pago al Socio',
+          'Dscto. por jabas',
+          'Pago Socio',
           'Observación',
         ]
 
@@ -556,7 +561,7 @@ const Ingresos = () => {
 
           // Center the text within each column
           const emisorText = `FIRMA DEL EMISOR DE NOTA DE INGRESO\nNombre:  \nDNI:  \n\n\n_____________________________________`
-          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI:  \n\n\n_____________________________`
+          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI: ${ingreso.socio.dni || ''}  \n\n\n_____________________________`
           const emisorTextWidth = doc.getTextWidth(emisorText)
           const socioTextWidth = doc.getTextWidth(socioText)
 
@@ -1137,7 +1142,7 @@ const Ingresos = () => {
           setDetalleOrdenSeleccionado(ingreso.detalle_orden.id)
         }
 
-        
+
 
         setPesajesTemporales((prev) => {
           const nuevosTemporales = [...prev]
@@ -1889,24 +1894,24 @@ const Ingresos = () => {
     }
   }, [pesajesTemporales])
 
-  
+
 
   // Asegúrate de que estas funciones estén definidas ANTES del return del componente
- const calcularPesoNetoIngresadoPorProducto = (productoId) => {
-  if (pesajesTemporales.length === 0) {
-    return 0; // Return 0 if there are no pesajesTemporales
-  }
+  const calcularPesoNetoIngresadoPorProducto = (productoId) => {
+    if (pesajesTemporales.length === 0) {
+      return 0; // Return 0 if there are no pesajesTemporales
+    }
 
-  const filteredPesajes = pesajesTemporales.filter(
-    (pesaje) => pesaje.detalle_orden_id === productoId,
-  );
+    const filteredPesajes = pesajesTemporales.filter(
+      (pesaje) => pesaje.detalle_orden_id === productoId,
+    );
 
-  const totalPesoNeto = filteredPesajes.reduce((sum, pesaje) => {
-    return sum + parseFloat(pesaje.peso_neto || 0);
-  }, 0);
+    const totalPesoNeto = filteredPesajes.reduce((sum, pesaje) => {
+      return sum + parseFloat(pesaje.peso_neto || 0);
+    }, 0);
 
-  return totalPesoNeto;
-};
+    return totalPesoNeto;
+  };
 
   function calcularCantidadPendienteActualizada(producto, editingId) {
 
@@ -2899,7 +2904,7 @@ const Ingresos = () => {
       // Cargar los detalles del ingreso desde el servicio
       const ingresoDetalles = await ingresoService.getById(ingreso.id)
 
-      
+
 
       // Asegúrate de que los datos de socios y órdenes estén cargados
       if (socios.length === 0) {

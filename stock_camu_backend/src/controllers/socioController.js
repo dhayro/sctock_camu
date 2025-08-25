@@ -253,3 +253,63 @@ exports.getSociosContribucionPorFecha = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener contribuciones de socios', details: error.message });
   }
 };
+
+
+// Obtener contribuciones de un socio específico por fecha
+exports.getSocioContribucionPorFecha = async (req, res) => {
+  try {
+    const { fechaInicio, fechaFin, socioId } = req.query;
+
+    if (!fechaInicio || !fechaFin || !socioId) {
+      return res.status(400).json({ error: 'Se requieren fechas de inicio y fin, y el ID del socio' });
+    }
+
+    // Convertir fechas a UTC
+    const fechaInicioUTC = moment.tz(fechaInicio, 'YYYY-MM-DD', 'America/Lima').startOf('day').utc().toDate();
+    const fechaFinUTC = moment.tz(fechaFin, 'YYYY-MM-DD', 'America/Lima').endOf('day').utc().toDate();
+
+    // Consultar los ingresos del socio específico en el rango de fechas
+    const socioContribuciones = await Ingreso.findAll({
+      where: {
+        fecha: {
+          [Op.between]: [fechaInicioUTC, fechaFinUTC]
+        },
+        socio_id: socioId
+      },
+      include: [
+        {
+          model: Socio,
+          as: 'socio',
+          attributes: ['id', 'nombres', 'apellidos', 'codigo']
+        },
+        {
+          model: DetalleOrdenCompra,
+          as: 'detalle_orden',
+          include: [
+            {
+              model: OrdenCompra,
+              as: 'orden_compra',
+              attributes: ['id', 'codigo_lote', 'numero_orden']
+            },
+            {
+              model: Producto,
+              as: 'producto',
+              attributes: ['id', 'nombre']
+            },
+            {
+              model: TipoFruta,
+              as: 'tipo_fruta',
+              attributes: ['id', 'nombre']
+            }
+          ]
+        }
+      ],
+      order: [['fecha', 'ASC']]
+    });
+
+    res.json(socioContribuciones);
+  } catch (error) {
+    console.error('Error al obtener contribuciones del socio:', error);
+    res.status(500).json({ error: 'Error al obtener contribuciones del socio', details: error.message });
+  }
+};

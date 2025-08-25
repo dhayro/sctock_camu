@@ -151,6 +151,11 @@ const _nav = [
         component: CNavItem,
         name: 'Consulta de Clientes',
         to: '/consultas/clientes',
+      },
+      {
+        component: CNavItem,
+        name: 'Ingresos por Socio',
+        to: '/consultas/ingresos-por-socio',
       }
     ],
   }

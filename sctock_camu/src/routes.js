@@ -32,6 +32,9 @@ const ConsultaSocios = React.lazy(() => import('./views/consultas/ConsultaSocios
 // Import the ConsultaClientes component
 const ConsultaClientes = React.lazy(() => import('./views/consultas/ConsultaClientes'))
 
+const ConsultaIngresosPorSocio = React.lazy(() => import('./views/consultas/ConsultaIngresosPorSocio'))
+
+
 // Base
 const Accordion = React.lazy(() => import('./views/base/accordion/Accordion'))
 const Breadcrumbs = React.lazy(() => import('./views/base/breadcrumbs/Breadcrumbs'))
@@ -114,6 +117,9 @@ const routes = [
 
   // Add the route for Consulta de Clientes
   { path: '/consultas/clientes', name: 'Consulta de Clientes', element: ConsultaClientes },
+
+  { path: '/consultas/ingresos-por-socio', name: 'Ingresos por Socio', element: ConsultaIngresosPorSocio },
+
 
   { path: '/base', name: 'Base', element: Cards, exact: true },
   { path: '/base/accordion', name: 'Accordion', element: Accordion },

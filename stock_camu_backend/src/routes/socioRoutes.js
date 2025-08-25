@@ -92,6 +92,9 @@ router.use(verifyToken);
  */
 router.get('/contribuciones', socioController.getSociosContribucionPorFecha);
 
+router.get('/socio-contribucion', socioController.getSocioContribucionPorFecha);
+
+
 /**
  * @swagger
  * /api/socios:
