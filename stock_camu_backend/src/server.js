@@ -32,7 +32,7 @@ async function startServer() {
     // Iniciar el servidor
     const server = app.listen(PORT, () => {
       console.log(`Servidor corriendo en el puerto ${PORT}`);
-      console.log(`Documentación de la API disponible en http://localhost:${PORT}/api-docs`);
+      console.log(`Documentación de la API disponible en http://172.10.9.11:${PORT}/api-docs`);
     });
 
     // Manejar cierre del servidor

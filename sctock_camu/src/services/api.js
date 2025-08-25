@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Crear una instancia de axios con la URL base
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'http://172.10.9.11:3000/api';
 
 // Función para obtener el token de autenticación
 const getAuthToken = () => {

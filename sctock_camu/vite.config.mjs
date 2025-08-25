@@ -40,7 +40,7 @@ export default defineConfig(() => {
       extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json', '.scss'],
     },
     server: {
-      host: 'localhost', // Cambiar a la IP deseada
+      host: '172.10.9.11', // Cambiar a la IP deseada
       port: 3001, // Cambiado de 3000 a 5173
       proxy: {
         '/api': {
