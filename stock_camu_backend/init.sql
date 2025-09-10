@@ -62,7 +62,7 @@ DROP TABLE IF EXISTS socios;
 CREATE TABLE socios (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(20) UNIQUE NOT NULL,
-    dni CHAR(8) UNIQUE ,
+    dni CHAR(8)  ,
     apellidos VARCHAR(100) NOT NULL,
     nombres VARCHAR(100) NOT NULL,
     caserio VARCHAR(100),
@@ -71,6 +71,22 @@ CREATE TABLE socios (
     telefono VARCHAR(20),
     email VARCHAR(100),
     estado BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE parcelas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(20) UNIQUE NOT NULL,
+    hectarias DECIMAL(10,2) NOT NULL,
+    volumen DECIMAL(10,2) NOT NULL,
+    periodo INT(11) NOT NULL,
+    estado BOOLEAN DEFAULT TRUE,
+    tipo_lote ENUM('organica', 'convencional') NULL,
+    socio_id INT NOT NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE,
+    FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE RESTRICT,
+    INDEX idx_fecha_inicio (fecha_inicio),
+    INDEX idx_fecha_fin (fecha_fin)
 );
 
 -- Tabla de tipos de fruta
@@ -153,7 +169,7 @@ CREATE TABLE ingresos (
     id INT AUTO_INCREMENT PRIMARY KEY,
     numero_ingreso VARCHAR(20) UNIQUE NOT NULL,
     fecha DATETIME NOT NULL,
-    socio_id INT NOT NULL,
+    parcela_id INT NOT NULL,
     detalle_orden_id INT NOT NULL,
     
     -- Campos de peso y medidas
@@ -189,14 +205,14 @@ CREATE TABLE ingresos (
     
     -- Restricciones de clave foránea
     FOREIGN KEY (detalle_orden_id) REFERENCES detalle_ordenes_compra(id) ON DELETE RESTRICT,
-    FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE RESTRICT,
+    FOREIGN KEY (parcela_id) REFERENCES parcelas(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_creacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     FOREIGN KEY (usuario_modificacion_id) REFERENCES usuarios(id) ON DELETE RESTRICT,
     
     -- Índices para mejor rendimiento
     INDEX idx_numero_ingreso (numero_ingreso),
     INDEX idx_fecha (fecha),
-    INDEX idx_socio_id (socio_id),
+    INDEX idx_parcela_id (parcela_id),
     INDEX idx_detalle_orden_id (detalle_orden_id),
     INDEX idx_estado (estado)
 );

@@ -7,21 +7,23 @@ require('dotenv').config();
 const path = require('path');
 const { initBalanzaService } = require('./config/balanzaInit');
 
-// // Importar rutas
-// const rolesRoutes = require('./routes/rolesRoutes');
-// const socioRoutes = require('./routes/socioRoutes');
-// // Importar rutas de la balanza
+// Importar rutas
+const rolesRoutes = require('./routes/rolesRoutes');
+const cargosRoutes = require('./routes/cargosRoutes');
+const areasRoutes = require('./routes/areasRoutes');
+const personalRoutes = require('./routes/personalRoutes');
+const usuarioRoutes = require('./routes/usuarioRoutes');
+const socioRoutes = require('./routes/socioRoutes');
+const parcelaRoutes = require('./routes/parcelaRoutes');
+const clienteRoutes = require('./routes/clienteRoutes');
+const tipoFrutaRoutes = require('./routes/tipoFrutaRoutes');
+const unidadMedidaRoutes = require('./routes/unidadMedidaRoutes');
+const productoRoutes = require('./routes/productoRoutes');
+const ordenCompraRoutes = require('./routes/ordenCompraRoutes');
+const detalleOrdenCompraRoutes = require('./routes/detalleOrdenCompraRoutes');
+const detallePesajeRoutes = require('./routes/detallePesajeRoutes');
 const balanzaRoutes = require('./routes/balanzaRoutes');
 const ingresoRoutes = require('./routes/ingresoRoutes');
-// // Importar rutas adicionales
-// const clienteRoutes = require('./routes/clienteRoutes');
-// const ingresoRoutes = require('./routes/ingresoRoutes');
-// // const pedidoLoteRoutes = require('./routes/pedidoLoteRoutes');
-// const tipoFrutaRoutes = require('./routes/tipoFrutaRoutes');
-// const usuarioRoutes = require('./routes/usuarioRoutes');
-// const areasRoutes = require('./routes/areasRoutes');
-// const cargosRoutes = require('./routes/cargosRoutes');
-// const personalRoutes = require('./routes/personalRoutes');
 
 const app = express();
 
@@ -40,38 +42,21 @@ console.log('Documentación Swagger configurada correctamente');
 // Configurar carpeta pública para archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Importar y usar rutas de manera más segura
-const loadRoutes = (routePath, apiPath) => {
-  try {
-    const route = require(routePath);
-    app.use(apiPath, route);
-    console.log(`Rutas de ${apiPath} cargadas correctamente`);
-    return true;
-  } catch (error) {
-    console.error(`Error al cargar las rutas de ${apiPath}:`, error);
-    return false;
-  }
-};
-
-// Cargar rutas
-loadRoutes('./routes/rolesRoutes', '/api/roles');
-loadRoutes('./routes/cargosRoutes', '/api/cargos');
-loadRoutes('./routes/areasRoutes', '/api/areas');
-loadRoutes('./routes/personalRoutes', '/api/personal');
-loadRoutes('./routes/usuarioRoutes', '/api/usuarios');
-loadRoutes('./routes/socioRoutes', '/api/socios');
-loadRoutes('./routes/clienteRoutes', '/api/clientes');
-// loadRoutes('./routes/pedidoLoteRoutes', '/api/pedidos-lotes');
-loadRoutes('./routes/tipoFrutaRoutes', '/api/tipos-fruta');
-loadRoutes('./routes/unidadMedidaRoutes', '/api/unidades-medida');
-loadRoutes('./routes/productoRoutes', '/api/productos');
-loadRoutes('./routes/ordenCompraRoutes', '/api/ordenes-compra');
-loadRoutes('./routes/detalleOrdenCompraRoutes', '/api/detalles-orden-compra');
-loadRoutes('./routes/detallePesajeRoutes', '/api/detalles-pesaje');
-
-
-
-// Usar rutas de la balanza
+// Usar rutas
+app.use('/api/roles', rolesRoutes);
+app.use('/api/cargos', cargosRoutes);
+app.use('/api/areas', areasRoutes);
+app.use('/api/personal', personalRoutes);
+app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/socios', socioRoutes);
+app.use('/api/parcelas', parcelaRoutes);
+app.use('/api/clientes', clienteRoutes);
+app.use('/api/tipos-fruta', tipoFrutaRoutes);
+app.use('/api/unidades-medida', unidadMedidaRoutes);
+app.use('/api/productos', productoRoutes);
+app.use('/api/ordenes-compra', ordenCompraRoutes);
+app.use('/api/detalles-orden-compra', detalleOrdenCompraRoutes);
+app.use('/api/detalles-pesaje', detallePesajeRoutes);
 app.use('/api/balanza', balanzaRoutes);
 app.use('/api/ingresos', ingresoRoutes);
 
@@ -83,6 +68,7 @@ app.get('/monitor-balanza', (req, res) => {
 app.get('/serial-monitor', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'serial-monitor.html'));
 });
+
 // Ruta de prueba
 app.get('/', (req, res) => {
   res.send('API de Stock Camu Camu funcionando correctamente');

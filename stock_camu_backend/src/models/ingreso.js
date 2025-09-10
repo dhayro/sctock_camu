@@ -14,11 +14,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: false
     },
-    socio_id: {
+    parcela_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
-        model: 'socios',
+        model: 'parcelas',
         key: 'id'
       }
     },
@@ -171,7 +171,7 @@ module.exports = (sequelize, DataTypes) => {
         fields: ['fecha']
       },
       {
-        fields: ['socio_id']
+        fields: ['parcela_id']
       },
       {
         fields: ['detalle_orden_id']
@@ -184,8 +184,8 @@ module.exports = (sequelize, DataTypes) => {
 
   Ingreso.associate = (models) => {
     Ingreso.belongsTo(models.Socio, {
-      as: 'socio',
-      foreignKey: 'socio_id'
+      as: 'parcela',
+      foreignKey: 'parcela_id'
     });
 
     // Relación con DetalleOrdenCompra

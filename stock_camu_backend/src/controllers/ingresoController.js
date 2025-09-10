@@ -1,5 +1,6 @@
 const { 
   Ingreso, 
+  Parcela,
   Socio, 
   Usuario, 
   DetalleOrdenCompra,
@@ -7,12 +8,12 @@ const {
   Cliente,
   Producto,
   TipoFruta,
-  DetallePesaje,sequelize 
+  DetallePesaje,
+  sequelize 
 } = require('../models');
-
-// Importar Op por separado desde Sequelize
 const { Op } = require('sequelize');
 
+// Importar Op por separado desde Sequelize
 
 
 async function actualizarCantidadIngresada(detalleOrdenIds, transaction) {
@@ -68,7 +69,6 @@ async function actualizarCantidadIngresada(detalleOrdenIds, transaction) {
 
 
 // Obtener todos los ingresos con paginación y filtros
-
 exports.getAllIngresos = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -81,8 +81,8 @@ exports.getAllIngresos = async (req, res) => {
     if (req.query.search) {
       filters[Op.or] = [
         { numero_ingreso: { [Op.like]: `%${req.query.search}%` } },
-        { '$socio.nombres$': { [Op.like]: `%${req.query.search}%` } },
-        { '$socio.apellidos$': { [Op.like]: `%${req.query.search}%` } }
+        { '$parcela.socio.nombres$': { [Op.like]: `%${req.query.search}%` } },
+        { '$parcela.socio.apellidos$': { [Op.like]: `%${req.query.search}%` } }
       ];
     }
 
@@ -94,8 +94,8 @@ exports.getAllIngresos = async (req, res) => {
     // Filtro específico por nombre del socio
     if (req.query.socio_nombre) {
       filters[Op.or] = [
-        { '$socio.nombres$': { [Op.like]: `%${req.query.socio_nombre}%` } },
-        { '$socio.apellidos$': { [Op.like]: `%${req.query.socio_nombre}%` } }
+        { '$parcela.socio.nombres$': { [Op.like]: `%${req.query.socio_nombre}%` } },
+        { '$parcela.socio.apellidos$': { [Op.like]: `%${req.query.socio_nombre}%` } }
       ];
     }
 
@@ -117,8 +117,15 @@ exports.getAllIngresos = async (req, res) => {
       where: filters,
       include: [
         {
-          model: Socio,
-          as: 'socio',
+          model: Parcela,
+          as: 'parcela',
+          include: [
+            {
+              model: Socio,
+              as: 'socio',
+              attributes: []
+            }
+          ],
           attributes: []
         }
       ],
@@ -130,9 +137,16 @@ exports.getAllIngresos = async (req, res) => {
       where: filters,
       include: [
         {
-          model: Socio,
-          as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
+          model: Parcela,
+          as: 'parcela',
+          attributes: ['id', 'codigo', 'hectarias', 'volumen', 'periodo', 'tipo_lote'],
+          include: [
+            {
+              model: Socio,
+              as: 'socio',
+              attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
+            }
+          ]
         },
         {
           model: DetalleOrdenCompra,
@@ -161,13 +175,6 @@ exports.getAllIngresos = async (req, res) => {
             }
           ]
         },
-        // {
-        //   model: DetallePesaje,
-        //   as: 'pesajes',
-        //   where: { estado: true },
-        //   required: false,
-        //   attributes: ['id', 'numero_pesaje', 'peso_bruto', 'peso_jaba', 'descuento_merma_pesaje', 'fecha_pesaje']
-        // },
         {
           model: Usuario,
           as: 'usuario_creacion',
@@ -209,15 +216,22 @@ exports.searchIngresos = async (req, res) => {
       where: {
         [Op.or]: [
           { numero_ingreso: { [Op.like]: `%${term}%` } },
-          { '$socio.nombres$': { [Op.like]: `%${term}%` } },
-          { '$socio.apellidos$': { [Op.like]: `%${term}%` } }
+          { '$parcela.socio.nombres$': { [Op.like]: `%${term}%` } },
+          { '$parcela.socio.apellidos$': { [Op.like]: `%${term}%` } }
         ]
       },
       include: [
-        { 
-          model: Socio, 
-          as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
+        {
+          model: Parcela,
+          as: 'parcela',
+          attributes: ['id', 'codigo', 'hectarias', 'volumen', 'periodo', 'tipo_lote'],
+          include: [
+            {
+              model: Socio,
+              as: 'socio',
+              attributes: ['id', 'nombres', 'apellidos', 'dni', 'codigo']
+            }
+          ]
         },
         {
           model: DetalleOrdenCompra,
@@ -269,10 +283,17 @@ exports.getIngresoById = async (req, res) => {
     
     const ingreso = await Ingreso.findByPk(id, {
       include: [
-        { 
-          model: Socio, 
-          as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'codigo']
+        {
+          model: Parcela,
+          as: 'parcela',
+          attributes: ['id', 'codigo', 'hectarias', 'volumen', 'periodo', 'tipo_lote'],
+          include: [
+            {
+              model: Socio,
+              as: 'socio',
+              attributes: ['id', 'nombres', 'apellidos', 'codigo']
+            }
+          ]
         },
         {
           model: DetalleOrdenCompra,
@@ -344,7 +365,7 @@ exports.createIngreso = async (req, res) => {
     console.log('Datos recibidos para crear ingreso:', req.body);
     
     // Validar campos obligatorios
-    const camposObligatorios = ['socio_id', 'detalle_orden_id'];
+    const camposObligatorios = ['parcela_id', 'detalle_orden_id'];
     
     for (const campo of camposObligatorios) {
       if (!req.body[campo]) {
@@ -353,11 +374,18 @@ exports.createIngreso = async (req, res) => {
       }
     }
     
-    // Validar que el socio exista
-    const socio = await Socio.findByPk(req.body.socio_id);
-    if (!socio) {
+    // Validar que la parcela exista
+    const parcela = await Parcela.findByPk(req.body.parcela_id, {
+      include: [
+        {
+          model: Socio,
+          as: 'socio'
+        }
+      ]
+    });
+    if (!parcela) {
       await transaction.rollback();
-      return res.status(404).json({ error: 'El socio especificado no existe' });
+      return res.status(404).json({ error: 'La parcela especificada no existe' });
     }
     
     // Validar que el detalle de orden exista y obtener la orden de compra
@@ -431,7 +459,7 @@ exports.createIngreso = async (req, res) => {
     const datosIngreso = {
       numero_ingreso: numeroIngreso,
       fecha: req.body.fecha || new Date(),
-      socio_id: parseInt(req.body.socio_id),
+      parcela_id: parseInt(req.body.parcela_id),
       detalle_orden_id: parseInt(req.body.detalle_orden_id),
       peso_bruto: parseFloat(req.body.peso_bruto) || 0,
       peso_total_jabas: parseFloat(req.body.peso_total_jabas) || 0,
@@ -463,10 +491,17 @@ exports.createIngreso = async (req, res) => {
     // Obtener el ingreso creado con todas las relaciones
     const ingresoCompleto = await Ingreso.findByPk(nuevoIngreso.id, {
       include: [
-        { 
-          model: Socio, 
-          as: 'socio',
-          attributes: ['id', 'nombres', 'apellidos', 'dni','codigo']
+        {
+          model: Parcela,
+          as: 'parcela',
+          attributes: ['id', 'codigo', 'hectarias', 'volumen', 'periodo', 'tipo_lote'],
+          include: [
+            {
+              model: Socio,
+              as: 'socio',
+              attributes: ['id', 'nombres', 'apellidos', 'dni','codigo']
+            }
+          ]
         },
         {
           model: DetalleOrdenCompra,
@@ -537,12 +572,12 @@ exports.updateIngreso = async (req, res) => {
       return res.status(404).json({ error: 'Ingreso no encontrado' });
     }
     
-    // Validar que el socio exista si se está actualizando
-    if (req.body.socio_id) {
-      const socio = await Socio.findByPk(req.body.socio_id);
-      if (!socio) {
+    // Validar que la parcela exista si se está actualizando
+    if (req.body.parcela_id) {
+      const parcela = await Parcela.findByPk(req.body.parcela_id);
+      if (!parcela) {
         await transaction.rollback();
-        return res.status(404).json({ error: 'El socio especificado no existe' });
+        return res.status(404).json({ error: 'La parcela especificada no existe' });
       }
     }
     
@@ -574,7 +609,7 @@ exports.updateIngreso = async (req, res) => {
     // Obtener el ingreso actualizado con sus relaciones
     const ingresoActualizado = await Ingreso.findByPk(req.params.id, {
       include: [
-        { model: Socio, as: 'socio' },
+        { model: Parcela, as: 'parcela' },
         { model: DetalleOrdenCompra, as: 'detalle_orden' },
         { model: DetallePesaje, as: 'pesajes', where: { estado: true }, required: false },
         { model: Usuario, as: 'usuario_creacion', attributes: ['id', 'usuario'] },
