@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import sociosService from '../../services/api/socioService';
+import parcelasService from '../../services/api/parcelaService';
 import CIcon from '@coreui/icons-react'
 import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx';
@@ -14,7 +15,7 @@ import {
   CTableRow,
   CTableHeaderCell,
   CTableBody,
-  CTableDataCell, // Importa CTableDataCell aquí
+  CTableDataCell,
   CSpinner,
   CAlert,
   CInputGroup,
@@ -22,13 +23,20 @@ import {
   CButton,
   CPagination,
   CPaginationItem,
-  CFormSelect // Import CFormSelect for dropdown
+  CFormSelect,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
+  CForm,
+  CFormLabel
 } from '@coreui/react'
-import { cilPencil, cilTrash, cilPlus, cilSearch, cilFilter, cilFilterX, cilCloudUpload, cilFolderOpen } from '@coreui/icons'
+import { cilPencil, cilTrash, cilPlus, cilSearch, cilFilter, cilFilterX, cilCloudUpload, cilFolderOpen, cilMap, cilCopy } from '@coreui/icons'
 import { debounce } from 'lodash'
 
 // Define el componente SocioRow
-const SocioRow = ({ socio, index, currentPage, itemsPerPage, onEdit, onDelete }) => {
+const SocioRow = ({ socio, index, currentPage, itemsPerPage, onEdit, onDelete, onManageParcelas }) => {
   return (
     <CTableRow>
       <CTableDataCell>{(currentPage - 1) * itemsPerPage + index + 1}</CTableDataCell>
@@ -39,6 +47,9 @@ const SocioRow = ({ socio, index, currentPage, itemsPerPage, onEdit, onDelete })
       <CTableDataCell>{socio.caserio || '-'}</CTableDataCell>
       <CTableDataCell>{socio.certificado ? 'Sí' : 'No'}</CTableDataCell>
       <CTableDataCell>
+        <CButton color="success" size="sm" className="me-2" onClick={() => onManageParcelas(socio)}>
+          <CIcon icon={cilMap} />
+        </CButton>
         <CButton color="info" size="sm" className="me-2" onClick={() => onEdit(socio)}>
           <CIcon icon={cilPencil} />
         </CButton>
@@ -49,6 +60,238 @@ const SocioRow = ({ socio, index, currentPage, itemsPerPage, onEdit, onDelete })
     </CTableRow>
   );
 };
+
+// Componente para mostrar las parcelas de un socio
+const ParcelaRow = ({ parcela, index, onEdit, onDelete, onClone }) => {
+  return (
+    <CTableRow>
+      <CTableDataCell>{index + 1}</CTableDataCell>
+      <CTableDataCell>{parcela.codigo}</CTableDataCell>
+      <CTableDataCell>{parcela.hectarias}</CTableDataCell>
+      <CTableDataCell>{parcela.volumen}</CTableDataCell>
+      <CTableDataCell>{parcela.periodo}</CTableDataCell>
+      <CTableDataCell>{parcela.tipo_lote}</CTableDataCell>
+      <CTableDataCell>{parcela.fecha_inicio ? new Date(parcela.fecha_inicio).toLocaleDateString() : '-'}</CTableDataCell>
+      <CTableDataCell>{parcela.fecha_fin ? new Date(parcela.fecha_fin).toLocaleDateString() : '-'}</CTableDataCell>
+      <CTableDataCell>{parcela.estado ? 'Activa' : 'Inactiva'}</CTableDataCell>
+      <CTableDataCell>
+        <CButton color="warning" size="sm" className="me-2" onClick={() => onClone(parcela)}>
+          <CIcon icon={cilCopy} />
+        </CButton>
+        <CButton color="info" size="sm" className="me-2" onClick={() => onEdit(parcela)}>
+          <CIcon icon={cilPencil} />
+        </CButton>
+        <CButton color="danger" size="sm" onClick={() => onDelete(parcela)}>
+          <CIcon icon={cilTrash} />
+        </CButton>
+      </CTableDataCell>
+    </CTableRow>
+  );
+};
+
+// Modal para gestionar parcelas
+const ParcelasModal = ({ visible, onClose, socio, parcelas, loading, onCreateParcela, onEditParcela, onDeleteParcela, onCloneParcela }) => {
+  return (
+    <CModal visible={visible} onClose={onClose} size="xl">
+      <CModalHeader>
+        <CModalTitle>Parcelas de {socio?.nombres} {socio?.apellidos}</CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h6>Código del Socio: {socio?.codigo}</h6>
+          <CButton color="primary" onClick={onCreateParcela}>
+            <CIcon icon={cilPlus} className="me-2" />
+            Nueva Parcela
+          </CButton>
+        </div>
+
+        {loading ? (
+          <div className="text-center my-3">
+            <CSpinner />
+          </div>
+        ) : parcelas.length > 0 ? (
+          <CTable hover responsive>
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>#</CTableHeaderCell>
+                <CTableHeaderCell>Código</CTableHeaderCell>
+                <CTableHeaderCell>Hectáreas</CTableHeaderCell>
+                <CTableHeaderCell>Volumen</CTableHeaderCell>
+                <CTableHeaderCell>Período</CTableHeaderCell>
+                <CTableHeaderCell>Tipo Lote</CTableHeaderCell>
+                <CTableHeaderCell>Fecha Inicio</CTableHeaderCell>
+                <CTableHeaderCell>Fecha Fin</CTableHeaderCell>
+                <CTableHeaderCell>Estado</CTableHeaderCell>
+                <CTableHeaderCell>Acciones</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              {parcelas.map((parcela, index) => (
+                <ParcelaRow
+                  key={parcela.id}
+                  parcela={parcela}
+                  index={index}
+                  onEdit={onEditParcela}
+                  onDelete={onDeleteParcela}
+                  onClone={onCloneParcela}
+                />
+              ))}
+            </CTableBody>
+          </CTable>
+        ) : (
+          <CAlert color="info">
+            Este socio no tiene parcelas registradas. Haga clic en "Nueva Parcela" para agregar una.
+          </CAlert>
+        )}
+      </CModalBody>
+      <CModalFooter>
+        <CButton color="secondary" onClick={onClose}>
+          Cerrar
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+};
+
+// Modal para crear/editar parcela
+const ParcelaFormModal = ({ visible, onClose, title, parcela, errors, submitting, onChange, onSave }) => {
+  const hectariasInputRef = useRef(null);
+
+  useEffect(() => {
+    if (visible && hectariasInputRef.current) {
+      hectariasInputRef.current.focus();
+    }
+  }, [visible]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      onSave();
+    }
+  };
+
+  return (
+    <CModal visible={visible} onClose={onClose}>
+      <CModalHeader>
+        <CModalTitle>{title}</CModalTitle>
+      </CModalHeader>
+      <CModalBody>
+        <CForm onKeyDown={handleKeyDown}>
+          <div className="mb-3">
+            <CFormLabel htmlFor="hectarias">Hectáreas *</CFormLabel>
+            <CFormInput
+              type="number"
+              step="0.01"
+              className={errors.hectarias ? 'is-invalid' : ''}
+              id="hectarias"
+              name="hectarias"
+              value={parcela.hectarias || ''}
+              onChange={onChange}
+              ref={hectariasInputRef}
+            />
+            {errors.hectarias && <div className="invalid-feedback">{errors.hectarias}</div>}
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel htmlFor="volumen">Volumen *</CFormLabel>
+            <CFormInput
+              type="number"
+              step="0.01"
+              className={errors.volumen ? 'is-invalid' : ''}
+              id="volumen"
+              name="volumen"
+              value={parcela.volumen || ''}
+              onChange={onChange}
+            />
+            {errors.volumen && <div className="invalid-feedback">{errors.volumen}</div>}
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel htmlFor="periodo">Período *</CFormLabel>
+            <CFormInput
+              type="text"
+              className={errors.periodo ? 'is-invalid' : ''}
+              id="periodo"
+              name="periodo"
+              value={parcela.periodo || ''}
+              onChange={onChange}
+              placeholder="Ej: 2024"
+            />
+            {errors.periodo && <div className="invalid-feedback">{errors.periodo}</div>}
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel htmlFor="tipo_lote">Tipo de Lote</CFormLabel>
+            <CFormSelect
+              id="tipo_lote"
+              name="tipo_lote"
+              value={parcela.tipo_lote || ''}
+              onChange={onChange}
+            >
+              <option value="">Seleccionar tipo</option>
+              <option value="Convencional">Convencional</option>
+              <option value="Orgánico">Orgánico</option>
+              <option value="En transición">En transición</option>
+            </CFormSelect>
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel htmlFor="fecha_inicio">Fecha de Inicio</CFormLabel>
+            <CFormInput
+              type="date"
+              id="fecha_inicio"
+              name="fecha_inicio"
+              value={parcela.fecha_inicio || ''}
+              onChange={onChange}
+            />
+          </div>
+
+          <div className="mb-3">
+            <CFormLabel htmlFor="fecha_fin">Fecha de Fin</CFormLabel>
+            <CFormInput
+              type="date"
+              id="fecha_fin"
+              name="fecha_fin"
+              value={parcela.fecha_fin || ''}
+              onChange={onChange}
+            />
+          </div>
+
+          <div className="mb-3">
+            <div className="form-check">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="estado"
+                name="estado"
+                checked={parcela.estado || false}
+                onChange={(e) => onChange({ target: { name: 'estado', value: e.target.checked } })}
+              />
+              <CFormLabel className="form-check-label" htmlFor="estado">
+                Parcela Activa
+              </CFormLabel>
+            </div>
+          </div>
+
+          {errors.api && <CAlert color="danger">{errors.api}</CAlert>}
+        </CForm>
+      </CModalBody>
+      <CModalFooter>
+        <CButton color="secondary" onClick={onClose}>
+          Cancelar
+        </CButton>
+        <CButton
+          color="primary"
+          onClick={onSave}
+          disabled={submitting}
+        >
+          {submitting ? 'Guardando...' : 'Guardar'}
+        </CButton>
+      </CModalFooter>
+    </CModal>
+  );
+};
+
 
 // Update the SocioModal component
 const SocioModal = ({ visible, onClose, title, socio, errors, submitting, onChange, onSave }) => {
@@ -256,7 +499,7 @@ const ListaSocios = () => {
   }, []);
 
   useEffect(() => {
-    const filtered = socios.filter(socio => 
+    const filtered = socios.filter(socio =>
       (socio.codigo || '').toLowerCase().includes(codigoFilter.toLowerCase()) &&
       (socio.dni || '').toLowerCase().includes(dniFilter.toLowerCase()) &&
       (socio.nombres || '').toLowerCase().includes(nombresFilter.toLowerCase()) &&
@@ -288,7 +531,7 @@ const ListaSocios = () => {
     } catch (err) {
       console.error('Error fetching socios:', err);
       setError('Error loading socios. Please try again.');
-      
+
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -520,10 +763,10 @@ const ListaSocios = () => {
 
   useEffect(() => {
     setIsFilterActive(
-      searchTerm.trim() !== '' || 
-      codigoFilter.trim() !== '' || 
-      dniFilter.trim() !== '' || 
-      nombresFilter.trim() !== '' || 
+      searchTerm.trim() !== '' ||
+      codigoFilter.trim() !== '' ||
+      dniFilter.trim() !== '' ||
+      nombresFilter.trim() !== '' ||
       apellidosFilter.trim() !== '' ||
       caserioFilter.trim() !== '' ||
       certificadoFilter.trim() !== ''
@@ -610,9 +853,9 @@ const ListaSocios = () => {
         <CCardHeader>
           <strong>Gestión de Socios</strong>
           <div className="d-flex justify-content-end align-items-center">
-            <a 
-              href="/templates/plantilla_socios.xlsx" 
-              download 
+            <a
+              href="/templates/plantilla_socios.xlsx"
+              download
               className="btn btn-outline-secondary me-2"
             >
               Descargar Plantilla
@@ -639,8 +882,8 @@ const ListaSocios = () => {
                 {loadingUpload ? 'Cargando...' : 'Cargar Datos'}
               </CButton>
             )}
-            <CButton 
-              color="primary" 
+            <CButton
+              color="primary"
               className="me-2"
               onClick={handleOpenCreateModal}
             >
@@ -677,7 +920,7 @@ const ListaSocios = () => {
             </CCol>
             <CCol md={4}>
               <CInputGroup>
-              {activeFilter === 'certificado' && (
+                {activeFilter === 'certificado' && (
                   <CFormSelect
                     value={certificadoFilter}
                     onChange={handleCertificadoFilterChange}
@@ -693,19 +936,19 @@ const ListaSocios = () => {
                     placeholder={`Filtrar por ${activeFilter}...`}
                     value={
                       activeFilter === 'codigo' ? codigoFilter :
-                      activeFilter === 'dni' ? dniFilter :
-                      activeFilter === 'nombres' ? nombresFilter :
-                      activeFilter === 'apellidos' ? apellidosFilter :
-                      activeFilter === 'caserio' ? caserioFilter :
-                      certificadoFilter
+                        activeFilter === 'dni' ? dniFilter :
+                          activeFilter === 'nombres' ? nombresFilter :
+                            activeFilter === 'apellidos' ? apellidosFilter :
+                              activeFilter === 'caserio' ? caserioFilter :
+                                certificadoFilter
                     }
                     onChange={handleFilterInputChange(
                       activeFilter === 'codigo' ? setCodigoFilter :
-                      activeFilter === 'dni' ? setDniFilter :
-                      activeFilter === 'nombres' ? setNombresFilter :
-                      activeFilter === 'apellidos' ? setApellidosFilter :
-                      activeFilter === 'caserio' ? setCaserioFilter :
-                      setCertificadoFilter
+                        activeFilter === 'dni' ? setDniFilter :
+                          activeFilter === 'nombres' ? setNombresFilter :
+                            activeFilter === 'apellidos' ? setApellidosFilter :
+                              activeFilter === 'caserio' ? setCaserioFilter :
+                                setCertificadoFilter
                     )}
                   />
                 )}
@@ -726,7 +969,7 @@ const ListaSocios = () => {
                   <CTableRow>
                     <CTableHeaderCell scope="col">#</CTableHeaderCell>
                     <CTableHeaderCell scope="col">
-                      Código 
+                      Código
                       <CButton
                         color="link"
                         onClick={() => setActiveFilter(activeFilter === 'codigo' ? null : 'codigo')}
@@ -735,7 +978,7 @@ const ListaSocios = () => {
                       </CButton>
                     </CTableHeaderCell>
                     <CTableHeaderCell scope="col">
-                      DNI 
+                      DNI
                       <CButton
                         color="link"
                         onClick={() => setActiveFilter(activeFilter === 'dni' ? null : 'dni')}
@@ -744,7 +987,7 @@ const ListaSocios = () => {
                       </CButton>
                     </CTableHeaderCell>
                     <CTableHeaderCell scope="col">
-                      Nombres 
+                      Nombres
                       <CButton
                         color="link"
                         onClick={() => setActiveFilter(activeFilter === 'nombres' ? null : 'nombres')}
@@ -753,7 +996,7 @@ const ListaSocios = () => {
                       </CButton>
                     </CTableHeaderCell>
                     <CTableHeaderCell scope="col">
-                      Apellidos 
+                      Apellidos
                       <CButton
                         color="link"
                         onClick={() => setActiveFilter(activeFilter === 'apellidos' ? null : 'apellidos')}
@@ -792,6 +1035,7 @@ const ListaSocios = () => {
                       itemsPerPage={itemsPerPage}
                       onEdit={handleOpenEditModal}
                       onDelete={handleOpenDeleteModal}
+                      // onManageParcelas={handleManageParcelas}
                     />
                   ))}
                 </CTableBody>
