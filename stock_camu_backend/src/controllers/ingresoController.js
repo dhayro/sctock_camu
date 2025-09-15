@@ -1,14 +1,14 @@
 const { 
   Ingreso, 
-  Parcela,
+  Parcela, 
   Socio, 
+  DetalleOrdenCompra, 
+  OrdenCompra, 
+  Cliente, 
+  Producto, 
+  TipoFruta, 
   Usuario, 
-  DetalleOrdenCompra,
-  OrdenCompra,
-  Cliente,
-  Producto,
-  TipoFruta,
-  DetallePesaje,
+  DetallePesaje, 
   sequelize 
 } = require('../models');
 const { Op } = require('sequelize');
@@ -111,29 +111,8 @@ exports.getAllIngresos = async (req, res) => {
       };
     }
 
-
-    // Hacer el conteo por separado
-    const count = await Ingreso.count({
-      where: filters,
-      include: [
-        {
-          model: Parcela,
-          as: 'parcela',
-          include: [
-            {
-              model: Socio,
-              as: 'socio',
-              attributes: []
-            }
-          ],
-          attributes: []
-        }
-      ],
-      distinct: true
-    });
-
-    // Obtener los registros
-    const rows = await Ingreso.findAll({
+    // Obtener los registros con conteo
+    const { count, rows } = await Ingreso.findAndCountAll({
       where: filters,
       include: [
         {
@@ -151,10 +130,12 @@ exports.getAllIngresos = async (req, res) => {
         {
           model: DetalleOrdenCompra,
           as: 'detalle_orden',
+          attributes: ['id', 'orden_compra_id', 'producto_id', 'tipo_fruta_id', 'cantidad', 'precio', 'subtotal', 'cantidad_ingresada', 'estado', 'observacion'],
           include: [
             {
               model: OrdenCompra,
               as: 'orden_compra',
+              attributes: ['id', 'codigo_lote', 'tipo_lote', 'tipo_pago', 'cliente_id', 'numero_orden', 'fecha_emision', 'fecha_entrega', 'lugar_entrega', 'estado', 'observacion', 'forma_pago', 'usuario_creacion_id', 'fecha_creacion', 'usuario_modificacion_id', 'fecha_modificacion'],
               include: [
                 {
                   model: Cliente,
@@ -188,7 +169,8 @@ exports.getAllIngresos = async (req, res) => {
       ],
       limit,
       offset,
-      order: [['fecha', 'DESC']]
+      order: [['fecha', 'DESC']],
+      distinct: true
     });
 
     res.json({
@@ -199,7 +181,10 @@ exports.getAllIngresos = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al obtener ingresos:', error);
-    res.status(500).json({ message: 'Error al obtener ingresos', details: error.message });
+    res.status(500).json({ 
+      error: 'Error al obtener ingresos', 
+      details: error.message 
+    });
   }
 };
 

@@ -75,7 +75,7 @@ CREATE TABLE socios (
 
 CREATE TABLE parcelas (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    codigo VARCHAR(20) UNIQUE NOT NULL,
+    codigo VARCHAR(20)  NOT NULL,
     hectarias DECIMAL(10,2) NOT NULL,
     volumen DECIMAL(10,2) NOT NULL,
     periodo INT(11) NOT NULL,
@@ -86,7 +86,8 @@ CREATE TABLE parcelas (
     fecha_fin DATE,
     FOREIGN KEY (socio_id) REFERENCES socios(id) ON DELETE RESTRICT,
     INDEX idx_fecha_inicio (fecha_inicio),
-    INDEX idx_fecha_fin (fecha_fin)
+    INDEX idx_fecha_fin (fecha_fin),
+    UNIQUE KEY unique_codigo_periodo (codigo, periodo)
 );
 
 -- Tabla de tipos de fruta

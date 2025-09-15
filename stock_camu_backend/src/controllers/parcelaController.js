@@ -15,7 +15,9 @@ exports.getAllParcelas = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const whereClause = {};
+    const whereClause = {
+      estado: true
+    };
 
     // Filtros
     if (search) {
@@ -196,13 +198,23 @@ exports.createParcela = async (req, res) => {
     
     res.status(201).json(parcelaCreada);
   } catch (error) {
-    console.error('Error al crear parcela:', error);
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      res.status(400).json({ error: 'Ya existe una parcela con este código' });
+  console.error('Error al crear/actualizar parcela:', error);
+  if (error.name === 'SequelizeUniqueConstraintError') {
+    // Verificar si el error es por el constraint único compuesto
+    if (error.fields && (error.fields.codigo || error.fields.periodo)) {
+      res.status(400).json({ 
+        error: 'Ya existe una parcela con este código para el período especificado' 
+      });
     } else {
-      res.status(500).json({ error: 'Error al crear parcela', details: error.message });
+      res.status(400).json({ error: 'Ya existe una parcela con estos datos' });
     }
+  } else {
+    res.status(500).json({ 
+      error: 'Error al crear/actualizar parcela', 
+      details: error.message 
+    });
   }
+}
 };
 
 // Actualizar parcela
@@ -275,13 +287,23 @@ exports.updateParcela = async (req, res) => {
     
     res.json(parcelaActualizada);
   } catch (error) {
-    console.error('Error al actualizar parcela:', error);
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      res.status(400).json({ error: 'Ya existe una parcela con este código' });
+  console.error('Error al crear/actualizar parcela:', error);
+  if (error.name === 'SequelizeUniqueConstraintError') {
+    // Verificar si el error es por el constraint único compuesto
+    if (error.fields && (error.fields.codigo || error.fields.periodo)) {
+      res.status(400).json({ 
+        error: 'Ya existe una parcela con este código para el período especificado' 
+      });
     } else {
-      res.status(500).json({ error: 'Error al actualizar parcela', details: error.message });
+      res.status(400).json({ error: 'Ya existe una parcela con estos datos' });
     }
+  } else {
+    res.status(500).json({ 
+      error: 'Error al crear/actualizar parcela', 
+      details: error.message 
+    });
   }
+}
 };
 
 // Eliminar parcela (soft delete)
@@ -295,9 +317,8 @@ exports.deleteParcela = async (req, res) => {
       return res.status(404).json({ error: 'Parcela no encontrada' });
     }
     
-    // Cambiar estado a false en lugar de eliminar físicamente
-    parcela.estado = false;
-    await parcela.save();
+    await parcela.destroy();
+
     
     res.json({ message: 'Parcela eliminada correctamente' });
   } catch (error) {
@@ -323,7 +344,7 @@ exports.getParcelasBySocio = async (req, res) => {
           attributes: ['id', 'codigo', 'nombres', 'apellidos']
         }
       ],
-      order: [['codigo', 'ASC']]
+      order: [['estado', 'DESC'],['periodo', 'DESC'], ['codigo', 'DESC']]
     });
     
     res.json(parcelas);

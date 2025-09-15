@@ -183,7 +183,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Ingreso.associate = (models) => {
-    Ingreso.belongsTo(models.Socio, {
+    Ingreso.belongsTo(models.Parcela, {
       as: 'parcela',
       foreignKey: 'parcela_id'
     });

@@ -85,6 +85,7 @@ import Select from 'react-select'
 import { UserContext } from '../../context/UserContext'
 import ingresoService from '../../services/api/ingresoService'
 import socioService from '../../services/api/socioService'
+import parcelaService from '../../services/api/parcelaService'
 import productoService from '../../services/api/productoService'
 import detalleOrdenCompraService from '../../services/api/detalleOrdenCompraService'
 import detallePesajeService from '../../services/api/detallePesajeService'
@@ -987,14 +988,14 @@ const Ingresos = () => {
     try {
       setCargandoSocios(true)
       // Enviar el searchTerm al backend
-      const response = await socioService.getAllSocios({
+      const response = await parcelaService.getAllParcelas({
         search: searchTerm,
         page: 1,
         itemsPerPage: 100, // Aumentar el límite para obtener más resultados
       })
 
-      if (response && Array.isArray(response.socios)) {
-        setSocios(response.socios)
+      if (response && Array.isArray(response.parcelas)) {
+        setSocios(response.parcelas)
       } else if (Array.isArray(response)) {
         setSocios(response)
       } else {
@@ -1536,14 +1537,14 @@ const Ingresos = () => {
   const fetchDatosRelacionados = async () => {
     try {
       const [sociosRes, productosRes, pedidosRes, unidadesRes, tiposRes] = await Promise.all([
-        socioService.getAllSocios(),
+        parcelaService.getAllParcelas(),
         productoService.getAll(),
         detalleOrdenCompraService.getAll(),
         unidadMedidaService.getAll(),
         tipoFrutaService.getAll(),
       ])
 
-      setSocios(sociosRes?.socios || sociosRes || [])
+      setSocios(sociosRes?.parcelas || sociosRes || [])
       setProductos(productosRes.data?.productos || productosRes || [])
       setPedidosLote(pedidosRes.data?.detallesOrdenCompra || pedidosRes || [])
       setUnidadesMedida(unidadesRes.data?.unidadesMedida || unidadesRes || [])
@@ -4602,7 +4603,7 @@ const Ingresos = () => {
                           }}
                           options={socios.map((socio) => ({
                             value: socio.id,
-                            label: `${socio.codigo} - ${socio.nombres} ${socio.apellidos}`,
+                            label: `${socio.codigo} - ${socio.socio.nombres} ${socio.socio.apellidos}`,
                           }))}
                           placeholder="Buscar y seleccionar socio..."
                           isClearable

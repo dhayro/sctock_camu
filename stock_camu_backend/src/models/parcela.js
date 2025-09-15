@@ -11,7 +11,6 @@ module.exports = (sequelize, DataTypes) => {
     codigo: {
       type: DataTypes.STRING(20),
       allowNull: false,
-      unique: true
     },
     hectarias: {
       type: DataTypes.DECIMAL(10, 2),
@@ -46,7 +45,14 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'parcelas',
-    timestamps: false
+    timestamps: false,
+    indexes: [
+      {
+        unique: true,
+        fields: ['codigo', 'periodo'],
+        name: 'unique_codigo_periodo'
+      }
+    ]
   });
 
   Parcela.associate = (models) => {
