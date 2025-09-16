@@ -5,14 +5,14 @@ module.exports = {
     username: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'stock_camu',
-    host: process.env.DB_HOST || '192.168.10.106',
+    host: process.env.DB_HOST || '192.168.1.6',
     dialect: 'mysql',
   },
   test: {
     username: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'stock_camu_test',
-    host: process.env.DB_HOST || '192.168.10.106',
+    host: process.env.DB_HOST || '192.168.1.6',
     dialect: 'mysql',
   },
   production: {

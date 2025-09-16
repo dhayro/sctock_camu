@@ -10,7 +10,7 @@ async function initializeDatabase() {
   try {
     // Primero conectamos sin especificar una base de datos
     const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || '192.168.10.106',
+      host: process.env.DB_HOST || '192.168.1.6',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
       multipleStatements: true // Importante para ejecutar múltiples consultas
@@ -51,7 +51,7 @@ const sequelize = new Sequelize(
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {
-    host: process.env.DB_HOST || '192.168.10.106',
+    host: process.env.DB_HOST || '192.168.1.6',
     dialect: 'mysql',
     port: process.env.DB_PORT || 3306,
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
@@ -75,7 +75,114 @@ async function testConnection() {
     return false;
   }
 }
-
+async function createDefaultData() {
+  try {
+    // Importamos los modelos después de que se haya inicializado Sequelize
+    const { TipoFruta, UnidadMedida, Producto } = require('../models');
+    
+    console.log('Verificando tipos de fruta del sistema...');
+    
+    // Verificar y crear tipo de fruta "Madura"
+    let tipoMadura = await TipoFruta.findOne({ where: { nombre: 'Madura' } });
+    if (!tipoMadura) {
+      console.log('El tipo de fruta "Madura" no existe. Creando...');
+      tipoMadura = await TipoFruta.create({
+        nombre: 'Madura',
+        descripcion: 'Fruta en estado de madurez completa',
+        estado: true
+      });
+      console.log('Tipo de fruta "Madura" creado exitosamente.');
+    }
+    
+    // Verificar y crear tipo de fruta "Verde"
+    let tipoVerde = await TipoFruta.findOne({ where: { nombre: 'Verde' } });
+    if (!tipoVerde) {
+      console.log('El tipo de fruta "Verde" no existe. Creando...');
+      tipoVerde = await TipoFruta.create({
+        nombre: 'Verde',
+        descripcion: 'Fruta en estado verde, sin madurar',
+        estado: true
+      });
+      console.log('Tipo de fruta "Verde" creado exitosamente.');
+    }
+    
+    console.log('Verificando unidades de medida del sistema...');
+    
+    // Verificar y crear unidad de medida "Kilogramos"
+    let unidadKg = await UnidadMedida.findOne({ where: { nombre: 'Kilogramos' } });
+    if (!unidadKg) {
+      console.log('La unidad de medida "Kilogramos" no existe. Creando...');
+      unidadKg = await UnidadMedida.create({
+        nombre: 'Kilogramos',
+        abreviatura: 'kg',
+        descripcion: 'Unidad de medida de peso en kilogramos',
+        estado: true
+      });
+      console.log('Unidad de medida "Kilogramos" creada exitosamente.');
+    }
+    
+    // Verificar y crear unidad de medida "Gramos" (adicional)
+    let unidadGr = await UnidadMedida.findOne({ where: { nombre: 'Gramos' } });
+    if (!unidadGr) {
+      console.log('La unidad de medida "Gramos" no existe. Creando...');
+      unidadGr = await UnidadMedida.create({
+        nombre: 'Gramos',
+        abreviatura: 'g',
+        descripcion: 'Unidad de medida de peso en gramos',
+        estado: true
+      });
+      console.log('Unidad de medida "Gramos" creada exitosamente.');
+    }
+    
+    // Verificar y crear unidad de medida "Toneladas" (adicional)
+    let unidadTon = await UnidadMedida.findOne({ where: { nombre: 'Toneladas' } });
+    if (!unidadTon) {
+      console.log('La unidad de medida "Toneladas" no existe. Creando...');
+      unidadTon = await UnidadMedida.create({
+        nombre: 'Toneladas',
+        abreviatura: 't',
+        descripcion: 'Unidad de medida de peso en toneladas',
+        estado: true
+      });
+      console.log('Unidad de medida "Toneladas" creada exitosamente.');
+    }
+    
+    console.log('Verificando productos del sistema...');
+    
+    // Verificar y crear producto "Camu Camu"
+    let productoCamuCamu = await Producto.findOne({ where: { nombre: 'Camu Camu' } });
+    if (!productoCamuCamu) {
+      console.log('El producto "Camu Camu" no existe. Creando...');
+      productoCamuCamu = await Producto.create({
+        nombre: 'Camu Camu',
+        descripcion: 'Fruta amazónica rica en vitamina C, conocida científicamente como Myrciaria dubia',
+        unidad_medida_id: unidadKg.id,
+        estado: true
+      });
+      console.log('Producto "Camu Camu" creado exitosamente.');
+    }
+    
+    // // Verificar y crear producto "Pulpa de Camu Camu" (adicional)
+    // let productoPulpa = await Producto.findOne({ where: { nombre: 'Pulpa de Camu Camu' } });
+    // if (!productoPulpa) {
+    //   console.log('El producto "Pulpa de Camu Camu" no existe. Creando...');
+    //   productoPulpa = await Producto.create({
+    //     nombre: 'Pulpa de Camu Camu',
+    //     descripcion: 'Pulpa procesada de Camu Camu, lista para consumo o procesamiento industrial',
+    //     unidad_medida_id: unidadKg.id,
+    //     estado: true
+    //   });
+    //   console.log('Producto "Pulpa de Camu Camu" creado exitosamente.');
+    // }
+    
+    console.log('Datos por defecto del sistema verificados y creados exitosamente.');
+    return true;
+    
+  } catch (error) {
+    console.error('Error al crear datos por defecto del sistema:', error);
+    return false;
+  }
+}
 // Función para crear un usuario administrador por defecto
 async function createDefaultAdmin() {
   try {
@@ -153,6 +260,8 @@ async function createDefaultAdmin() {
     } else {
       console.log('El usuario administrador ya existe.');
     }
+
+    await createDefaultData();
     
     return true;
   } catch (error) {

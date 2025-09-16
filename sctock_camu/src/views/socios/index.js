@@ -1239,6 +1239,178 @@ const handleSaveParcela = async () => {
 
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
+
+// Agregar estos estados después de los estados existentes
+const parcelasFileInputRef = useRef(null);
+const [selectedParcelasFile, setSelectedParcelasFile] = useState(null);
+const [loadingParcelasUpload, setLoadingParcelasUpload] = useState(false);
+
+// Agregar estas funciones después de las funciones existentes de carga masiva
+
+const handleParcelasFileSelect = (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    setSelectedParcelasFile(file);
+    console.log('Archivo de parcelas seleccionado:', file.name);
+  }
+};
+
+const handleParcelasFileUpload = () => {
+  if (!selectedParcelasFile) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'No hay archivo seleccionado',
+      text: 'Por favor, seleccione un archivo antes de cargar.',
+      confirmButtonColor: '#321fdb'
+    });
+    return;
+  }
+
+  setLoadingParcelasUpload(true);
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const expectedColumns = ['dni', 'codigo', 'hectarias', 'volumen', 'periodo', 'tipo_lote', 'fecha_inicio', 'fecha_fin'];
+      const fileColumns = jsonData[0];
+      const missingColumns = expectedColumns.filter(col => !fileColumns.includes(col));
+
+      if (missingColumns.length > 0) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error en la plantilla',
+          text: `Las siguientes columnas faltan en la plantilla: ${missingColumns.join(', ')}`,
+          confirmButtonColor: '#321fdb'
+        });
+        setLoadingParcelasUpload(false);
+        return;
+      }
+
+      const parcelasData = XLSX.utils.sheet_to_json(worksheet);
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      // Mostrar progreso
+      Swal.fire({
+        title: 'Procesando parcelas...',
+        text: 'Por favor espere mientras se procesan las parcelas',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      for (const [index, parcelaData] of parcelasData.entries()) {
+        try {
+          // Buscar el socio por DNI
+          const sociosResponse = await sociosService.getAllSocios({ 
+            dni: parcelaData.dni,
+            itemsPerPage: 1 
+          });
+
+          if (!sociosResponse.socios || sociosResponse.socios.length === 0) {
+            errors.push(`Fila ${index + 2}: No se encontró socio con DNI ${parcelaData.dni}`);
+            errorCount++;
+            continue;
+          }
+
+          const socio = sociosResponse.socios[0];
+
+          // Preparar datos de la parcela
+          const parcelaToCreate = {
+            codigo: parcelaData.codigo,
+            hectarias: parseFloat(parcelaData.hectarias) || 0,
+            volumen: parseFloat(parcelaData.volumen) || 0,
+            periodo: parseInt(parcelaData.periodo) || new Date().getFullYear(),
+            tipo_lote: parcelaData.tipo_lote || 'convencional',
+            socio_id: socio.id,
+            fecha_inicio: parcelaData.fecha_inicio || new Date().toISOString().split('T')[0],
+            fecha_fin: parcelaData.fecha_fin || null,
+            estado: true
+          };
+
+          // Validar datos requeridos
+          if (!parcelaToCreate.codigo) {
+            errors.push(`Fila ${index + 2}: Código de parcela es requerido`);
+            errorCount++;
+            continue;
+          }
+
+          if (parcelaToCreate.hectarias <= 0) {
+            errors.push(`Fila ${index + 2}: Hectáreas debe ser mayor a 0`);
+            errorCount++;
+            continue;
+          }
+
+          if (parcelaToCreate.volumen <= 0) {
+            errors.push(`Fila ${index + 2}: Volumen debe ser mayor a 0`);
+            errorCount++;
+            continue;
+          }
+
+          // Crear la parcela
+          await parcelasService.createParcela(parcelaToCreate);
+          successCount++;
+          
+          console.log(`Parcela creada: ${parcelaToCreate.codigo} para socio ${socio.nombres} ${socio.apellidos}`);
+        } catch (error) {
+          console.error('Error al crear parcela:', error);
+          errors.push(`Fila ${index + 2}: ${error.response?.data?.error || error.message || 'Error desconocido'}`);
+          errorCount++;
+        }
+      }
+
+      // Mostrar resultado
+      if (successCount > 0) {
+        await fetchSocios(currentPage, itemsPerPage, searchTerm, codigoFilter, dniFilter, nombresFilter, apellidosFilter, caserioFilter, certificadoFilter);
+      }
+
+      let resultMessage = `Procesamiento completado:\n`;
+      resultMessage += `✅ Parcelas creadas exitosamente: ${successCount}\n`;
+      resultMessage += `❌ Errores: ${errorCount}`;
+
+      if (errors.length > 0) {
+        resultMessage += `\n\nDetalles de errores:\n${errors.slice(0, 10).join('\n')}`;
+        if (errors.length > 10) {
+          resultMessage += `\n... y ${errors.length - 10} errores más`;
+        }
+      }
+
+      Swal.fire({
+        icon: successCount > 0 ? 'success' : 'warning',
+        title: 'Carga masiva completada',
+        text: resultMessage,
+        confirmButtonColor: '#321fdb',
+        customClass: {
+          popup: 'swal-wide'
+        }
+      });
+
+      setSelectedParcelasFile(null);
+      parcelasFileInputRef.current.value = null;
+      
+    } catch (error) {
+      console.error('Error procesando archivo:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error al procesar el archivo. Verifique el formato y contenido.',
+        confirmButtonColor: '#321fdb'
+      });
+    } finally {
+      setLoadingParcelasUpload(false);
+    }
+  };
+  reader.readAsArrayBuffer(selectedParcelasFile);
+};
   const [loadingUpload, setLoadingUpload] = useState(false);
 
   const handleFileSelect = (event) => {
@@ -1314,55 +1486,105 @@ const handleSaveParcela = async () => {
   return (
     <>
       <CCard className="mb-4">
-        <CCardHeader>
-          <strong>Gestión de Socios</strong>
-          <div className="d-flex justify-content-end align-items-center">
-            <a
-              href="/templates/plantilla_socios.xlsx"
-              download
-              className="btn btn-outline-secondary me-2"
-            >
-              Descargar Plantilla
-            </a>
-            <CButton
-              color="secondary"
-              className="me-2"
-              onClick={() => fileInputRef.current.click()}
-            >
-              <CIcon icon={cilFolderOpen} className="me-2" />
-              Seleccionar Archivo
-            </CButton>
-            {selectedFile && (
-              <CButton
-                color="success"
-                onClick={handleFileUpload}
-                disabled={loadingUpload}
-              >
-                {loadingUpload ? (
-                  <CSpinner size="sm" />
-                ) : (
-                  <CIcon icon={cilCloudUpload} className="me-2" />
-                )}
-                {loadingUpload ? 'Cargando...' : 'Cargar Datos'}
-              </CButton>
-            )}
-            <CButton
-              color="primary"
-              className="me-2"
-              onClick={handleOpenCreateModal}
-            >
-              <CIcon icon={cilPlus} className="me-2" />
-              Nuevo Socio
-            </CButton>
-          </div>
-          <input
-            type="file"
-            accept=".xlsx, .xls"
-            onChange={handleFileSelect}
-            ref={fileInputRef}
-            style={{ display: 'none' }}
-          />
-        </CCardHeader>
+      <CCardHeader>
+  <strong>Gestión de Socios</strong>
+  <div className="d-flex justify-content-end align-items-center">
+    {/* Botones para carga masiva de socios */}
+    <a
+      href="/templates/plantilla_socios.xlsx"
+      download
+      className="btn btn-outline-secondary me-2"
+    >
+      Descargar Plantilla Socios
+    </a>
+    <CButton
+      color="secondary"
+      className="me-2"
+      onClick={() => fileInputRef.current.click()}
+    >
+      <CIcon icon={cilFolderOpen} className="me-2" />
+      Seleccionar Archivo Socios
+    </CButton>
+    {selectedFile && (
+      <CButton
+        color="success"
+        className="me-2"
+        onClick={handleFileUpload}
+        disabled={loadingUpload}
+      >
+        {loadingUpload ? (
+          <CSpinner size="sm" />
+        ) : (
+          <CIcon icon={cilCloudUpload} className="me-2" />
+        )}
+        {loadingUpload ? 'Cargando...' : 'Cargar Socios'}
+      </CButton>
+    )}
+    
+    {/* Separador visual */}
+    <div className="vr me-2"></div>
+    
+    {/* Botones para carga masiva de parcelas */}
+    <a
+      href="/templates/plantilla_parcelas.xlsx"
+      download
+      className="btn btn-outline-info me-2"
+    >
+      Descargar Plantilla Parcelas
+    </a>
+    <CButton
+      color="info"
+      className="me-2"
+      onClick={() => parcelasFileInputRef.current.click()}
+    >
+      <CIcon icon={cilFolderOpen} className="me-2" />
+      Seleccionar Archivo Parcelas
+    </CButton>
+    {selectedParcelasFile && (
+      <CButton
+        color="success"
+        className="me-2"
+        onClick={handleParcelasFileUpload}
+        disabled={loadingParcelasUpload}
+      >
+        {loadingParcelasUpload ? (
+          <CSpinner size="sm" />
+        ) : (
+          <CIcon icon={cilCloudUpload} className="me-2" />
+        )}
+        {loadingParcelasUpload ? 'Cargando...' : 'Cargar Parcelas'}
+      </CButton>
+    )}
+    
+    {/* Botón para crear nuevo socio */}
+    <CButton
+      color="primary"
+      className="me-2"
+      onClick={handleOpenCreateModal}
+    >
+      <CIcon icon={cilPlus} className="me-2" />
+      Nuevo Socio
+    </CButton>
+  </div>
+  
+  {/* Input oculto para socios */}
+  <input
+    type="file"
+    accept=".xlsx, .xls"
+    onChange={handleFileSelect}
+    ref={fileInputRef}
+    style={{ display: 'none' }}
+  />
+  
+  {/* Input oculto para parcelas */}
+  <input
+    type="file"
+    accept=".xlsx, .xls"
+    onChange={handleParcelasFileSelect}
+    ref={parcelasFileInputRef}
+    style={{ display: 'none' }}
+  />
+</CCardHeader>
         <CCardBody>
           <CRow className="mb-3">
             <CCol md={4}>

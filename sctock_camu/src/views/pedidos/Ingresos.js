@@ -126,7 +126,7 @@ const Ingresos = () => {
   const [currentIngreso, setCurrentIngreso] = useState({
     numero_ingreso: '',
     fecha: '',
-    socio_id: '',
+    parcela_id: '',
     producto_id: '',
     detalle_orden_id: '',
     unidad_medida_id: '',
@@ -507,9 +507,9 @@ const Ingresos = () => {
         // Add the table
         const tableData = [
           ['Nro registro', ingreso.numero_ingreso],
-          ['Apellidos del socio', ingreso.socio.apellidos],
-          ['Nombre del socio', ingreso.socio.nombres],
-          ['Código del socio', ingreso.socio.codigo],
+          ['Apellidos del socio', ingreso.parcela.socio.apellidos],
+          ['Nombre del socio', ingreso.parcela.socio.nombres],
+          ['Código del socio', ingreso.parcela.codigo],
         ]
 
         // Replace autoTable with a custom table drawing function
@@ -562,7 +562,7 @@ const Ingresos = () => {
 
           // Center the text within each column
           const emisorText = `FIRMA DEL EMISOR DE NOTA DE INGRESO\nNombre:  \nDNI:  \n\n\n_____________________________________`
-          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.socio.nombres} ${ingreso.socio.apellidos}\nDNI: ${ingreso.socio.dni || ''}  \n\n\n_____________________________`
+          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela.socio.nombres} ${ingreso.parcela.socio.apellidos}\nDNI: ${ingreso.parcela.dni || ''}  \n\n\n_____________________________`
           const emisorTextWidth = doc.getTextWidth(emisorText)
           const socioTextWidth = doc.getTextWidth(socioText)
 
@@ -1031,7 +1031,7 @@ const Ingresos = () => {
     setCurrentIngreso({
       numero_ingreso: '',
       fecha: new Date().toISOString().split('T')[0],
-      socio_id: '',
+      parcela_id: '',
       producto_id: '',
       detalle_orden_id: '',
       unidad_medida_id: '',
@@ -1225,7 +1225,7 @@ const Ingresos = () => {
         setCurrentIngreso({
           numero_ingreso: '',
           fecha: new Date().toISOString().split('T')[0],
-          socio_id: '',
+          parcela_id: '',
           producto_id: '',
           detalle_orden_id: '',
           unidad_medida_id: '',
@@ -1436,9 +1436,9 @@ const Ingresos = () => {
     return socios.filter(
       (socio) =>
         socio.codigo?.toLowerCase().includes(term) ||
-        socio.nombres?.toLowerCase().includes(term) ||
-        socio.apellidos?.toLowerCase().includes(term) ||
-        `${socio.nombres} ${socio.apellidos}`.toLowerCase().includes(term),
+        socio.socio.nombres?.toLowerCase().includes(term) ||
+        socio.socio.apellidos?.toLowerCase().includes(term) ||
+        `${socio.socio.nombres} ${socio.socio.apellidos}`.toLowerCase().includes(term),
     )
   }
 
@@ -1576,8 +1576,8 @@ const Ingresos = () => {
       errors.fecha = 'La fecha es requerida'
     }
 
-    if (!currentIngreso.socio_id) {
-      errors.socio_id = 'El socio es requerido'
+    if (!currentIngreso.parcela_id) {
+      errors.parcela_id = 'El socio es requerido'
     }
 
     if (!currentIngreso.producto_id) {
@@ -2875,7 +2875,7 @@ const Ingresos = () => {
   //   setCurrentIngreso({
   //     numero_ingreso: '',
   //     fecha: new Date().toISOString().split('T')[0],
-  //     socio_id: '',
+  //     parcela_id: '',
   //     producto_id: '',
   //     detalle_orden_id: '',
   //     unidad_medida_id: '',
@@ -2915,13 +2915,13 @@ const Ingresos = () => {
         await cargarOrdenesPendientes()
       }
 
-      const socioExistente = socios.find((socio) => socio.id === ingresoDetalles.socio_id)
+      const socioExistente = socios.find((socio) => socio.id === ingresoDetalles.parcela_id)
       if (!socioExistente) {
         const nuevoSocio = {
-          id: ingresoDetalles.socio_id,
+          id: ingresoDetalles.parcela_id,
           codigo: ingresoDetalles.socio.codigo,
-          nombres: ingresoDetalles.socio.nombres,
-          apellidos: ingresoDetalles.socio.apellidos,
+          nombres: ingresoDetalles.socio.socio.nombres,
+          apellidos: ingresoDetalles.socio.socio.apellidos,
         }
         setSocios((prevSocios) => [...prevSocios, nuevoSocio])
       }
@@ -2948,7 +2948,7 @@ const Ingresos = () => {
       setCurrentIngreso({
         ...ingresoDetalles,
         fecha: ingresoDetalles.fecha ? ingresoDetalles.fecha.split('T')[0] : '',
-        socio_id: ingresoDetalles.socio_id || '',
+        parcela_id: ingresoDetalles.parcela_id || '',
         detalle_orden_id: ingresoDetalles.detalle_orden_id || '',
         orden_compra_id: ingresoDetalles.detalle_orden.orden_compra_id || '',
         aplicarPrecioJaba: ingresoDetalles.aplicarPrecioJaba || false,
@@ -2961,7 +2961,7 @@ const Ingresos = () => {
       setContadorPesajes(ingresoDetalles.num_pesajes + 1)
 
       // Establecer los valores seleccionados para los selectores
-      setSocioSeleccionado(ingresoDetalles.socio_id)
+      setSocioSeleccionado(ingresoDetalles.parcela_id)
       setOrdenSeleccionada(ingresoDetalles.detalle_orden.orden_compra_id)
 
       // Limpiar errores del formulario
@@ -3033,7 +3033,7 @@ const Ingresos = () => {
 
   //   try {
   //     const ingresoData = {
-  //       socio_id: parseInt(socioSeleccionado),
+  //       parcela_id: parseInt(socioSeleccionado),
   //       detalle_orden_id: parseInt(productoSeleccionadoPesaje),
   //       peso_bruto: parseFloat(currentIngreso.peso_bruto) || 0,
   //       peso_total_jabas: parseFloat(currentIngreso.peso_total_jabas) || 0,
@@ -3483,7 +3483,7 @@ const Ingresos = () => {
       }
 
       if (!socioSeleccionado) {
-        errors.socio_id = 'Debe seleccionar un socio'
+        errors.parcela_id = 'Debe seleccionar un socio'
       }
 
       if (!productoSeleccionadoPesaje) {
@@ -3576,7 +3576,7 @@ const Ingresos = () => {
 
       // Preparar datos del ingreso consolidado
       const ingresoData = {
-        socio_id: parseInt(socioSeleccionado),
+        parcela_id: parseInt(socioSeleccionado),
         detalle_orden_id: parseInt(detalleOrdenSeleccionado),
         peso_bruto: pesoBrutoTotal,
         peso_total_jabas: pesoTotalJabas,
@@ -4036,7 +4036,7 @@ const Ingresos = () => {
                                   {new Date(ingreso.fecha).toLocaleDateString()}
                                 </CTableDataCell>
                                 <CTableDataCell>
-                                  {ingreso.socio.nombres} {ingreso.socio.apellidos}
+                                  {ingreso.parcela.socio.nombres} {ingreso.parcela.socio.apellidos}
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   {(parseFloat(ingreso.peso_neto) || 0).toFixed(3)} kg
@@ -4593,7 +4593,7 @@ const Ingresos = () => {
                             socios.find((socio) => socio.id === socioSeleccionado)
                               ? {
                                 value: socioSeleccionado,
-                                label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).nombres} ${socios.find((socio) => socio.id === socioSeleccionado).apellidos}`,
+                                label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).socio.nombres} ${socios.find((socio) => socio.id === socioSeleccionado).socio.apellidos}`,
                               }
                               : null
                           }
@@ -4616,12 +4616,12 @@ const Ingresos = () => {
                               setSearchTermSocios(inputValue)
                             }
                           }}
-                          className={`basic-single ${formErrors.socio_id ? 'is-invalid' : ''}`}
+                          className={`basic-single ${formErrors.parcela_id ? 'is-invalid' : ''}`}
                           classNamePrefix="select"
                           styles={{
                             control: (provided, state) => ({
                               ...provided,
-                              borderColor: formErrors.socio_id
+                              borderColor: formErrors.parcela_id
                                 ? '#dc3545'
                                 : state.isFocused
                                   ? '#321fdb'
@@ -4643,8 +4643,8 @@ const Ingresos = () => {
                           }
                           loadingMessage={() => 'Cargando socios...'}
                         />
-                        {formErrors.socio_id && (
-                          <div className="invalid-feedback d-block">{formErrors.socio_id}</div>
+                        {formErrors.parcela_id && (
+                          <div className="invalid-feedback d-block">{formErrors.parcela_id}</div>
                         )}
                         <small className="text-muted">
                           Busque por código, nombre o apellido del socio. El socio se vinculará al
