@@ -1,57 +1,93 @@
-
 import React, { useState } from 'react';
-import { CCard, CCardBody, CCardHeader, CButton, CFormInput, CRow, CCol, CTable, CTableHead, CTableRow, CTableHeaderCell, CTableBody, CTableDataCell } from '@coreui/react';
+import { CCard, CCardBody, CCardHeader, CButton, CFormInput, CRow, CCol, CTable, CTableHead, CTableRow, CTableHeaderCell, CTableBody, CTableDataCell, CBadge } from '@coreui/react';
 import { getSociosContribucionPorFecha } from '../../services/api/socioService';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 
 const ConsultaSocios = () => {
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
-  const [contribuciones, setContribuciones] = useState([]);
+  const [fechaInicio, setFechaInicio] = useState(() => {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), 0, 1);
+    return firstDayOfMonth.toISOString().split('T')[0];
+  });
+  
+  const [fechaFin, setFechaFin] = useState(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  });
+  const [socios, setSocios] = useState([]);
 
   const handleConsultar = async () => {
     try {
       const data = await getSociosContribucionPorFecha(fechaInicio, fechaFin);
-      setContribuciones(data);
+      setSocios(data);
     } catch (error) {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'No se pudo obtener las contribuciones. Por favor, intente nuevamente.',
+        text: 'No se pudo obtener las contribuciones de socios. Por favor, intente nuevamente.',
         confirmButtonColor: '#321fdb'
       });
     }
   };
 
   const handleDownloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(contribuciones.map((contribucion, index) => ({
-      '#': index + 1,
-      Socio: `${contribucion.socio.nombres} ${contribucion.socio.apellidos}`,
-      Código: contribucion.socio.codigo,
-      'Número Ingreso': contribucion.numero_ingreso,
-      'Peso Neto': `${contribucion.peso_neto} kg`,
-      'Precio Venta/kg': `S/ ${contribucion.precio_venta_kg}`,
-      Producto: contribucion.detalle_orden.producto.nombre,
-      'Tipo Fruta': contribucion.detalle_orden.tipo_fruta.nombre,
-      'Num Jabas': contribucion.num_jabas,
-      'Monto Transporte': `S/ ${contribucion.monto_transporte}`,
-      'Ingreso Cooperativa': `S/ ${contribucion.ingreso_cooperativa}`,
-      'Pago Socio': `S/ ${contribucion.pago_socio}`,
-      Fecha: new Date(contribucion.fecha).toLocaleDateString()
-    })));
+    // Crear una lista plana de todos los ingresos de todos los socios
+    const datosExcel = socios.flatMap(socio => 
+      socio.ingresos.map(ingreso => {
+        // Usar valores reales del backend
+        const pesoNeto = parseFloat(ingreso.peso_neto) || 0;
+        const precioVentaKg = parseFloat(ingreso.precio_venta_kg) || 0;
+        const numJabas = ingreso.num_jabas || 0;
+        const montoTransporte = parseFloat(ingreso.monto_transporte) || 0;
+        const ingresoCooperativa = parseFloat(ingreso.ingreso_cooperativa) || 0;
+        const pagoSocio = parseFloat(ingreso.pago_socio) || 0;
+        const subtotal = parseFloat(ingreso.subtotal) || 0;
+        
+        return {
+          'Socio': `${socio.nombres} ${socio.apellidos}`,
+          'Código': ingreso.parcela_codigo,
+          'Número Ingreso': ingreso.numero_ingreso,
+          'Peso Neto': `${pesoNeto.toFixed(2)} kg`,
+          'Precio Venta/kg': `S/ ${precioVentaKg.toFixed(2)}`,
+          'Subtotal': `S/ ${subtotal.toFixed(2)}`,
+          'Producto': ingreso.detalle_orden?.producto,
+          'Tipo Fruta': ingreso.detalle_orden?.tipo_fruta,
+          'Num Jabas': numJabas,
+          'Monto Transporte': `S/ ${montoTransporte.toFixed(2)}`,
+          'Ingreso Cooperativa': `S/ ${ingresoCooperativa.toFixed(2)}`,
+          'Pago Socio': `S/ ${pagoSocio.toFixed(2)}`,
+          'Fecha': new Date(ingreso.fecha).toLocaleDateString()
+        };
+      })
+    );
 
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Contribuciones');
     XLSX.writeFile(workbook, 'Contribuciones_Socios.xlsx');
   };
 
-  // Calculate totals
-  const totalPesoNeto = contribuciones.reduce((acc, contribucion) => acc + parseFloat(contribucion.peso_neto || 0), 0);
-  const totalMontoTransporte = contribuciones.reduce((acc, contribucion) => acc + parseFloat(contribucion.monto_transporte || 0), 0);
-  const totalIngresoCooperativa = contribuciones.reduce((acc, contribucion) => acc + parseFloat(contribucion.ingreso_cooperativa || 0), 0);
-  const totalPagoSocio = contribuciones.reduce((acc, contribucion) => acc + parseFloat(contribucion.pago_socio || 0), 0);
-  const totalNumJabas = contribuciones.reduce((acc, contribucion) => acc + parseInt(contribucion.num_jabas || 0), 0);
+  // Calcular totales
+  const totalSocios = socios.length;
+  const totalParcelas = socios.reduce((acc, socio) => acc + socio.parcelas.length, 0);
+  const totalKg = socios.reduce((acc, socio) => acc + parseFloat(socio.total_kg || 0), 0);
+  const totalIngresos = socios.reduce((acc, socio) => acc + socio.ingresos.length, 0);
+  
+  // Calcular totales financieros
+  let totalMontoTransporte = 0;
+  let totalIngresoCooperativa = 0;
+  let totalPagoSocios = 0;
+  let totalSubtotal = 0;
+  
+  socios.forEach(socio => {
+    socio.ingresos.forEach(ingreso => {
+      totalMontoTransporte += parseFloat(ingreso.monto_transporte) || 0;
+      totalIngresoCooperativa += parseFloat(ingreso.ingreso_cooperativa) || 0;
+      totalPagoSocios += parseFloat(ingreso.pago_socio) || 0;
+      totalSubtotal += parseFloat(ingreso.subtotal) || 0;
+    });
+  });
 
   return (
     <CCard>
@@ -82,57 +118,89 @@ const ConsultaSocios = () => {
             </CButton>
           </CCol>
         </CRow>
-        <CButton color="success" onClick={handleDownloadExcel} className="mb-3">
-          Descargar Excel
-        </CButton>
-        <CTable hover responsive>
-          <CTableHead>
-            <CTableRow>
-              <CTableHeaderCell>#</CTableHeaderCell>
-              <CTableHeaderCell>Socio</CTableHeaderCell>
-              <CTableHeaderCell>Código</CTableHeaderCell>
-              <CTableHeaderCell>Número Ingreso</CTableHeaderCell>
-              <CTableHeaderCell>Peso Neto</CTableHeaderCell>
-              <CTableHeaderCell>Precio Venta/kg</CTableHeaderCell>
-              <CTableHeaderCell>Producto</CTableHeaderCell>
-              <CTableHeaderCell>Tipo Fruta</CTableHeaderCell>
-              <CTableHeaderCell>Num Jabas</CTableHeaderCell>
-              <CTableHeaderCell>Monto Transporte</CTableHeaderCell>
-              <CTableHeaderCell>Ingreso Cooperativa</CTableHeaderCell>
-              <CTableHeaderCell>Pago Socio</CTableHeaderCell>
-              <CTableHeaderCell>Fecha</CTableHeaderCell>
-            </CTableRow>
-          </CTableHead>
-          <CTableBody>
-            {contribuciones.map((contribucion, index) => (
-              <CTableRow key={index}>
-                <CTableDataCell>{index + 1}</CTableDataCell>
-                <CTableDataCell>{contribucion.socio.nombres} {contribucion.socio.apellidos}</CTableDataCell>
-                <CTableDataCell>{contribucion.socio.codigo}</CTableDataCell>
-                <CTableDataCell>{contribucion.numero_ingreso}</CTableDataCell>
-                <CTableDataCell>{contribucion.peso_neto} kg</CTableDataCell>
-                <CTableDataCell>S/ {contribucion.precio_venta_kg}</CTableDataCell>
-                <CTableDataCell>{contribucion.detalle_orden.producto.nombre}</CTableDataCell>
-                <CTableDataCell>{contribucion.detalle_orden.tipo_fruta.nombre}</CTableDataCell>
-                <CTableDataCell>{contribucion.num_jabas}</CTableDataCell>
-                <CTableDataCell>S/ {contribucion.monto_transporte}</CTableDataCell>
-                <CTableDataCell>S/ {contribucion.ingreso_cooperativa}</CTableDataCell>
-                <CTableDataCell>S/ {contribucion.pago_socio}</CTableDataCell>
-                <CTableDataCell>{new Date(contribucion.fecha).toLocaleDateString()}</CTableDataCell>
-              </CTableRow>
-            ))}
-            <CTableRow>
-              <CTableDataCell colSpan="4" className="text-end"><strong>Total:</strong></CTableDataCell>
-              <CTableDataCell>{totalPesoNeto.toFixed(2)} kg</CTableDataCell>
-              <CTableDataCell colSpan="3"></CTableDataCell>
-              <CTableDataCell>{totalNumJabas}</CTableDataCell>
-              <CTableDataCell>S/ {totalMontoTransporte.toFixed(2)}</CTableDataCell>
-              <CTableDataCell>S/ {totalIngresoCooperativa.toFixed(2)}</CTableDataCell>
-              <CTableDataCell>S/ {totalPagoSocio.toFixed(2)}</CTableDataCell>
-              <CTableDataCell></CTableDataCell>
-            </CTableRow>
-          </CTableBody>
-        </CTable>
+        
+        {socios.length > 0 && (
+          <>
+            <CRow className="mb-3">
+              <CCol>
+                <CButton color="success" onClick={handleDownloadExcel}>
+                  Descargar Excel
+                </CButton>
+              </CCol>
+            </CRow>
+            <CTable hover responsive>
+              <CTableHead>
+                <CTableRow>
+                  <CTableHeaderCell>#</CTableHeaderCell>
+                  <CTableHeaderCell>Socio</CTableHeaderCell>
+                  <CTableHeaderCell>Código</CTableHeaderCell>
+                  <CTableHeaderCell>Número Ingreso</CTableHeaderCell>
+                  <CTableHeaderCell>Peso Neto</CTableHeaderCell>
+                  <CTableHeaderCell>Precio Venta/kg</CTableHeaderCell>
+                  <CTableHeaderCell>Subtotal</CTableHeaderCell>
+                  <CTableHeaderCell>Producto</CTableHeaderCell>
+                  <CTableHeaderCell>Tipo Fruta</CTableHeaderCell>
+                  <CTableHeaderCell>Num Jabas</CTableHeaderCell>
+                  <CTableHeaderCell>Monto Transporte</CTableHeaderCell>
+                  <CTableHeaderCell>Ingreso Cooperativa</CTableHeaderCell>
+                  <CTableHeaderCell>Pago Socio</CTableHeaderCell>
+                  <CTableHeaderCell>Fecha</CTableHeaderCell>
+                </CTableRow>
+              </CTableHead>
+              <CTableBody>
+                {socios.flatMap((socio, socioIndex) => 
+                  socio.ingresos.map((ingreso, ingresoIndex) => {
+                    // Usar los valores reales del backend en lugar de calcularlos
+                    const pesoNeto = parseFloat(ingreso.peso_neto) || 0;
+                    const precioVentaKg = parseFloat(ingreso.precio_venta_kg) || 0;
+                    const numJabas = ingreso.num_jabas || 0;
+                    const montoTransporte = parseFloat(ingreso.monto_transporte) || 0;
+                    const ingresoCooperativa = parseFloat(ingreso.ingreso_cooperativa) || 0;
+                    const pagoSocio = parseFloat(ingreso.pago_socio) || 0;
+                    const subtotal = parseFloat(ingreso.subtotal) || 0;
+                    
+                    return (
+                      <CTableRow key={`${socio.id}-${ingreso.id}`}>
+                        <CTableDataCell>{socioIndex + ingresoIndex + 1}</CTableDataCell>
+                        <CTableDataCell>{socio.nombres} {socio.apellidos}</CTableDataCell>
+                        <CTableDataCell>{ingreso.parcela_codigo}</CTableDataCell>
+                        <CTableDataCell>{ingreso.numero_ingreso}</CTableDataCell>
+                        <CTableDataCell>{pesoNeto.toFixed(2)} kg</CTableDataCell>
+                        <CTableDataCell>S/ {precioVentaKg.toFixed(2)}</CTableDataCell>
+                        <CTableDataCell>S/ {subtotal.toFixed(2)}</CTableDataCell>
+                        <CTableDataCell>{ingreso.detalle_orden?.producto}</CTableDataCell>
+                        <CTableDataCell>{ingreso.detalle_orden?.tipo_fruta}</CTableDataCell>
+                        <CTableDataCell>{numJabas}</CTableDataCell>
+                        <CTableDataCell>S/ {montoTransporte.toFixed(2)}</CTableDataCell>
+                        <CTableDataCell>S/ {ingresoCooperativa.toFixed(2)}</CTableDataCell>
+                        <CTableDataCell>S/ {pagoSocio.toFixed(2)}</CTableDataCell>
+                        <CTableDataCell>{new Date(ingreso.fecha).toLocaleDateString()}</CTableDataCell>
+                      </CTableRow>
+                    );
+                  })
+                )}
+                {/* Fila de totales */}
+                <CTableRow className="table-primary fw-bold">
+                  <CTableDataCell colSpan={4}>TOTALES</CTableDataCell>
+                  <CTableDataCell>{totalKg.toFixed(2)} kg</CTableDataCell>
+                  <CTableDataCell></CTableDataCell>
+                  <CTableDataCell>S/ {totalSubtotal.toFixed(2)}</CTableDataCell>
+                  <CTableDataCell colSpan={3}></CTableDataCell>
+                  <CTableDataCell>S/ {totalMontoTransporte.toFixed(2)}</CTableDataCell>
+                  <CTableDataCell>S/ {totalIngresoCooperativa.toFixed(2)}</CTableDataCell>
+                  <CTableDataCell>S/ {totalPagoSocios.toFixed(2)}</CTableDataCell>
+                  <CTableDataCell></CTableDataCell>
+                </CTableRow>
+              </CTableBody>
+            </CTable>
+          </>
+        )}
+        
+        {socios.length === 0 && fechaInicio && fechaFin && (
+          <div className="text-center p-4">
+            <p>No se encontraron contribuciones en el rango de fechas seleccionado.</p>
+          </div>
+        )}
       </CCardBody>
     </CCard>
   );

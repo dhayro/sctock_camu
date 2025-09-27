@@ -78,7 +78,8 @@ import {
   cilHistory,
   cilList,
   cilClock,
-  cilX,
+  cilX,cilCircle,
+  cilPrint,
 } from '@coreui/icons'
 import Swal from 'sweetalert2'
 import Select from 'react-select'
@@ -182,6 +183,457 @@ const Ingresos = () => {
 
   const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0)
 
+  
+// Agregar estos estados después de los estados existentes
+const [selectedIngresos, setSelectedIngresos] = useState([])
+const [generatingMassivePDF, setGeneratingMassivePDF] = useState(false)
+
+// Función para manejar la selección de ingresos
+const handleSelectIngreso = (ingresoId) => {
+  setSelectedIngresos(prev => {
+    if (prev.includes(ingresoId)) {
+      return prev.filter(id => id !== ingresoId)
+    } else {
+      return [...prev, ingresoId]
+    }
+  })
+}
+
+// Función para seleccionar todos los ingresos
+const handleSelectAll = () => {
+  if (selectedIngresos.length === ingresos.length) {
+    setSelectedIngresos([])
+  } else {
+    setSelectedIngresos(ingresos.map(ingreso => ingreso.id))
+  }
+}
+
+// Función para generar PDF masivo
+const handleGenerateMassivePDF = async () => {
+  if (selectedIngresos.length === 0) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Sin selección',
+      text: 'Por favor seleccione al menos un ingreso para imprimir',
+      confirmButtonColor: '#321fdb',
+    })
+    return
+  }
+
+  setGeneratingMassivePDF(true)
+
+  try {
+    // Filtrar los ingresos seleccionados
+    const ingresosSeleccionados = ingresos.filter(ingreso => 
+      selectedIngresos.includes(ingreso.id)
+    )
+
+    // Calcular cuántos ingresos por página (2 por página en A3)
+    const ingresosPorPagina = 2
+    const totalPaginas = Math.ceil(ingresosSeleccionados.length / ingresosPorPagina)
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a3'
+    })
+
+    let paginaActual = 0
+
+    for (let i = 0; i < ingresosSeleccionados.length; i += ingresosPorPagina) {
+      if (paginaActual > 0) {
+        doc.addPage()
+      }
+
+      const ingresosEnPagina = ingresosSeleccionados.slice(i, i + ingresosPorPagina)
+      
+      for (let j = 0; j < ingresosEnPagina.length; j++) {
+        const ingreso = ingresosEnPagina[j]
+        const yOffset = j * (doc.internal.pageSize.getHeight() / 2) // Dividir la página en 2
+
+        await generarIngresoEnPDF(doc, ingreso, yOffset, j === 1) // j === 1 indica si es la segunda mitad
+      }
+
+      paginaActual++
+    }
+
+    // Generar y mostrar el PDF
+    const pdfBlob = doc.output('blob')
+    const pdfUrl = URL.createObjectURL(pdfBlob)
+    setPdfData(pdfUrl)
+    setShowPdfModal(true)
+
+    // Limpiar selección
+    setSelectedIngresos([])
+
+    Swal.fire({
+      icon: 'success',
+      title: '¡PDF Generado!',
+      text: `Se generaron ${ingresosSeleccionados.length} notas de ingreso`,
+      timer: 2000,
+      showConfirmButton: false,
+    })
+
+  } catch (error) {
+    console.error('Error generating massive PDF:', error)
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Error al generar el PDF masivo. Intente nuevamente.',
+      confirmButtonColor: '#321fdb',
+    })
+  } finally {
+    setGeneratingMassivePDF(false)
+  }
+}
+
+// Función auxiliar para generar cada ingreso en el PDF
+const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
+  try {
+    // Obtener pesajes temporales del ingreso
+    const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id)
+
+    const pesajesTableData = pesajesTemporales.map((pesaje) => [
+      new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
+      `${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
+      parseFloat(pesaje.peso_bruto || 0).toFixed(3),
+      pesaje.num_jabas_pesaje || 0,
+      parseFloat(pesaje.peso_jaba || 0).toFixed(3),
+      parseFloat(pesaje.peso_neto || 0).toFixed(3),
+      parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
+      (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
+      (
+        (parseFloat(ingreso.pago_transporte || 0) / 100) *
+        parseFloat(pesaje.peso_neto || 0)
+      ).toFixed(2),
+      ((parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0)).toFixed(2),
+      ingreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje * 1.0).toFixed(2) : '0.00',
+      (
+        parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
+        (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+        (parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+        (ingreso.aplicarPrecioJaba ? pesaje.num_jabas_pesaje * 1.0 : 0)
+      ).toFixed(2),
+      pesaje.observacion || '',
+    ])
+
+    // Calcular totales
+    const totals = pesajesTableData.reduce((acc, row) => {
+      acc[1] += parseFloat(row[2]) || 0
+      acc[2] += parseInt(row[3]) || 0
+      acc[3] += parseFloat(row[4]) || 0
+      acc[4] += parseFloat(row[5]) || 0
+      acc[5] += parseFloat(row[7]) || 0
+      acc[6] += parseFloat(row[8]) || 0
+      acc[7] += parseFloat(row[9]) || 0
+      acc[8] += parseFloat(row[10]) || 0
+      acc[9] = parseFloat(row[6]) || 0
+      acc[10] += parseFloat(row[11]) || 0
+      return acc
+    }, Array(11).fill(0))
+
+    // Agregar fila de totales
+    pesajesTableData.push([
+      'Total',
+      '',
+      totals[1].toFixed(3),
+      totals[2],
+      totals[3].toFixed(3),
+      totals[4].toFixed(3),
+      totals[9].toFixed(2),
+      totals[5].toFixed(2),
+      totals[6].toFixed(2),
+      totals[7].toFixed(2),
+      totals[8].toFixed(2),
+      totals[10].toFixed(2),
+      '',
+    ])
+
+    // Configuración de posiciones para cada mitad
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const mitadHeight = pageHeight / 2
+    
+    // Posiciones base ajustadas para cada mitad
+    const imgWidth = 35
+    const imgHeight = 25
+    const xPosImage = pageWidth - imgWidth - 20
+    const yPosImage = yOffset + 5
+    const xPosText = 10
+    const yPosText = yOffset + 15
+
+    // Cargar y agregar imagen
+    const imageUrl = '/img/coopay.png'
+    const img = new Image()
+    
+    return new Promise((resolve) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const base64Image = canvas.toDataURL('image/png')
+        
+        doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight)
+
+        // Configurar texto
+        const fontSize = 10
+        doc.setFontSize(fontSize)
+
+        // Títulos centrados
+        const notaIngresoText = 'NOTA DE INGRESO'
+        const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA - COOPAY'
+        
+        const notaIngresoWidth = doc.getTextWidth(notaIngresoText)
+        const coopayWidth = doc.getTextWidth(coopayText)
+        
+        const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2
+        const centerXCoopay = (pageWidth - coopayWidth) / 2
+
+        doc.text(notaIngresoText, centerXNotaIngreso, yPosText)
+        doc.text(coopayText, centerXCoopay, yPosText + 10)
+
+        // Tabla de información básica
+        const tableData = [
+          ['Nro registro', ingreso.numero_ingreso],
+          ['Apellidos del socio', ingreso.parcela?.socio?.apellidos || 'N/A'],
+          ['Nombre del socio', ingreso.parcela?.socio?.nombres || 'N/A'],
+          ['Código del socio', ingreso.parcela?.codigo || 'N/A'],
+        ]
+
+        drawTableMassive(doc, tableData, yPosText + 20, yOffset, mitadHeight)
+
+        // Detalle de pesajes
+        const detailText = 'DETALLE DE LA NOTA DE INGRESO:'
+        const detailTextYPos = yPosText + 20 + tableData.length * 7 + 10
+        doc.text(detailText, xPosText, detailTextYPos)
+
+        // Tabla de pesajes
+        const pesajesTableHeaders = [
+          'Fecha', 'Producto', 'Peso Bruto', 'Jabas', 'Peso Jabas', 'Peso Neto',
+          'Precio Venta', 'Subtotal', 'Pago Transporte', 'Ingreso Cooperativa',
+          'Dscto. por jabas', 'Pago Socio', 'Observación'
+        ]
+
+        
+        drawPesajesTableMassive(
+          doc,
+          pesajesTableHeaders,
+          pesajesTableData,
+          detailTextYPos + 5,
+          yOffset,
+          mitadHeight,
+          8
+        )
+
+        
+        // Firmas
+        const signatureYPos = yOffset + mitadHeight - 40 // Posicionar firmas cerca del final de cada mitad
+        const signatureWidth = pageWidth / 2 - 20
+        const signatureXPosLeft = 20
+        const signatureXPosRight = pageWidth / 2 + 10
+
+        doc.setFontSize(8)
+
+        const emisorText = `FIRMA DEL EMISOR\nNombre: ________________\nDNI: ___________________\n\n_______________________`
+        const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela?.socio?.nombres || ''} ${ingreso.parcela?.socio?.apellidos || ''}\nDNI: ${ingreso.parcela?.dni || '_______________'}\n\n_______________________`
+
+        // Calcular el ancho de cada texto para centrarlo en su columna
+        const emisorLines = emisorText.split('\n')
+        const socioLines = socioText.split('\n')
+        
+        // Encontrar la línea más ancha de cada texto para centrar correctamente
+        const emisorMaxWidth = Math.max(...emisorLines.map(line => doc.getTextWidth(line)))
+        const socioMaxWidth = Math.max(...socioLines.map(line => doc.getTextWidth(line)))
+        
+        // Calcular posiciones X centradas para cada columna
+        const leftColumnCenter = signatureXPosLeft + (signatureWidth / 2)
+        const rightColumnCenter = signatureXPosRight + (signatureWidth / 2)
+        
+        const emisorCenteredX = leftColumnCenter - (emisorMaxWidth / 2)
+        const socioCenteredX = rightColumnCenter - (socioMaxWidth / 2)
+
+        doc.text(emisorText, emisorCenteredX, signatureYPos, { align: 'left' })
+        doc.text(socioText, socioCenteredX, signatureYPos, { align: 'left' })
+
+        // Línea separadora entre mitades (solo si es la primera mitad)
+        if (!esMitadInferior) {
+          // doc.setDrawColor(200, 200, 200)
+          // doc.setLineWidth(0.5)
+          doc.line(10, yOffset + mitadHeight, pageWidth - 10, yOffset + mitadHeight)
+        }
+
+        resolve()
+      }
+      
+      img.onerror = () => {
+        console.warn('No se pudo cargar la imagen, continuando sin ella')
+        resolve()
+      }
+      
+      img.src = imageUrl
+    })
+
+  } catch (error) {
+    console.error('Error generando ingreso individual:', error)
+    throw error
+  }
+}
+
+
+
+
+// Función auxiliar para dibujar tabla de pesajes en formato masivo con texto multilínea
+const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeight, fontSize = 9) => {
+  const cellPadding = 2
+  const lineHeight = 1.2
+  const headerHeight = 8
+
+  doc.setFontSize(fontSize)
+
+  // Función para calcular el ancho de una celda basado en su texto
+  const calculateCellWidth = (text) => {
+    return doc.getTextWidth(text) + cellPadding * 2
+  }
+
+  // Calcular el ancho máximo para cada columna
+  const columnWidths = headers.map((header, index) => {
+    const headerWidth = calculateCellWidth(header)
+    const maxDataWidth = data.reduce((maxWidth, row) => {
+      const cellWidth = calculateCellWidth(row[index].toString())
+      return Math.max(maxWidth, cellWidth)
+    }, 0)
+    return Math.max(headerWidth, maxDataWidth)
+  })
+
+  // Calcular ancho total de la tabla
+  const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0)
+
+  // Calcular posición X inicial (centrar la tabla)
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const startX = (pageWidth - totalTableWidth) / 2
+
+  // Función para calcular la altura de una celda basada en su texto
+  const calculateCellHeight = (text, cellWidth) => {
+    const textLines = doc.splitTextToSize(text.toString(), cellWidth - cellPadding * 2)
+    return textLines.length * fontSize * lineHeight
+  }
+
+  // Dibujar headers con fuente bold
+  doc.setFont('helvetica', 'bold')
+  headers.forEach((header, index) => {
+    const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0)
+    const cellWidth = columnWidths[index]
+    
+    // Verificar límites
+    if (startY + headerHeight > yOffset + mitadHeight - 50) return
+
+    // Dibujar borde del header
+    doc.rect(x, startY, cellWidth, headerHeight).stroke()
+    
+    // Texto del header centrado
+    const textX = x + (cellWidth - doc.getTextWidth(header)) / 2
+    const textY = startY + headerHeight / 2 + cellPadding / 2
+    doc.text(header, textX, textY, { baseline: 'middle' })
+  })
+
+  // Dibujar datos
+  doc.setFont('helvetica', 'normal')
+  
+  data.forEach((row, rowIndex) => {
+    // Verificar si es la fila de totales
+    const isTotal = rowIndex === data.length - 1
+
+    if (isTotal) {
+      doc.setFont('helvetica', 'bold')
+    }
+
+    row.forEach((cell, cellIndex) => {
+      const cellWidth = columnWidths[cellIndex]
+      const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0)
+      const y = startY + headerHeight + rowIndex * fontSize * lineHeight
+
+      // Calcular altura de la celda
+      const cellHeight = calculateCellHeight(cell.toString(), cellWidth)
+
+      // Verificar límites
+      if (y + cellHeight > yOffset + mitadHeight - 50) return
+
+      // Aplicar sombreado para la fila de totales
+      if (isTotal) {
+        doc.setFillColor(220, 220, 220) // Gris claro
+        doc.rect(x, y, cellWidth, cellHeight, 'F') // Rellenar
+      }
+
+      // Dibujar borde de la celda
+      doc.rect(x, y, cellWidth, cellHeight).stroke()
+
+      // Dividir texto en líneas y dibujar centrado
+      const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2)
+      textLines.forEach((line, lineIndex) => {
+        const textY = y + cellPadding + lineIndex * fontSize * lineHeight
+        const textX = x + (cellWidth - doc.getTextWidth(line)) / 2 // Centrar texto
+        doc.text(line, textX, textY, { baseline: 'top' })
+      })
+    })
+
+    // Restaurar fuente normal después de totales
+    if (isTotal) {
+      doc.setFont('helvetica', 'normal')
+    }
+  })
+}
+
+
+// Función corregida para drawTableMassive similar a drawTable individual
+const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
+  const cellPadding = 2
+  const cellHeight = 7
+  const fontSize = 10
+  const firstColumnWidth = 50 // Ancho fijo para la primera columna
+  const startX = 10
+
+  doc.setFontSize(fontSize)
+
+  // Calcular el ancho máximo del texto para la segunda columna
+  const maxTextWidth = tableData.reduce((maxWidth, row) => {
+    if (row[1]) {
+      const textWidth = doc.getTextWidth(row[1].toString())
+      return Math.max(maxWidth, textWidth)
+    }
+    return maxWidth
+  }, 0)
+
+  // Ancho de la segunda columna = ancho máximo del texto + padding
+  const secondColumnWidth = maxTextWidth + cellPadding * 2
+
+  // Verificar que no se salga de la mitad asignada
+  const maxRows = Math.floor((mitadHeight - 50 - (startY - yOffset)) / cellHeight)
+  const rowsToShow = Math.min(tableData.length, maxRows)
+
+  tableData.slice(0, rowsToShow).forEach((row, rowIndex) => {
+    const y = startY + rowIndex * cellHeight
+
+    row.forEach((cell, cellIndex) => {
+      const cellWidth = cellIndex === 0 ? firstColumnWidth : secondColumnWidth
+      const x = startX + (cellIndex === 0 ? 0 : firstColumnWidth)
+
+      // Fondo amarillo para primera columna (igual que drawTable individual)
+      if (cellIndex === 0) {
+        doc.setFillColor(255, 192, 0) // Color amarillo #ffc000
+        doc.rect(x, y, cellWidth, cellHeight, 'F')
+      }
+
+      // Borde de celda
+      doc.rect(x, y, cellWidth, cellHeight).stroke()
+
+      // Texto centrado verticalmente
+      const textY = y + cellHeight / 2 + cellPadding / 2
+      doc.text(cell?.toString() || '', x + cellPadding, textY, { baseline: 'middle' })
+    })
+  })
+}
   const drawTable = (doc, tableData, startY, format) => {
     const cellPadding = 2 // Padding inside each cell
     let cellHeight = 7 // Default height of each cell
@@ -1434,12 +1886,15 @@ const Ingresos = () => {
 
     const term = searchTerm.toLowerCase()
     return socios.filter(
-      (socio) =>
-        socio.codigo?.toLowerCase().includes(term) ||
-        socio.socio.nombres?.toLowerCase().includes(term) ||
-        socio.socio.apellidos?.toLowerCase().includes(term) ||
-        `${socio.socio.nombres} ${socio.socio.apellidos}`.toLowerCase().includes(term),
-    )
+      (parcela) =>
+      parcela.codigo?.toLowerCase().includes(term) ||
+      parcela.socio?.nombres?.toLowerCase().includes(term) ||
+      parcela.socio?.apellidos?.toLowerCase().includes(term) ||
+      `${parcela.socio?.nombres || ''} ${parcela.socio?.apellidos || ''}`.toLowerCase().includes(term) ||
+      // Agregar búsqueda por hectáreas y volumen
+      (parcela.hectarias && parcela.hectarias.toString().includes(term)) ||
+      (parcela.volumen && parcela.volumen.toString().includes(term)),
+  )
   }
 
   // Función para filtrar órdenes basada en el término de búsqueda
@@ -2915,13 +3370,15 @@ const Ingresos = () => {
         await cargarOrdenesPendientes()
       }
 
-      const socioExistente = socios.find((socio) => socio.id === ingresoDetalles.parcela_id)
+      const socioExistente = socios.find((parcela) => parcela.id === ingresoDetalles.parcela_id)
       if (!socioExistente) {
         const nuevoSocio = {
           id: ingresoDetalles.parcela_id,
-          codigo: ingresoDetalles.socio.codigo,
-          nombres: ingresoDetalles.socio.socio.nombres,
-          apellidos: ingresoDetalles.socio.socio.apellidos,
+          codigo: ingresoDetalles.parcela.codigo,
+          nombres: ingresoDetalles.parcela.socio.nombres,
+          apellidos: ingresoDetalles.parcela.socio.apellidos,
+          hectarias: ingresoDetalles.parcela.hectarias || 0,
+          volumen: ingresoDetalles.parcela.volumen || 0
         }
         setSocios((prevSocios) => [...prevSocios, nuevoSocio])
       }
@@ -3113,9 +3570,9 @@ const Ingresos = () => {
   }
 
   // Opciones para selects
-  const socioOptions = socios.map((socio) => ({
-    value: socio.id,
-    label: `${socio.codigo} - ${socio.nombre} ${socio.apellido}`,
+  const socioOptions = socios.map((parcela) => ({
+    value: parcela.id,
+    label: `${parcela.codigo} - ${parcela.nombre} ${parcela.apellido}`,
   }))
 
   const productoOptions = productos.map((producto) => ({
@@ -3855,6 +4312,26 @@ const Ingresos = () => {
                     <CIcon icon={cilSpeedometer} className="me-2" />
                     Gestión de Ingresos
                   </h4>
+                  <div className="d-flex gap-2 mb-3">
+  <CButton
+    color="success"
+    onClick={handleSelectAll}
+    size="sm"
+  >
+    <CIcon icon={selectedIngresos.length === ingresos.length ? cilCheckCircle : cilCircle} className="me-1" />
+    {selectedIngresos.length === ingresos.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+  </CButton>
+  
+  <CButton
+    color="primary"
+    onClick={handleGenerateMassivePDF}
+    disabled={selectedIngresos.length === 0 || generatingMassivePDF}
+    size="sm"
+  >
+    <CIcon icon={cilPrint} className="me-1" />
+    {generatingMassivePDF ? 'Generando...' : `Imprimir Seleccionados (${selectedIngresos.length})`}
+  </CButton>
+</div>
                   <CButton
                     color={balanzaConectada ? 'success' : 'warning'}
                     variant="outline"
@@ -3973,6 +4450,12 @@ const Ingresos = () => {
                     <CTable hover responsive striped>
                       <CTableHead>
                         <CTableRow>
+                        <CTableHeaderCell>
+                          <CFormCheck
+                            checked={selectedIngresos.length === ingresos.length && ingresos.length > 0}
+                            onChange={handleSelectAll}
+                          />
+                        </CTableHeaderCell>
                           <CTableHeaderCell>#</CTableHeaderCell>
                           <CTableHeaderCell>
                             Número
@@ -4030,6 +4513,12 @@ const Ingresos = () => {
                           ingresos.map((ingreso, index) => (
                             <React.Fragment key={ingreso.id}>
                               <CTableRow onClick={() => toggleRow(ingreso.id)}>
+                              <CTableDataCell>
+  <CFormCheck
+    checked={selectedIngresos.includes(ingreso.id)}
+    onChange={() => handleSelectIngreso(ingreso.id)}
+  />
+</CTableDataCell>
                                 <CTableDataCell>{index + 1}</CTableDataCell>
                                 <CTableDataCell>{ingreso.numero_ingreso}</CTableDataCell>
                                 <CTableDataCell>
@@ -4590,10 +5079,15 @@ const Ingresos = () => {
                         <Select
                           id="socio_pesaje"
                           value={
-                            socios.find((socio) => socio.id === socioSeleccionado)
+                            socios.find((parcela) => parcela.id === socioSeleccionado)
                               ? {
                                 value: socioSeleccionado,
-                                label: `${socios.find((socio) => socio.id === socioSeleccionado).codigo} - ${socios.find((socio) => socio.id === socioSeleccionado).socio.nombres} ${socios.find((socio) => socio.id === socioSeleccionado).socio.apellidos}`,
+                                label: (() => {
+                                  const parcelaSeleccionada = socios.find(p => p.id === socioSeleccionado);
+                                  if (!parcelaSeleccionada) return '';
+                                  const socio = parcelaSeleccionada.socio || {};
+                                  return `${parcelaSeleccionada.codigo} - ${socio.nombres || parcelaSeleccionada.nombres} ${socio.apellidos || parcelaSeleccionada.apellidos} - ${parcelaSeleccionada.hectarias} ha ${parcelaSeleccionada.volumen} t`;
+                                })(),
                               }
                               : null
                           }
@@ -4601,9 +5095,9 @@ const Ingresos = () => {
                             const socioId = selectedOption ? selectedOption.value : ''
                             setSocioSeleccionado(socioId)
                           }}
-                          options={socios.map((socio) => ({
-                            value: socio.id,
-                            label: `${socio.codigo} - ${socio.socio.nombres} ${socio.socio.apellidos}`,
+                          options={socios.map((parcela) => ({
+                            value: parcela.id,
+                            label: `${parcela.codigo} - ${parcela.socio?.nombres || parcela.nombres || 'SIN_NOMBRE'} ${parcela.socio?.apellidos || parcela.apellidos || 'SIN_APELLIDO'} - ${parcela.hectarias} ha ${parcela.volumen} t`,
                           }))}
                           placeholder="Buscar y seleccionar socio..."
                           isClearable
@@ -5338,7 +5832,7 @@ const Ingresos = () => {
                                                   setDetalleOrdenSeleccionado(producto.id)
                                                 }
                                               }}
-                                              disabled={isCompleto}
+                                              disabled={isCompleto || editingId !== null}
                                             >
                                               {detalleOrdenSeleccionado === producto.id ? (
                                                 <>

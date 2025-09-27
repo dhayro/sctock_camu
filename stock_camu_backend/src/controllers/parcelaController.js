@@ -1,5 +1,5 @@
 
-const { Parcela, Socio } = require('../models');
+const { Parcela, Socio,sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 // Obtener todas las parcelas con paginación y filtros
@@ -22,7 +22,10 @@ exports.getAllParcelas = async (req, res) => {
     // Filtros
     if (search) {
       whereClause[Op.or] = [
-        { codigo: { [Op.like]: `%${search}%` } }
+        { codigo: { [Op.like]: `%${search}%` } },
+        { '$socio.nombres$': { [Op.like]: `%${search}%` } },
+        { '$socio.apellidos$': { [Op.like]: `%${search}%` } },
+        sequelize.literal(`CONCAT(socio.nombres, ' ', socio.apellidos) LIKE '%${search}%'`)
       ];
     }
 

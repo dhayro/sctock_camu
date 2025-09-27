@@ -1,13 +1,21 @@
 
 import React, { useState } from 'react';
-import { CCard, CCardBody, CCardHeader, CButton, CFormInput, CRow, CCol, CTable, CTableHead, CTableRow, CTableHeaderCell, CTableBody, CTableDataCell } from '@coreui/react';
+import { CCard, CCardBody, CCardHeader, CButton, CFormInput, CRow, CCol, CTable, CTableHead, CTableRow, CTableHeaderCell,CBadge, CTableBody, CTableDataCell } from '@coreui/react';
 import { obtenerClientesConOrdenesYDetalles } from '../../services/api/clienteService';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 
 const ConsultaClientes = () => {
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  const [fechaInicio, setFechaInicio] = useState(() => {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), 0, 1);
+    return firstDayOfMonth.toISOString().split('T')[0];
+  });
+  
+  const [fechaFin, setFechaFin] = useState(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  });
   const [clientes, setClientes] = useState([]);
 
   const handleConsultar = async () => {
@@ -114,7 +122,35 @@ const ConsultaClientes = () => {
                     <CTableDataCell>{detalle.tipo_fruta.nombre}</CTableDataCell>
                     <CTableDataCell>{detalle.cantidad}</CTableDataCell>
                     <CTableDataCell>{detalle.cantidad_ingresada}</CTableDataCell>
-                    <CTableDataCell>{orden.estado}</CTableDataCell>
+                    <CTableDataCell>
+                      {(() => {
+                        const estado = orden.estado;
+                        let color = 'secondary';
+                        
+                        switch(estado) {
+                          case 'pendiente':
+                            color = 'warning';
+                            break;
+                          case 'en_proceso':
+                            color = 'info';
+                            break;
+                          case 'completado':
+                            color = 'success';
+                            break;
+                          case 'cancelado':
+                            color = 'danger';
+                            break;
+                          default:
+                            color = 'secondary';
+                        }
+                        
+                        return (
+                          <CBadge color={color} className="text-uppercase">
+                            {estado?.replace('_', ' ')}
+                          </CBadge>
+                        );
+                      })()}
+                    </CTableDataCell>
                   </CTableRow>
                 ))
               ))
