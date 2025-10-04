@@ -25,6 +25,9 @@ class BalanzaService extends EventEmitter {
         
         // Inicializar el SSE para el monitor de datos
         this.monitorDataSSE = new SSE();
+        
+        this.lastWeightEmitTime = 0;
+        this.lastWeightValue = null;
     }
     
     async getPorts() {
@@ -147,12 +150,17 @@ class BalanzaService extends EventEmitter {
             this.parser.on('data', (data) => {
                 console.log('Datos procesados por el parser:');
                 console.log('  - Como texto:', data);
-                
-                // Intentar interpretar como peso
+
                 const weightData = this.parseWeight(data);
-                
-                // Emitir evento con los datos de peso
-                this.emit('weightData', weightData);
+
+                // Throttle: solo emitir si pasaron 200ms o el peso cambió
+                const now = Date.now();
+                const weightChanged = this.lastWeightValue !== weightData;
+                if (weightChanged || now - this.lastWeightEmitTime > 200) {
+                    this.emit('weightData', weightData);
+                    this.lastWeightEmitTime = now;
+                    this.lastWeightValue = weightData;
+                }
             });
             
             // Esperar a que el puerto se abra

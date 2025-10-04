@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react'
+import throttle from 'lodash.throttle'
 import { Document, Page } from 'react-pdf'
 import { debounce } from 'lodash'
 import {
@@ -183,7 +184,7 @@ const Ingresos = () => {
 
   const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0)
 
-  
+
 // Agregar estos estados después de los estados existentes
 const [selectedIngresos, setSelectedIngresos] = useState([])
 const [generatingMassivePDF, setGeneratingMassivePDF] = useState(false)
@@ -208,7 +209,6 @@ const handleSelectAll = () => {
   }
 }
 
-// Función para generar PDF masivo
 const handleGenerateMassivePDF = async () => {
   if (selectedIngresos.length === 0) {
     Swal.fire({
@@ -224,37 +224,32 @@ const handleGenerateMassivePDF = async () => {
 
   try {
     // Filtrar los ingresos seleccionados
-    const ingresosSeleccionados = ingresos.filter(ingreso => 
+    const ingresosSeleccionados = ingresos.filter(ingreso =>
       selectedIngresos.includes(ingreso.id)
     )
 
-    // Calcular cuántos ingresos por página (2 por página en A3)
-    const ingresosPorPagina = 2
-    const totalPaginas = Math.ceil(ingresosSeleccionados.length / ingresosPorPagina)
+    // Ancho A3 (297mm), altura dinámica tipo ticket
+    const ticketWidth = 297 // mm (A3 vertical)
+    const ingresoHeight = 120 // Ajusta según el contenido de cada ingreso
+    const totalHeight = ingresosSeleccionados.length * ingresoHeight + 20
 
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: 'a3'
+      format: [ticketWidth, totalHeight]
     })
 
-    let paginaActual = 0
+    let yOffset = 10
 
-    for (let i = 0; i < ingresosSeleccionados.length; i += ingresosPorPagina) {
-      if (paginaActual > 0) {
-        doc.addPage()
+    for (let i = 0; i < ingresosSeleccionados.length; i++) {
+      const ingreso = ingresosSeleccionados[i]
+      await generarIngresoEnPDF(doc, ingreso, yOffset, false)
+      yOffset += ingresoHeight
+      // Línea separadora entre ingresos
+      if (i < ingresosSeleccionados.length - 1) {
+        doc.setDrawColor(200)
+        doc.line(5, yOffset - 2, ticketWidth - 5, yOffset - 2)
       }
-
-      const ingresosEnPagina = ingresosSeleccionados.slice(i, i + ingresosPorPagina)
-      
-      for (let j = 0; j < ingresosEnPagina.length; j++) {
-        const ingreso = ingresosEnPagina[j]
-        const yOffset = j * (doc.internal.pageSize.getHeight() / 2) // Dividir la página en 2
-
-        await generarIngresoEnPDF(doc, ingreso, yOffset, j === 1) // j === 1 indica si es la segunda mitad
-      }
-
-      paginaActual++
     }
 
     // Generar y mostrar el PDF
@@ -286,7 +281,6 @@ const handleGenerateMassivePDF = async () => {
     setGeneratingMassivePDF(false)
   }
 }
-
 // Función auxiliar para generar cada ingreso en el PDF
 const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
   try {
@@ -353,7 +347,7 @@ const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
     const mitadHeight = pageHeight / 2
-    
+
     // Posiciones base ajustadas para cada mitad
     const imgWidth = 35
     const imgHeight = 25
@@ -365,7 +359,7 @@ const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
     // Cargar y agregar imagen
     const imageUrl = '/img/coopay.png'
     const img = new Image()
-    
+
     return new Promise((resolve) => {
       img.onload = () => {
         const canvas = document.createElement('canvas')
@@ -374,7 +368,7 @@ const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
         const ctx = canvas.getContext('2d')
         ctx.drawImage(img, 0, 0)
         const base64Image = canvas.toDataURL('image/png')
-        
+
         doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight)
 
         // Configurar texto
@@ -384,10 +378,10 @@ const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
         // Títulos centrados
         const notaIngresoText = 'NOTA DE INGRESO'
         const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA - COOPAY'
-        
+
         const notaIngresoWidth = doc.getTextWidth(notaIngresoText)
         const coopayWidth = doc.getTextWidth(coopayText)
-        
+
         const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2
         const centerXCoopay = (pageWidth - coopayWidth) / 2
 
@@ -416,62 +410,60 @@ const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
           'Dscto. por jabas', 'Pago Socio', 'Observación'
         ]
 
-        
-        drawPesajesTableMassive(
-          doc,
-          pesajesTableHeaders,
-          pesajesTableData,
-          detailTextYPos + 5,
-          yOffset,
-          mitadHeight,
-          8
-        )
 
-        
+       const tableEndY = drawPesajesTableMassive(
+  doc,
+  pesajesTableHeaders,
+  pesajesTableData,
+  detailTextYPos + 5,
+  yOffset,
+  mitadHeight,
+  8
+);
+
+
         // Firmas
-        const signatureYPos = yOffset + mitadHeight - 40 // Posicionar firmas cerca del final de cada mitad
-        const signatureWidth = pageWidth / 2 - 20
-        const signatureXPosLeft = 20
-        const signatureXPosRight = pageWidth / 2 + 10
+        const pesajesTableYStart = detailTextYPos + 5
+const pesajesTableRowHeight = 8 // o el valor real que uses
+const pesajesTableHeight = pesajesTableData.length * pesajesTableRowHeight
+const firmasY = tableEndY + 10; // 10 de espacio extra
 
-        doc.setFontSize(8)
+const signatureWidth = pageWidth / 2 - 20
+const signatureXPosLeft = 20
+const signatureXPosRight = pageWidth / 2 + 10
 
-        const emisorText = `FIRMA DEL EMISOR\nNombre: ________________\nDNI: ___________________\n\n_______________________`
-        const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela?.socio?.nombres || ''} ${ingreso.parcela?.socio?.apellidos || ''}\nDNI: ${ingreso.parcela?.dni || '_______________'}\n\n_______________________`
+doc.setFontSize(10)
 
-        // Calcular el ancho de cada texto para centrarlo en su columna
-        const emisorLines = emisorText.split('\n')
-        const socioLines = socioText.split('\n')
-        
-        // Encontrar la línea más ancha de cada texto para centrar correctamente
-        const emisorMaxWidth = Math.max(...emisorLines.map(line => doc.getTextWidth(line)))
-        const socioMaxWidth = Math.max(...socioLines.map(line => doc.getTextWidth(line)))
-        
-        // Calcular posiciones X centradas para cada columna
-        const leftColumnCenter = signatureXPosLeft + (signatureWidth / 2)
-        const rightColumnCenter = signatureXPosRight + (signatureWidth / 2)
-        
-        const emisorCenteredX = leftColumnCenter - (emisorMaxWidth / 2)
-        const socioCenteredX = rightColumnCenter - (socioMaxWidth / 2)
+const emisorText = `FIRMA DEL EMISOR\nNombre: ________________\nDNI: ___________________\n\n_______________________`
+const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela?.socio?.nombres || ''} ${ingreso.parcela?.socio?.apellidos || ''}\nDNI: ${ingreso.parcela?.dni || '_______________'}\n\n_______________________`
 
-        doc.text(emisorText, emisorCenteredX, signatureYPos, { align: 'left' })
-        doc.text(socioText, socioCenteredX, signatureYPos, { align: 'left' })
+const emisorLines = emisorText.split('\n')
+const socioLines = socioText.split('\n')
+const emisorMaxWidth = Math.max(...emisorLines.map(line => doc.getTextWidth(line)))
+const socioMaxWidth = Math.max(...socioLines.map(line => doc.getTextWidth(line)))
+const leftColumnCenter = signatureXPosLeft + (signatureWidth / 2)
+const rightColumnCenter = signatureXPosRight + (signatureWidth / 2)
+const emisorCenteredX = leftColumnCenter - (emisorMaxWidth / 2)
+const socioCenteredX = rightColumnCenter - (socioMaxWidth / 2)
 
-        // Línea separadora entre mitades (solo si es la primera mitad)
-        if (!esMitadInferior) {
-          // doc.setDrawColor(200, 200, 200)
-          // doc.setLineWidth(0.5)
-          doc.line(10, yOffset + mitadHeight, pageWidth - 10, yOffset + mitadHeight)
-        }
+doc.text(emisorText, emisorCenteredX, firmasY, { align: 'left' });
+doc.text(socioText, socioCenteredX, firmasY, { align: 'left' });
+
+        // // Línea separadora entre mitades (solo si es la primera mitad)
+        // if (!esMitadInferior) {
+        //   // doc.setDrawColor(200, 200, 200)
+        //   // doc.setLineWidth(0.5)
+        //   doc.line(10, yOffset + mitadHeight, pageWidth - 10, yOffset + mitadHeight)
+        // }
 
         resolve()
       }
-      
+
       img.onerror = () => {
         console.warn('No se pudo cargar la imagen, continuando sin ella')
         resolve()
       }
-      
+
       img.src = imageUrl
     })
 
@@ -525,13 +517,13 @@ const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeigh
   headers.forEach((header, index) => {
     const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0)
     const cellWidth = columnWidths[index]
-    
+
     // Verificar límites
     if (startY + headerHeight > yOffset + mitadHeight - 50) return
 
     // Dibujar borde del header
     doc.rect(x, startY, cellWidth, headerHeight).stroke()
-    
+
     // Texto del header centrado
     const textX = x + (cellWidth - doc.getTextWidth(header)) / 2
     const textY = startY + headerHeight / 2 + cellPadding / 2
@@ -540,7 +532,8 @@ const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeigh
 
   // Dibujar datos
   doc.setFont('helvetica', 'normal')
-  
+  let lastY = startY + headerHeight;
+
   data.forEach((row, rowIndex) => {
     // Verificar si es la fila de totales
     const isTotal = rowIndex === data.length - 1
@@ -552,7 +545,7 @@ const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeigh
     row.forEach((cell, cellIndex) => {
       const cellWidth = columnWidths[cellIndex]
       const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0)
-      const y = startY + headerHeight + rowIndex * fontSize * lineHeight
+    const y = startY + headerHeight + rowIndex * fontSize * lineHeight;
 
       // Calcular altura de la celda
       const cellHeight = calculateCellHeight(cell.toString(), cellWidth)
@@ -566,8 +559,11 @@ const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeigh
         doc.rect(x, y, cellWidth, cellHeight, 'F') // Rellenar
       }
 
+
       // Dibujar borde de la celda
       doc.rect(x, y, cellWidth, cellHeight).stroke()
+          lastY = Math.max(lastY, y + cellHeight);
+
 
       // Dividir texto en líneas y dibujar centrado
       const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2)
@@ -583,6 +579,8 @@ const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeigh
       doc.setFont('helvetica', 'normal')
     }
   })
+    return lastY; // Devuelve la última Y utilizada
+
 }
 
 
@@ -1843,36 +1841,42 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
   // }, [searchTerm]) // Remover socioSeleccionado de las dependencias
 
   const conectarBalanza = async () => {
-    if (!puertoSeleccionado) {
-      toast.warning('Por favor, seleccione un puerto')
-      return
-    }
-
-    // Check if the selected port is available
-    const puertoDisponible = puertosDisponibles.some((puerto) => puerto.path === puertoSeleccionado)
-    if (!puertoDisponible) {
-      toast.error(
-        'El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.',
-      )
-      return
-    }
-
-    try {
-      setConectandoBalanza(true)
-      const response = await balanzaService.connect({
-        port: puertoSeleccionado,
-        baudRate: parseInt(baudRate),
-      })
-
-      toast.success(response.message || 'Balanza conectada exitosamente')
-      setBalanzaConectada(true)
-    } catch (error) {
-      console.error('Error al conectar balanza:', error)
-      toast.error('Error al conectar: ' + (error.response?.data?.error || error.message))
-    } finally {
-      setConectandoBalanza(false)
-    }
+  if (!puertoSeleccionado) {
+    toast.warning('Por favor, seleccione un puerto')
+    return
   }
+
+  const puertoDisponible = puertosDisponibles.some((puerto) => puerto.path === puertoSeleccionado)
+  if (!puertoDisponible) {
+    toast.error(
+      'El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.',
+    )
+    return
+  }
+
+  try {
+    setConectandoBalanza(true)
+    const response = await balanzaService.connect({
+      port: puertoSeleccionado,
+      baudRate: parseInt(baudRate),
+    })
+
+    toast.success(response.message || 'Balanza conectada exitosamente')
+    setBalanzaConectada(true)
+
+    // --- NUEVO: Reinicia el monitor si estaba activo ---
+    detenerMonitoreoRealTime();
+    setTimeout(() => {
+      iniciarMonitoreoRealTime();
+    }, 500);
+    // ---------------------------------------------------
+  } catch (error) {
+    console.error('Error al conectar balanza:', error)
+    toast.error('Error al conectar: ' + (error.response?.data?.error || error.message))
+  } finally {
+    setConectandoBalanza(false)
+  }
+}
   // Cargar puertos cuando se abre la pestaña de pesaje
   useEffect(() => {
     if (activeTab === 'pesaje' && puertosDisponibles.length === 0) {
@@ -2141,71 +2145,53 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
     }
   }
 
-  // Agregar después de la línea 693, en la sección del monitor en tiempo real:
-
-  // Funciones para el Monitor en Tiempo Real
-
-  // Función para iniciar el monitoreo en tiempo real
-
-  // Función para iniciar el monitoreo en tiempo real
-
-  // Función para iniciar el monitoreo en tiempo real
+  const throttledSetPesajeRealTime = useRef(
+  throttle((data) => {
+    setPesajeRealTime((prev) => ({
+      ...prev,
+      weight: data.weight || 0,
+      stable: data.stable || false,
+      status: data.stable ? 'ESTABLE' : 'LEYENDO...',
+      statusColor: data.stable ? '#28a745' : '#ffc107',
+      timestamp: data.timestamp || new Date().toISOString(),
+      rawData: data.rawData || '',
+      hexData: data.hexData || '',
+    }));
+  }, 600) // 300 ms, puedes ajustar el tiempo
+).current;
   const iniciarMonitoreoRealTime = async () => {
-    if (!balanzaConectada) {
-      toast.warning('Debe conectar la balanza primero')
-      return
+  if (!balanzaConectada) {
+    toast.warning('Debe conectar la balanza primero')
+    return
+  }
+
+  try {
+    setMonitorActivo(true)
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
     }
 
-    try {
-      setMonitorActivo(true)
+    const eventSource = balanzaService.createRealtimeConnection(
+      (data) => {
+        if (data.type !== 'messageProcessed') return;
+        throttledSetPesajeRealTime(data); // <--- Usa la función throttled aquí
 
-      // Cerrar cualquier conexión EventSource existente
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-      }
-
-      // Usar el servicio createRealtimeConnection en lugar de crear EventSource manualmente
-      const eventSource = balanzaService.createRealtimeConnection(
-        // Función onData - se ejecuta cuando llegan datos
-        (data) => {
-          console.log('Datos recibidos del monitor:', data)
-
-          // Solo procesar si el tipo es 'messageProcessed'
-          if (data.type !== 'messageProcessed') {
-            return
-          }
-
-          // Actualizar el estado del pesaje en tiempo real
-          setPesajeRealTime((prev) => ({
-            ...prev,
-            weight: data.weight || 0,
-            stable: data.stable || false,
-            status: data.stable ? 'ESTABLE' : 'LEYENDO...',
-            statusColor: data.stable ? '#28a745' : '#ffc107',
-            timestamp: data.timestamp || new Date().toISOString(),
-            rawData: data.rawData || '',
-            hexData: data.hexData || '',
-          }))
-
-          // Si el peso es estable, agregarlo al historial
-          if (data.stable && data.weight > 0) {
-            setPesajes((prev) => {
-              const nuevoPesaje = {
-                id: `pesaje_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // ID único
-                peso: data.weight,
-                stable: data.stable,
-                timestamp: data.timestamp || new Date().toISOString(),
-                rawData: data.rawData,
-              }
-
-              // Mantener solo los últimos 10 pesajes
-              const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10)
-              return nuevoHistorial
-            })
-          }
-        },
-        // Función onError - se ejecuta cuando hay errores
-        (error) => {
+        if (data.stable && data.weight > 0) {
+          setPesajes((prev) => {
+            const nuevoPesaje = {
+              id: `pesaje_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              peso: data.weight,
+              stable: data.stable,
+              timestamp: data.timestamp || new Date().toISOString(),
+              rawData: data.rawData,
+            }
+            const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10)
+            return nuevoHistorial
+          })
+        }
+      },
+      (error) => {
           console.error('Error en conexión de tiempo real:', error)
           setMonitorActivo(false)
           toast.error('Error en la conexión del monitor')
@@ -2232,28 +2218,24 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
     }
   }
 
-  // Función para detener el monitoreo
-  const detenerMonitoreoRealTime = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-    }
-
-    setMonitorActivo(false)
-
-    // Resetear el estado del pesaje
-    setPesajeRealTime({
-      weight: 0,
-      stable: false,
-      status: 'DESCONECTADO',
-      statusColor: '#6c757d',
-      timestamp: null,
-      rawData: '',
-      hexData: '',
-    })
-
-    toast.info('Monitor de peso detenido')
+ const detenerMonitoreoRealTime = () => {
+  if (eventSourceRef.current) {
+    eventSourceRef.current.close();
+    eventSourceRef.current = null;
   }
+  setMonitorActivo(false);
+  setPesajeRealTime({
+    weight: 0,
+    stable: false,
+    status: 'DESCONECTADO',
+    statusColor: '#6c757d',
+    timestamp: null,
+    rawData: '',
+    hexData: '',
+  });
+  setPesajes([]); // <-- Limpia el historial de pesajes en tiempo real
+  toast.info('Monitor de peso detenido');
+};
 
   // Función para aplicar peso estable
   const aplicarPesoEstable = () => {
@@ -2991,12 +2973,14 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
 
   // Limpiar al desmontar el componente
   useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-      }
+  return () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
     }
-  }, [])
+    setMonitorActivo(false);
+  };
+}, []);
 
   // Función para obtener peso interpretado de la balanza (nueva)
   const obtenerPesoInterpretado = async () => {
@@ -4274,21 +4258,22 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
   }
 
   const desconectarBalanza = async () => {
-    try {
-      setConectandoBalanza(true)
-      const response = await balanzaService.disconnect()
+  try {
+    setConectandoBalanza(true);
+    const response = await balanzaService.disconnect();
+    toast.success(response.message || 'Balanza desconectada exitosamente');
+    setBalanzaConectada(false);
+    setPesoActual(0);
 
-      // Corregir el acceso a la respuesta - quitar .data
-      toast.success(response.message || 'Balanza desconectada exitosamente')
-      setBalanzaConectada(false)
-      setPesoActual(0)
-      setConectandoBalanza(false)
-    } catch (error) {
-      console.error('Error al desconectar balanza:', error)
-      toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message))
-      setConectandoBalanza(false)
-    }
+    // Limpia el monitor y los datos en tiempo real
+    detenerMonitoreoRealTime();
+  } catch (error) {
+    console.error('Error al desconectar balanza:', error);
+    toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message));
+  } finally {
+    setConectandoBalanza(false);
   }
+};
 
   useEffect(() => {
     setIsFilterActive(
@@ -4321,7 +4306,7 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
     <CIcon icon={selectedIngresos.length === ingresos.length ? cilCheckCircle : cilCircle} className="me-1" />
     {selectedIngresos.length === ingresos.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
   </CButton>
-  
+
   <CButton
     color="primary"
     onClick={handleGenerateMassivePDF}
