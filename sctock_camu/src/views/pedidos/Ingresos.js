@@ -79,7 +79,7 @@ import {
   cilHistory,
   cilList,
   cilClock,
-  cilX,cilCircle,
+  cilX, cilCircle,
   cilPrint,
 } from '@coreui/icons'
 import Swal from 'sweetalert2'
@@ -185,453 +185,458 @@ const Ingresos = () => {
   const [pesoNetoIngresadotemporal, setPesoNetoIngresadotemporal] = useState(0)
 
 
-// Agregar estos estados después de los estados existentes
-const [selectedIngresos, setSelectedIngresos] = useState([])
-const [generatingMassivePDF, setGeneratingMassivePDF] = useState(false)
+  // Agregar estos estados después de los estados existentes
+  const [selectedIngresos, setSelectedIngresos] = useState([])
+  const [generatingMassivePDF, setGeneratingMassivePDF] = useState(false)
 
-// Función para manejar la selección de ingresos
-const handleSelectIngreso = (ingresoId) => {
-  setSelectedIngresos(prev => {
-    if (prev.includes(ingresoId)) {
-      return prev.filter(id => id !== ingresoId)
+  // Función para manejar la selección de ingresos
+  const handleSelectIngreso = (ingresoId) => {
+    setSelectedIngresos(prev => {
+      if (prev.includes(ingresoId)) {
+        return prev.filter(id => id !== ingresoId)
+      } else {
+        return [...prev, ingresoId]
+      }
+    })
+  }
+
+  // Función para seleccionar todos los ingresos
+  const handleSelectAll = () => {
+    if (selectedIngresos.length === ingresos.length) {
+      setSelectedIngresos([])
     } else {
-      return [...prev, ingresoId]
+      setSelectedIngresos(ingresos.map(ingreso => ingreso.id))
     }
-  })
-}
-
-// Función para seleccionar todos los ingresos
-const handleSelectAll = () => {
-  if (selectedIngresos.length === ingresos.length) {
-    setSelectedIngresos([])
-  } else {
-    setSelectedIngresos(ingresos.map(ingreso => ingreso.id))
-  }
-}
-
-const handleGenerateMassivePDF = async () => {
-  if (selectedIngresos.length === 0) {
-    Swal.fire({
-      icon: 'warning',
-      title: 'Sin selección',
-      text: 'Por favor seleccione al menos un ingreso para imprimir',
-      confirmButtonColor: '#321fdb',
-    })
-    return
   }
 
-  setGeneratingMassivePDF(true)
+  const handleGenerateMassivePDF = async () => {
+    if (selectedIngresos.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sin selección',
+        text: 'Por favor seleccione al menos un ingreso para imprimir',
+        confirmButtonColor: '#321fdb',
+      })
+      return
+    }
 
-  try {
-    // Filtrar los ingresos seleccionados
-    const ingresosSeleccionados = ingresos.filter(ingreso =>
-      selectedIngresos.includes(ingreso.id)
-    )
+    setGeneratingMassivePDF(true)
 
-    // Ancho A3 (297mm), altura dinámica tipo ticket
-    const ticketWidth = 297 // mm (A3 vertical)
-    const ingresoHeight = 120 // Ajusta según el contenido de cada ingreso
-    const totalHeight = ingresosSeleccionados.length * ingresoHeight + 20
+    try {
+      // Filtrar los ingresos seleccionados
+      const ingresosSeleccionados = ingresos.filter(ingreso =>
+        selectedIngresos.includes(ingreso.id)
+      )
 
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: [ticketWidth, totalHeight]
-    })
+      // Ancho A3 (297mm), altura dinámica tipo ticket
+      const ticketWidth = 297 // mm (A3 vertical)
+      const ingresoHeight = 150 // 14cm = 140mm
+      const totalHeight = ingresosSeleccionados.length * ingresoHeight + 20
 
-    let yOffset = 10
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [ticketWidth, totalHeight]
+      })
 
-    for (let i = 0; i < ingresosSeleccionados.length; i++) {
-      const ingreso = ingresosSeleccionados[i]
-      await generarIngresoEnPDF(doc, ingreso, yOffset, false)
-      yOffset += ingresoHeight
-      // Línea separadora entre ingresos
-      if (i < ingresosSeleccionados.length - 1) {
-        doc.setDrawColor(200)
-        doc.line(5, yOffset - 2, ticketWidth - 5, yOffset - 2)
+
+      let yOffset = 10
+
+      for (let i = 0; i < ingresosSeleccionados.length; i++) {
+        const ingreso = ingresosSeleccionados[i]
+        await generarIngresoEnPDF(doc, ingreso, yOffset, false)
+        // Después de las firmas, asegurar que el siguiente grupo (NOTA DE INGRESO) comience después
+        yOffset += ingresoHeight
+        // Si quieres que cada grupo empiece en una nueva página, puedes usar:
+        // doc.addPage(); yOffset = 10;
+        // Pero si solo quieres espacio, el yOffset ya lo controla
+        // Línea separadora entre ingresos
+        if (i < ingresosSeleccionados.length - 1) {
+          doc.setDrawColor(200)
+          doc.line(5, yOffset - 2, ticketWidth - 5, yOffset - 2)
+        }
       }
+
+      // Generar y mostrar el PDF
+      const pdfBlob = doc.output('blob')
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      setPdfData(pdfUrl)
+      setShowPdfModal(true)
+
+      // Limpiar selección
+      setSelectedIngresos([])
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡PDF Generado!',
+        text: `Se generaron ${ingresosSeleccionados.length} notas de ingreso`,
+        timer: 2000,
+        showConfirmButton: false,
+      })
+
+    } catch (error) {
+      console.error('Error generating massive PDF:', error)
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error al generar el PDF masivo. Intente nuevamente.',
+        confirmButtonColor: '#321fdb',
+      })
+    } finally {
+      setGeneratingMassivePDF(false)
+    }
+  }
+  // Función auxiliar para generar cada ingreso en el PDF
+  const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
+    try {
+      // Obtener pesajes temporales del ingreso
+      const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id)
+  doc.setDrawColor(0, 0, 0); // <-- Añade esta línea para asegurar que el borde sea negro
+
+
+      const pesajesTableData = pesajesTemporales.map((pesaje) => [
+        new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
+        `${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
+        parseFloat(pesaje.peso_bruto || 0).toFixed(3),
+        pesaje.num_jabas_pesaje || 0,
+        parseFloat(pesaje.peso_jaba || 0).toFixed(3),
+        parseFloat(pesaje.peso_neto || 0).toFixed(3),
+        parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
+        (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
+        (
+          (parseFloat(ingreso.pago_transporte || 0) / 100) *
+          parseFloat(pesaje.peso_neto || 0)
+        ).toFixed(2),
+        ((parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0)).toFixed(2),
+        ingreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje * 1.0).toFixed(2) : '0.00',
+        (
+          parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
+          (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+          (parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
+          (ingreso.aplicarPrecioJaba ? pesaje.num_jabas_pesaje * 1.0 : 0)
+        ).toFixed(2),
+        pesaje.observacion || '',
+      ])
+
+      // Calcular totales
+      const totals = pesajesTableData.reduce((acc, row) => {
+        acc[1] += parseFloat(row[2]) || 0
+        acc[2] += parseInt(row[3]) || 0
+        acc[3] += parseFloat(row[4]) || 0
+        acc[4] += parseFloat(row[5]) || 0
+        acc[5] += parseFloat(row[7]) || 0
+        acc[6] += parseFloat(row[8]) || 0
+        acc[7] += parseFloat(row[9]) || 0
+        acc[8] += parseFloat(row[10]) || 0
+        acc[9] = parseFloat(row[6]) || 0
+        acc[10] += parseFloat(row[11]) || 0
+        return acc
+      }, Array(11).fill(0))
+
+      // Agregar fila de totales
+      pesajesTableData.push([
+        'Total',
+        '',
+        totals[1].toFixed(3),
+        totals[2],
+        totals[3].toFixed(3),
+        totals[4].toFixed(3),
+        totals[9].toFixed(2),
+        totals[5].toFixed(2),
+        totals[6].toFixed(2),
+        totals[7].toFixed(2),
+        totals[8].toFixed(2),
+        totals[10].toFixed(2),
+        '',
+      ])
+
+      // Configuración de posiciones para cada grupo (mitad de A3)
+      const pageWidth = doc.internal.pageSize.getWidth()
+      // A3 height in points: 841.89, so half is 420.945
+      const mitadHeight = 841.89 / 2 // 420.945 puntos (mitad de A3)
+      // Si quieres que sea exactamente el alto de la página actual, usa:
+      // const mitadHeight = doc.internal.pageSize.getHeight() / 2
+
+      // Posiciones base ajustadas para cada mitad
+      const imgWidth = 35
+      const imgHeight = 25
+      const xPosImage = pageWidth - imgWidth - 20
+      const yPosImage = yOffset + 5
+      const xPosText = 10
+      const yPosText = yOffset + 2
+
+      // Cargar y agregar imagen
+      const imageUrl = '/img/coopay.png'
+      const img = new Image()
+
+      return new Promise((resolve) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.width
+          canvas.height = img.height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0)
+          const base64Image = canvas.toDataURL('image/png')
+
+          doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight)
+
+          // Configurar texto
+          const fontSize = 10
+          doc.setFontSize(fontSize)
+
+          // Títulos centrados
+          const notaIngresoText = 'NOTA DE INGRESO'
+          const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA - COOPAY'
+
+          const notaIngresoWidth = doc.getTextWidth(notaIngresoText)
+          const coopayWidth = doc.getTextWidth(coopayText)
+
+          const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2
+          const centerXCoopay = (pageWidth - coopayWidth) / 2
+
+          doc.text(notaIngresoText, centerXNotaIngreso, yPosText)
+          doc.text(coopayText, centerXCoopay, yPosText + 10)
+
+          // Tabla de información básica
+          const tableData = [
+            ['Nro registro', ingreso.numero_ingreso],
+            ['Apellidos del socio', ingreso.parcela?.socio?.apellidos || 'N/A'],
+            ['Nombre del socio', ingreso.parcela?.socio?.nombres || 'N/A'],
+            ['Código del socio', ingreso.parcela?.codigo || 'N/A'],
+          ]
+
+          drawTableMassive(doc, tableData, yPosText + 20, yOffset, mitadHeight)
+
+          // Detalle de pesajes
+          const detailText = 'DETALLE DE LA NOTA DE INGRESO:'
+          const detailTextYPos = yPosText + 20 + tableData.length * 7 + 10
+          doc.text(detailText, xPosText, detailTextYPos)
+
+          // Tabla de pesajes
+          const pesajesTableHeaders = [
+            'Fecha', 'Producto', 'Peso Bruto', 'Jabas', 'Peso Jabas', 'Peso Neto',
+            'Precio Venta', 'Subtotal', 'Pago Transporte', 'Ingreso Cooperativa',
+            'Dscto. por jabas', 'Pago Socio', 'Observación'
+          ]
+
+
+          const tableEndY = drawPesajesTableMassive(
+            doc,
+            pesajesTableHeaders,
+            pesajesTableData,
+            detailTextYPos + 5,
+            yOffset,
+            mitadHeight,
+            8
+          );
+
+
+          // Firmas
+          const pesajesTableYStart = detailTextYPos + 5
+          const pesajesTableRowHeight = 8 // o el valor real que uses
+          const pesajesTableHeight = pesajesTableData.length * pesajesTableRowHeight
+          const firmasY = tableEndY + 10; // 10 de espacio extra
+
+          const signatureWidth = pageWidth / 2 - 20
+          const signatureXPosLeft = 20
+          const signatureXPosRight = pageWidth / 2 + 10
+
+          doc.setFontSize(10)
+
+          const emisorText = `FIRMA DEL EMISOR\nNombre: ________________\nDNI: ___________________\n\n_______________________`
+          const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela?.socio?.nombres || ''} ${ingreso.parcela?.socio?.apellidos || ''}\nDNI: ${ingreso.parcela?.dni || '_______________'}\n\n_______________________`
+
+          const emisorLines = emisorText.split('\n')
+          const socioLines = socioText.split('\n')
+          const emisorMaxWidth = Math.max(...emisorLines.map(line => doc.getTextWidth(line)))
+          const socioMaxWidth = Math.max(...socioLines.map(line => doc.getTextWidth(line)))
+          const leftColumnCenter = signatureXPosLeft + (signatureWidth / 2)
+          const rightColumnCenter = signatureXPosRight + (signatureWidth / 2)
+          const emisorCenteredX = leftColumnCenter - (emisorMaxWidth / 2)
+          const socioCenteredX = rightColumnCenter - (socioMaxWidth / 2)
+
+          doc.text(emisorText, emisorCenteredX, firmasY, { align: 'left' });
+          doc.text(socioText, socioCenteredX, firmasY, { align: 'left' });
+
+          // // Línea separadora entre mitades (solo si es la primera mitad)
+          // if (!esMitadInferior) {
+          //   // doc.setDrawColor(200, 200, 200)
+          //   // doc.setLineWidth(0.5)
+          //   doc.line(10, yOffset + mitadHeight, pageWidth - 10, yOffset + mitadHeight)
+          // }
+
+          resolve()
+        }
+
+        img.onerror = () => {
+          console.warn('No se pudo cargar la imagen, continuando sin ella')
+          resolve()
+        }
+
+        img.src = imageUrl
+      })
+
+    } catch (error) {
+      console.error('Error generando ingreso individual:', error)
+      throw error
+    }
+  }
+
+  // Función auxiliar para dibujar tabla de pesajes en formato masivo con texto multilínea
+  const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeight, fontSize = 9) => {
+    const cellPadding = 2
+    const lineHeight = 0.8
+    const headerHeight = 8
+
+    doc.setFontSize(fontSize)
+
+    // Función para calcular el ancho de una celda basado en su texto
+    const calculateCellWidth = (text) => {
+      return doc.getTextWidth(text) + cellPadding * 2
     }
 
-    // Generar y mostrar el PDF
-    const pdfBlob = doc.output('blob')
-    const pdfUrl = URL.createObjectURL(pdfBlob)
-    setPdfData(pdfUrl)
-    setShowPdfModal(true)
-
-    // Limpiar selección
-    setSelectedIngresos([])
-
-    Swal.fire({
-      icon: 'success',
-      title: '¡PDF Generado!',
-      text: `Se generaron ${ingresosSeleccionados.length} notas de ingreso`,
-      timer: 2000,
-      showConfirmButton: false,
+    // Calcular el ancho máximo para cada columna
+    const columnWidths = headers.map((header, index) => {
+      const headerWidth = calculateCellWidth(header)
+      const maxDataWidth = data.reduce((maxWidth, row) => {
+        const cellWidth = calculateCellWidth(row[index].toString())
+        return Math.max(maxWidth, cellWidth)
+      }, 0)
+      return Math.max(headerWidth, maxDataWidth)
     })
 
-  } catch (error) {
-    console.error('Error generating massive PDF:', error)
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Error al generar el PDF masivo. Intente nuevamente.',
-      confirmButtonColor: '#321fdb',
-    })
-  } finally {
-    setGeneratingMassivePDF(false)
-  }
-}
-// Función auxiliar para generar cada ingreso en el PDF
-const generarIngresoEnPDF = async (doc, ingreso, yOffset, esMitadInferior) => {
-  try {
-    // Obtener pesajes temporales del ingreso
-    const pesajesTemporales = await detallePesajeService.getByIngresoId(ingreso.id)
+    // Calcular ancho total de la tabla
+    const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0)
 
-    const pesajesTableData = pesajesTemporales.map((pesaje) => [
-      new Date(pesaje.fecha_pesaje).toLocaleDateString() || '',
-      `${pesaje.tipo_fruta_nombre || 'Tipo no especificado'}`,
-      parseFloat(pesaje.peso_bruto || 0).toFixed(3),
-      pesaje.num_jabas_pesaje || 0,
-      parseFloat(pesaje.peso_jaba || 0).toFixed(3),
-      parseFloat(pesaje.peso_neto || 0).toFixed(3),
-      parseFloat(ingreso.precio_venta_kg || 0).toFixed(2),
-      (parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0)).toFixed(2),
-      (
-        (parseFloat(ingreso.pago_transporte || 0) / 100) *
-        parseFloat(pesaje.peso_neto || 0)
-      ).toFixed(2),
-      ((parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0)).toFixed(2),
-      ingreso.aplicarPrecioJaba ? (pesaje.num_jabas_pesaje * 1.0).toFixed(2) : '0.00',
-      (
-        parseFloat(pesaje.peso_neto || 0) * parseFloat(ingreso.precio_venta_kg || 0) -
-        (parseFloat(ingreso.pago_transporte || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
-        (parseFloat(ingreso.impuesto || 0) / 100) * parseFloat(pesaje.peso_neto || 0) -
-        (ingreso.aplicarPrecioJaba ? pesaje.num_jabas_pesaje * 1.0 : 0)
-      ).toFixed(2),
-      pesaje.observacion || '',
-    ])
-
-    // Calcular totales
-    const totals = pesajesTableData.reduce((acc, row) => {
-      acc[1] += parseFloat(row[2]) || 0
-      acc[2] += parseInt(row[3]) || 0
-      acc[3] += parseFloat(row[4]) || 0
-      acc[4] += parseFloat(row[5]) || 0
-      acc[5] += parseFloat(row[7]) || 0
-      acc[6] += parseFloat(row[8]) || 0
-      acc[7] += parseFloat(row[9]) || 0
-      acc[8] += parseFloat(row[10]) || 0
-      acc[9] = parseFloat(row[6]) || 0
-      acc[10] += parseFloat(row[11]) || 0
-      return acc
-    }, Array(11).fill(0))
-
-    // Agregar fila de totales
-    pesajesTableData.push([
-      'Total',
-      '',
-      totals[1].toFixed(3),
-      totals[2],
-      totals[3].toFixed(3),
-      totals[4].toFixed(3),
-      totals[9].toFixed(2),
-      totals[5].toFixed(2),
-      totals[6].toFixed(2),
-      totals[7].toFixed(2),
-      totals[8].toFixed(2),
-      totals[10].toFixed(2),
-      '',
-    ])
-
-    // Configuración de posiciones para cada mitad
+    // Calcular posición X inicial (centrar la tabla)
     const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
-    const mitadHeight = pageHeight / 2
+    const startX = (pageWidth - totalTableWidth) / 2
 
-    // Posiciones base ajustadas para cada mitad
-    const imgWidth = 35
-    const imgHeight = 25
-    const xPosImage = pageWidth - imgWidth - 20
-    const yPosImage = yOffset + 5
-    const xPosText = 10
-    const yPosText = yOffset + 15
-
-    // Cargar y agregar imagen
-    const imageUrl = '/img/coopay.png'
-    const img = new Image()
-
-    return new Promise((resolve) => {
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0)
-        const base64Image = canvas.toDataURL('image/png')
-
-        doc.addImage(base64Image, 'PNG', xPosImage, yPosImage, imgWidth, imgHeight)
-
-        // Configurar texto
-        const fontSize = 10
-        doc.setFontSize(fontSize)
-
-        // Títulos centrados
-        const notaIngresoText = 'NOTA DE INGRESO'
-        const coopayText = 'COOPERATIVA AGROINDUSTRIAL YARINACOCHA - COOPAY'
-
-        const notaIngresoWidth = doc.getTextWidth(notaIngresoText)
-        const coopayWidth = doc.getTextWidth(coopayText)
-
-        const centerXNotaIngreso = (pageWidth - notaIngresoWidth) / 2
-        const centerXCoopay = (pageWidth - coopayWidth) / 2
-
-        doc.text(notaIngresoText, centerXNotaIngreso, yPosText)
-        doc.text(coopayText, centerXCoopay, yPosText + 10)
-
-        // Tabla de información básica
-        const tableData = [
-          ['Nro registro', ingreso.numero_ingreso],
-          ['Apellidos del socio', ingreso.parcela?.socio?.apellidos || 'N/A'],
-          ['Nombre del socio', ingreso.parcela?.socio?.nombres || 'N/A'],
-          ['Código del socio', ingreso.parcela?.codigo || 'N/A'],
-        ]
-
-        drawTableMassive(doc, tableData, yPosText + 20, yOffset, mitadHeight)
-
-        // Detalle de pesajes
-        const detailText = 'DETALLE DE LA NOTA DE INGRESO:'
-        const detailTextYPos = yPosText + 20 + tableData.length * 7 + 10
-        doc.text(detailText, xPosText, detailTextYPos)
-
-        // Tabla de pesajes
-        const pesajesTableHeaders = [
-          'Fecha', 'Producto', 'Peso Bruto', 'Jabas', 'Peso Jabas', 'Peso Neto',
-          'Precio Venta', 'Subtotal', 'Pago Transporte', 'Ingreso Cooperativa',
-          'Dscto. por jabas', 'Pago Socio', 'Observación'
-        ]
-
-
-       const tableEndY = drawPesajesTableMassive(
-  doc,
-  pesajesTableHeaders,
-  pesajesTableData,
-  detailTextYPos + 5,
-  yOffset,
-  mitadHeight,
-  8
-);
-
-
-        // Firmas
-        const pesajesTableYStart = detailTextYPos + 5
-const pesajesTableRowHeight = 8 // o el valor real que uses
-const pesajesTableHeight = pesajesTableData.length * pesajesTableRowHeight
-const firmasY = tableEndY + 10; // 10 de espacio extra
-
-const signatureWidth = pageWidth / 2 - 20
-const signatureXPosLeft = 20
-const signatureXPosRight = pageWidth / 2 + 10
-
-doc.setFontSize(10)
-
-const emisorText = `FIRMA DEL EMISOR\nNombre: ________________\nDNI: ___________________\n\n_______________________`
-const socioText = `FIRMA DEL SOCIO\nNombre: ${ingreso.parcela?.socio?.nombres || ''} ${ingreso.parcela?.socio?.apellidos || ''}\nDNI: ${ingreso.parcela?.dni || '_______________'}\n\n_______________________`
-
-const emisorLines = emisorText.split('\n')
-const socioLines = socioText.split('\n')
-const emisorMaxWidth = Math.max(...emisorLines.map(line => doc.getTextWidth(line)))
-const socioMaxWidth = Math.max(...socioLines.map(line => doc.getTextWidth(line)))
-const leftColumnCenter = signatureXPosLeft + (signatureWidth / 2)
-const rightColumnCenter = signatureXPosRight + (signatureWidth / 2)
-const emisorCenteredX = leftColumnCenter - (emisorMaxWidth / 2)
-const socioCenteredX = rightColumnCenter - (socioMaxWidth / 2)
-
-doc.text(emisorText, emisorCenteredX, firmasY, { align: 'left' });
-doc.text(socioText, socioCenteredX, firmasY, { align: 'left' });
-
-        // // Línea separadora entre mitades (solo si es la primera mitad)
-        // if (!esMitadInferior) {
-        //   // doc.setDrawColor(200, 200, 200)
-        //   // doc.setLineWidth(0.5)
-        //   doc.line(10, yOffset + mitadHeight, pageWidth - 10, yOffset + mitadHeight)
-        // }
-
-        resolve()
-      }
-
-      img.onerror = () => {
-        console.warn('No se pudo cargar la imagen, continuando sin ella')
-        resolve()
-      }
-
-      img.src = imageUrl
-    })
-
-  } catch (error) {
-    console.error('Error generando ingreso individual:', error)
-    throw error
-  }
+    // Función para calcular la altura de una celda basada en su texto
+    const calculateCellHeight = (text, cellWidth) => {
+  const textLines = doc.splitTextToSize(text.toString(), cellWidth - cellPadding * 2)
+  return textLines.length * fontSize * lineHeight
 }
 
-
-
-
-// Función auxiliar para dibujar tabla de pesajes en formato masivo con texto multilínea
-const drawPesajesTableMassive = (doc, headers, data, startY, yOffset, mitadHeight, fontSize = 9) => {
-  const cellPadding = 2
-  const lineHeight = 1.2
-  const headerHeight = 8
-
-  doc.setFontSize(fontSize)
-
-  // Función para calcular el ancho de una celda basado en su texto
-  const calculateCellWidth = (text) => {
-    return doc.getTextWidth(text) + cellPadding * 2
-  }
-
-  // Calcular el ancho máximo para cada columna
-  const columnWidths = headers.map((header, index) => {
-    const headerWidth = calculateCellWidth(header)
-    const maxDataWidth = data.reduce((maxWidth, row) => {
-      const cellWidth = calculateCellWidth(row[index].toString())
-      return Math.max(maxWidth, cellWidth)
-    }, 0)
-    return Math.max(headerWidth, maxDataWidth)
-  })
-
-  // Calcular ancho total de la tabla
-  const totalTableWidth = columnWidths.reduce((sum, width) => sum + width, 0)
-
-  // Calcular posición X inicial (centrar la tabla)
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const startX = (pageWidth - totalTableWidth) / 2
-
-  // Función para calcular la altura de una celda basada en su texto
-  const calculateCellHeight = (text, cellWidth) => {
-    const textLines = doc.splitTextToSize(text.toString(), cellWidth - cellPadding * 2)
-    return textLines.length * fontSize * lineHeight
-  }
-
-  // Dibujar headers con fuente bold
-  doc.setFont('helvetica', 'bold')
-  headers.forEach((header, index) => {
-    const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0)
-    const cellWidth = columnWidths[index]
-
-    // Verificar límites
-    if (startY + headerHeight > yOffset + mitadHeight - 50) return
-
-    // Dibujar borde del header
-    doc.rect(x, startY, cellWidth, headerHeight).stroke()
-
-    // Texto del header centrado
-    const textX = x + (cellWidth - doc.getTextWidth(header)) / 2
-    const textY = startY + headerHeight / 2 + cellPadding / 2
-    doc.text(header, textX, textY, { baseline: 'middle' })
-  })
-
-  // Dibujar datos
-  doc.setFont('helvetica', 'normal')
-  let lastY = startY + headerHeight;
-
-  data.forEach((row, rowIndex) => {
-    // Verificar si es la fila de totales
-    const isTotal = rowIndex === data.length - 1
-
-    if (isTotal) {
-      doc.setFont('helvetica', 'bold')
-    }
-
-    row.forEach((cell, cellIndex) => {
-      const cellWidth = columnWidths[cellIndex]
-      const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0)
-    const y = startY + headerHeight + rowIndex * fontSize * lineHeight;
-
-      // Calcular altura de la celda
-      const cellHeight = calculateCellHeight(cell.toString(), cellWidth)
+    // Dibujar headers con fuente bold
+    doc.setFont('helvetica', 'bold')
+    headers.forEach((header, index) => {
+      const x = startX + columnWidths.slice(0, index).reduce((sum, width) => sum + width, 0)
+      const cellWidth = columnWidths[index]
 
       // Verificar límites
-      if (y + cellHeight > yOffset + mitadHeight - 50) return
+      if (startY + headerHeight > yOffset + mitadHeight - 50) return
 
-      // Aplicar sombreado para la fila de totales
-      if (isTotal) {
-        doc.setFillColor(220, 220, 220) // Gris claro
-        doc.rect(x, y, cellWidth, cellHeight, 'F') // Rellenar
-      }
+      // Dibujar borde del header
+      doc.rect(x, startY, cellWidth, headerHeight).stroke()
 
-
-      // Dibujar borde de la celda
-      doc.rect(x, y, cellWidth, cellHeight).stroke()
-          lastY = Math.max(lastY, y + cellHeight);
-
-
-      // Dividir texto en líneas y dibujar centrado
-      const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2)
-      textLines.forEach((line, lineIndex) => {
-        const textY = y + cellPadding + lineIndex * fontSize * lineHeight
-        const textX = x + (cellWidth - doc.getTextWidth(line)) / 2 // Centrar texto
-        doc.text(line, textX, textY, { baseline: 'top' })
-      })
+      // Texto del header centrado
+      const textX = x + (cellWidth - doc.getTextWidth(header)) / 2
+      const textY = startY + headerHeight / 2 + cellPadding / 2
+      doc.text(header, textX, textY, { baseline: 'middle' })
     })
 
-    // Restaurar fuente normal después de totales
-    if (isTotal) {
-      doc.setFont('helvetica', 'normal')
-    }
-  })
+    // Dibujar datos
+    doc.setFont('helvetica', 'normal')
+    let lastY = startY + headerHeight;
+
+    data.forEach((row, rowIndex) => {
+      // Verificar si es la fila de totales
+      const isTotal = rowIndex === data.length - 1
+
+      if (isTotal) {
+        doc.setFont('helvetica', 'bold')
+      }
+
+      row.forEach((cell, cellIndex) => {
+        const cellWidth = columnWidths[cellIndex]
+        const x = startX + columnWidths.slice(0, cellIndex).reduce((sum, width) => sum + width, 0)
+        const y = startY + headerHeight + rowIndex * fontSize * lineHeight;
+
+        // Calcular altura de la celda
+  const cellHeight = calculateCellHeight(cell.toString(), cellWidth)
+
+        // Verificar límites
+        if (y + cellHeight > yOffset + mitadHeight - 50) return
+
+        if (isTotal) {
+  doc.setFillColor(220, 220, 220); // Gris claro
+  doc.rect(x, y, cellWidth, cellHeight, 'F'); // Rellenar
+}
+
+
+        // Dibujar borde de la celda
+        doc.rect(x, y, cellWidth, cellHeight).stroke()
+        lastY = Math.max(lastY, y + cellHeight);
+
+
+        // Dividir texto en líneas y dibujar centrado
+        const textLines = doc.splitTextToSize(cell.toString(), cellWidth - cellPadding * 2)
+        textLines.forEach((line, lineIndex) => {
+          const textY = y + cellPadding + lineIndex * fontSize * lineHeight
+          const textX = x + (cellWidth - doc.getTextWidth(line)) / 2 // Centrar texto
+          doc.text(line, textX, textY, { baseline: 'top' })
+        })
+      })
+
+      // Restaurar fuente normal después de totales
+      if (isTotal) {
+        doc.setFont('helvetica', 'normal')
+      }
+    })
     return lastY; // Devuelve la última Y utilizada
 
-}
+  }
 
 
-// Función corregida para drawTableMassive similar a drawTable individual
-const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
-  const cellPadding = 2
-  const cellHeight = 7
-  const fontSize = 10
-  const firstColumnWidth = 50 // Ancho fijo para la primera columna
-  const startX = 10
+  // Función corregida para drawTableMassive similar a drawTable individual
+  const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
+    const cellPadding = 2
+    const cellHeight = 7
+    const fontSize = 10
+    const firstColumnWidth = 50 // Ancho fijo para la primera columna
+    const startX = 10
 
-  doc.setFontSize(fontSize)
+    doc.setFontSize(fontSize)
 
-  // Calcular el ancho máximo del texto para la segunda columna
-  const maxTextWidth = tableData.reduce((maxWidth, row) => {
-    if (row[1]) {
-      const textWidth = doc.getTextWidth(row[1].toString())
-      return Math.max(maxWidth, textWidth)
-    }
-    return maxWidth
-  }, 0)
-
-  // Ancho de la segunda columna = ancho máximo del texto + padding
-  const secondColumnWidth = maxTextWidth + cellPadding * 2
-
-  // Verificar que no se salga de la mitad asignada
-  const maxRows = Math.floor((mitadHeight - 50 - (startY - yOffset)) / cellHeight)
-  const rowsToShow = Math.min(tableData.length, maxRows)
-
-  tableData.slice(0, rowsToShow).forEach((row, rowIndex) => {
-    const y = startY + rowIndex * cellHeight
-
-    row.forEach((cell, cellIndex) => {
-      const cellWidth = cellIndex === 0 ? firstColumnWidth : secondColumnWidth
-      const x = startX + (cellIndex === 0 ? 0 : firstColumnWidth)
-
-      // Fondo amarillo para primera columna (igual que drawTable individual)
-      if (cellIndex === 0) {
-        doc.setFillColor(255, 192, 0) // Color amarillo #ffc000
-        doc.rect(x, y, cellWidth, cellHeight, 'F')
+    // Calcular el ancho máximo del texto para la segunda columna
+    const maxTextWidth = tableData.reduce((maxWidth, row) => {
+      if (row[1]) {
+        const textWidth = doc.getTextWidth(row[1].toString())
+        return Math.max(maxWidth, textWidth)
       }
+      return maxWidth
+    }, 0)
 
-      // Borde de celda
-      doc.rect(x, y, cellWidth, cellHeight).stroke()
+    // Ancho de la segunda columna = ancho máximo del texto + padding
+    const secondColumnWidth = maxTextWidth + cellPadding * 2
 
-      // Texto centrado verticalmente
-      const textY = y + cellHeight / 2 + cellPadding / 2
-      doc.text(cell?.toString() || '', x + cellPadding, textY, { baseline: 'middle' })
+    // Verificar que no se salga de la mitad asignada
+    const maxRows = Math.floor((mitadHeight - 50 - (startY - yOffset)) / cellHeight)
+    const rowsToShow = Math.min(tableData.length, maxRows)
+
+    tableData.slice(0, rowsToShow).forEach((row, rowIndex) => {
+      const y = startY + rowIndex * cellHeight
+
+      row.forEach((cell, cellIndex) => {
+        const cellWidth = cellIndex === 0 ? firstColumnWidth : secondColumnWidth
+        const x = startX + (cellIndex === 0 ? 0 : firstColumnWidth)
+
+        // Fondo amarillo para primera columna (igual que drawTable individual)
+        if (cellIndex === 0) {
+          doc.setFillColor(255, 192, 0) // Color amarillo #ffc000
+          doc.rect(x, y, cellWidth, cellHeight, 'F')
+        }
+
+        // Borde de celda
+        doc.rect(x, y, cellWidth, cellHeight).stroke()
+
+        // Texto centrado verticalmente
+        const textY = y + cellHeight / 2 + cellPadding / 2
+        doc.text(cell?.toString() || '', x + cellPadding, textY, { baseline: 'middle' })
+      })
     })
-  })
-}
+  }
   const drawTable = (doc, tableData, startY, format) => {
     const cellPadding = 2 // Padding inside each cell
     let cellHeight = 7 // Default height of each cell
@@ -897,7 +902,7 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
       const totalHeight = pesajesTableData.length * lineHeight + 120 // Add extra space for headers and footers
 
       const doc = new jsPDF({
-        orientation:  'portrait',
+        orientation: 'portrait',
         unit: 'mm',
         format: format === 'ticket' ? [80, totalHeight] : 'a3', // Use custom size for ticket
       })
@@ -1841,42 +1846,42 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
   // }, [searchTerm]) // Remover socioSeleccionado de las dependencias
 
   const conectarBalanza = async () => {
-  if (!puertoSeleccionado) {
-    toast.warning('Por favor, seleccione un puerto')
-    return
+    if (!puertoSeleccionado) {
+      toast.warning('Por favor, seleccione un puerto')
+      return
+    }
+
+    const puertoDisponible = puertosDisponibles.some((puerto) => puerto.path === puertoSeleccionado)
+    if (!puertoDisponible) {
+      toast.error(
+        'El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.',
+      )
+      return
+    }
+
+    try {
+      setConectandoBalanza(true)
+      const response = await balanzaService.connect({
+        port: puertoSeleccionado,
+        baudRate: parseInt(baudRate),
+      })
+
+      toast.success(response.message || 'Balanza conectada exitosamente')
+      setBalanzaConectada(true)
+
+      // --- NUEVO: Reinicia el monitor si estaba activo ---
+      detenerMonitoreoRealTime();
+      setTimeout(() => {
+        iniciarMonitoreoRealTime();
+      }, 500);
+      // ---------------------------------------------------
+    } catch (error) {
+      console.error('Error al conectar balanza:', error)
+      toast.error('Error al conectar: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setConectandoBalanza(false)
+    }
   }
-
-  const puertoDisponible = puertosDisponibles.some((puerto) => puerto.path === puertoSeleccionado)
-  if (!puertoDisponible) {
-    toast.error(
-      'El puerto seleccionado no está disponible. Por favor, actualice la lista de puertos.',
-    )
-    return
-  }
-
-  try {
-    setConectandoBalanza(true)
-    const response = await balanzaService.connect({
-      port: puertoSeleccionado,
-      baudRate: parseInt(baudRate),
-    })
-
-    toast.success(response.message || 'Balanza conectada exitosamente')
-    setBalanzaConectada(true)
-
-    // --- NUEVO: Reinicia el monitor si estaba activo ---
-    detenerMonitoreoRealTime();
-    setTimeout(() => {
-      iniciarMonitoreoRealTime();
-    }, 500);
-    // ---------------------------------------------------
-  } catch (error) {
-    console.error('Error al conectar balanza:', error)
-    toast.error('Error al conectar: ' + (error.response?.data?.error || error.message))
-  } finally {
-    setConectandoBalanza(false)
-  }
-}
   // Cargar puertos cuando se abre la pestaña de pesaje
   useEffect(() => {
     if (activeTab === 'pesaje' && puertosDisponibles.length === 0) {
@@ -1891,14 +1896,14 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
     const term = searchTerm.toLowerCase()
     return socios.filter(
       (parcela) =>
-      parcela.codigo?.toLowerCase().includes(term) ||
-      parcela.socio?.nombres?.toLowerCase().includes(term) ||
-      parcela.socio?.apellidos?.toLowerCase().includes(term) ||
-      `${parcela.socio?.nombres || ''} ${parcela.socio?.apellidos || ''}`.toLowerCase().includes(term) ||
-      // Agregar búsqueda por hectáreas y volumen
-      (parcela.hectarias && parcela.hectarias.toString().includes(term)) ||
-      (parcela.volumen && parcela.volumen.toString().includes(term)),
-  )
+        parcela.codigo?.toLowerCase().includes(term) ||
+        parcela.socio?.nombres?.toLowerCase().includes(term) ||
+        parcela.socio?.apellidos?.toLowerCase().includes(term) ||
+        `${parcela.socio?.nombres || ''} ${parcela.socio?.apellidos || ''}`.toLowerCase().includes(term) ||
+        // Agregar búsqueda por hectáreas y volumen
+        (parcela.hectarias && parcela.hectarias.toString().includes(term)) ||
+        (parcela.volumen && parcela.volumen.toString().includes(term)),
+    )
   }
 
   // Función para filtrar órdenes basada en el término de búsqueda
@@ -2146,52 +2151,52 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
   }
 
   const throttledSetPesajeRealTime = useRef(
-  throttle((data) => {
-    setPesajeRealTime((prev) => ({
-      ...prev,
-      weight: data.weight || 0,
-      stable: data.stable || false,
-      status: data.stable ? 'ESTABLE' : 'LEYENDO...',
-      statusColor: data.stable ? '#28a745' : '#ffc107',
-      timestamp: data.timestamp || new Date().toISOString(),
-      rawData: data.rawData || '',
-      hexData: data.hexData || '',
-    }));
-  }, 600) // 300 ms, puedes ajustar el tiempo
-).current;
+    throttle((data) => {
+      setPesajeRealTime((prev) => ({
+        ...prev,
+        weight: data.weight || 0,
+        stable: data.stable || false,
+        status: data.stable ? 'ESTABLE' : 'LEYENDO...',
+        statusColor: data.stable ? '#28a745' : '#ffc107',
+        timestamp: data.timestamp || new Date().toISOString(),
+        rawData: data.rawData || '',
+        hexData: data.hexData || '',
+      }));
+    }, 600) // 300 ms, puedes ajustar el tiempo
+  ).current;
   const iniciarMonitoreoRealTime = async () => {
-  if (!balanzaConectada) {
-    toast.warning('Debe conectar la balanza primero')
-    return
-  }
-
-  try {
-    setMonitorActivo(true)
-
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
+    if (!balanzaConectada) {
+      toast.warning('Debe conectar la balanza primero')
+      return
     }
 
-    const eventSource = balanzaService.createRealtimeConnection(
-      (data) => {
-        if (data.type !== 'messageProcessed') return;
-        throttledSetPesajeRealTime(data); // <--- Usa la función throttled aquí
+    try {
+      setMonitorActivo(true)
 
-        if (data.stable && data.weight > 0) {
-          setPesajes((prev) => {
-            const nuevoPesaje = {
-              id: `pesaje_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              peso: data.weight,
-              stable: data.stable,
-              timestamp: data.timestamp || new Date().toISOString(),
-              rawData: data.rawData,
-            }
-            const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10)
-            return nuevoHistorial
-          })
-        }
-      },
-      (error) => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+
+      const eventSource = balanzaService.createRealtimeConnection(
+        (data) => {
+          if (data.type !== 'messageProcessed') return;
+          throttledSetPesajeRealTime(data); // <--- Usa la función throttled aquí
+
+          if (data.stable && data.weight > 0) {
+            setPesajes((prev) => {
+              const nuevoPesaje = {
+                id: `pesaje_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                peso: data.weight,
+                stable: data.stable,
+                timestamp: data.timestamp || new Date().toISOString(),
+                rawData: data.rawData,
+              }
+              const nuevoHistorial = [nuevoPesaje, ...prev].slice(0, 10)
+              return nuevoHistorial
+            })
+          }
+        },
+        (error) => {
           console.error('Error en conexión de tiempo real:', error)
           setMonitorActivo(false)
           toast.error('Error en la conexión del monitor')
@@ -2218,24 +2223,24 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
     }
   }
 
- const detenerMonitoreoRealTime = () => {
-  if (eventSourceRef.current) {
-    eventSourceRef.current.close();
-    eventSourceRef.current = null;
-  }
-  setMonitorActivo(false);
-  setPesajeRealTime({
-    weight: 0,
-    stable: false,
-    status: 'DESCONECTADO',
-    statusColor: '#6c757d',
-    timestamp: null,
-    rawData: '',
-    hexData: '',
-  });
-  setPesajes([]); // <-- Limpia el historial de pesajes en tiempo real
-  toast.info('Monitor de peso detenido');
-};
+  const detenerMonitoreoRealTime = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setMonitorActivo(false);
+    setPesajeRealTime({
+      weight: 0,
+      stable: false,
+      status: 'DESCONECTADO',
+      statusColor: '#6c757d',
+      timestamp: null,
+      rawData: '',
+      hexData: '',
+    });
+    setPesajes([]); // <-- Limpia el historial de pesajes en tiempo real
+    toast.info('Monitor de peso detenido');
+  };
 
   // Función para aplicar peso estable
   const aplicarPesoEstable = () => {
@@ -2973,14 +2978,14 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
 
   // Limpiar al desmontar el componente
   useEffect(() => {
-  return () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    setMonitorActivo(false);
-  };
-}, []);
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      setMonitorActivo(false);
+    };
+  }, []);
 
   // Función para obtener peso interpretado de la balanza (nueva)
   const obtenerPesoInterpretado = async () => {
@@ -4258,22 +4263,22 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
   }
 
   const desconectarBalanza = async () => {
-  try {
-    setConectandoBalanza(true);
-    const response = await balanzaService.disconnect();
-    toast.success(response.message || 'Balanza desconectada exitosamente');
-    setBalanzaConectada(false);
-    setPesoActual(0);
+    try {
+      setConectandoBalanza(true);
+      const response = await balanzaService.disconnect();
+      toast.success(response.message || 'Balanza desconectada exitosamente');
+      setBalanzaConectada(false);
+      setPesoActual(0);
 
-    // Limpia el monitor y los datos en tiempo real
-    detenerMonitoreoRealTime();
-  } catch (error) {
-    console.error('Error al desconectar balanza:', error);
-    toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message));
-  } finally {
-    setConectandoBalanza(false);
-  }
-};
+      // Limpia el monitor y los datos en tiempo real
+      detenerMonitoreoRealTime();
+    } catch (error) {
+      console.error('Error al desconectar balanza:', error);
+      toast.error('Error al desconectar: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setConectandoBalanza(false);
+    }
+  };
 
   useEffect(() => {
     setIsFilterActive(
@@ -4298,25 +4303,25 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
                     Gestión de Ingresos
                   </h4>
                   <div className="d-flex gap-2 mb-3">
-  <CButton
-    color="success"
-    onClick={handleSelectAll}
-    size="sm"
-  >
-    <CIcon icon={selectedIngresos.length === ingresos.length ? cilCheckCircle : cilCircle} className="me-1" />
-    {selectedIngresos.length === ingresos.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
-  </CButton>
+                    <CButton
+                      color="success"
+                      onClick={handleSelectAll}
+                      size="sm"
+                    >
+                      <CIcon icon={selectedIngresos.length === ingresos.length ? cilCheckCircle : cilCircle} className="me-1" />
+                      {selectedIngresos.length === ingresos.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+                    </CButton>
 
-  <CButton
-    color="primary"
-    onClick={handleGenerateMassivePDF}
-    disabled={selectedIngresos.length === 0 || generatingMassivePDF}
-    size="sm"
-  >
-    <CIcon icon={cilPrint} className="me-1" />
-    {generatingMassivePDF ? 'Generando...' : `Imprimir Seleccionados (${selectedIngresos.length})`}
-  </CButton>
-</div>
+                    <CButton
+                      color="primary"
+                      onClick={handleGenerateMassivePDF}
+                      disabled={selectedIngresos.length === 0 || generatingMassivePDF}
+                      size="sm"
+                    >
+                      <CIcon icon={cilPrint} className="me-1" />
+                      {generatingMassivePDF ? 'Generando...' : `Imprimir Seleccionados (${selectedIngresos.length})`}
+                    </CButton>
+                  </div>
                   <CButton
                     color={balanzaConectada ? 'success' : 'warning'}
                     variant="outline"
@@ -4435,12 +4440,12 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
                     <CTable hover responsive striped>
                       <CTableHead>
                         <CTableRow>
-                        <CTableHeaderCell>
-                          <CFormCheck
-                            checked={selectedIngresos.length === ingresos.length && ingresos.length > 0}
-                            onChange={handleSelectAll}
-                          />
-                        </CTableHeaderCell>
+                          <CTableHeaderCell>
+                            <CFormCheck
+                              checked={selectedIngresos.length === ingresos.length && ingresos.length > 0}
+                              onChange={handleSelectAll}
+                            />
+                          </CTableHeaderCell>
                           <CTableHeaderCell>#</CTableHeaderCell>
                           <CTableHeaderCell>
                             Número
@@ -4498,12 +4503,12 @@ const drawTableMassive = (doc, tableData, startY, yOffset, mitadHeight) => {
                           ingresos.map((ingreso, index) => (
                             <React.Fragment key={ingreso.id}>
                               <CTableRow onClick={() => toggleRow(ingreso.id)}>
-                              <CTableDataCell>
-  <CFormCheck
-    checked={selectedIngresos.includes(ingreso.id)}
-    onChange={() => handleSelectIngreso(ingreso.id)}
-  />
-</CTableDataCell>
+                                <CTableDataCell>
+                                  <CFormCheck
+                                    checked={selectedIngresos.includes(ingreso.id)}
+                                    onChange={() => handleSelectIngreso(ingreso.id)}
+                                  />
+                                </CTableDataCell>
                                 <CTableDataCell>{index + 1}</CTableDataCell>
                                 <CTableDataCell>{ingreso.numero_ingreso}</CTableDataCell>
                                 <CTableDataCell>
