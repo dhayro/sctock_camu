@@ -1,0 +1,42 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: stock_camu
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build: ./stock_camu_backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./stock_camu_backend:/app
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=192.168.10.100
+      - DB_USER=root
+      - DB_PASSWORD=
+      - DB_NAME=stock_camu
+
+  frontend:
+    build: ./sctock_camu
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./sctock_camu/src:/app/src
+      - ./sctock_camu/public:/app/public
+      - ./sctock_camu/vite.config.mjs:/app/vite.config.mjs
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:

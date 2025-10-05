@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
+const API_BASE = 'http://localhost:3000/api'; // O la IP de tu backend si es remota
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -16,8 +17,7 @@ export const AuthProvider = ({ children }) => {
       
       if (storedToken) {
         try {
-          // Verificar si el token es válido haciendo una solicitud al endpoint /api/usuarios/auth/me
-          const response = await fetch('/api/usuarios/auth/me', {
+          const response = await fetch(`${API_BASE}/usuarios/auth/me`, {
             headers: { 
               Authorization: `Bearer ${storedToken}` 
             }
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch('/api/usuarios/auth/login', {
+      const response = await fetch(`${API_BASE}/usuarios/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

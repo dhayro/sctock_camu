@@ -11,7 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: 'http://192.168.0.39:3000',
+        url: 'http://192.168.10.100:3000',
         description: 'Servidor de desarrollo',
       },
     ],
