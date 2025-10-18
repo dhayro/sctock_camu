@@ -10,9 +10,7 @@
   "description": "Sistema de control de ingreso y salida de productos de camucamu",
   "main": "index.js",
   "scripts": {
-    "start:backend": "cd stock_camu_backend && npm run start",
-    "start:frontend": "cd sctock_camu && npm start",
-    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\""
+    "dev": "concurrently \"npm --prefix ./stock_camu_backend run dev\" \"npm --prefix ./sctock_camu start\""
   },
   "keywords": [],
   "author": "",

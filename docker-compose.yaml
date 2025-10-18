@@ -19,7 +19,7 @@ services:
       - ./stock_camu_backend:/app
     environment:
       - NODE_ENV=development
-      - DB_HOST=192.168.10.100
+      - DB_HOST=192.168.1.202
       - DB_USER=root
       - DB_PASSWORD=
       - DB_NAME=stock_camu

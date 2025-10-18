@@ -230,7 +230,7 @@ const Ingresos = () => {
 
       // Ancho A3 (297mm), altura dinámica tipo ticket
       const ticketWidth = 297 // mm (A3 vertical)
-      const ingresoHeight = 150 // 14cm = 140mm
+      const ingresoHeight = 200 // 14cm = 140mm
       const totalHeight = ingresosSeleccionados.length * ingresoHeight + 20
 
       const doc = new jsPDF({
