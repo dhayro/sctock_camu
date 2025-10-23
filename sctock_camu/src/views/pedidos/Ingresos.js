@@ -5955,7 +5955,7 @@ const Ingresos = () => {
                                                   setDetalleOrdenSeleccionado(producto.id)
                                                 }
                                               }}
-                                              disabled={isCompleto || editingId !== null}
+                                              disabled={ordenesPendientes.find(o => o.id === ordenSeleccionada)?.estado === 'terminado' || editingId !== null}
                                             >
                                               {detalleOrdenSeleccionado === producto.id ? (
                                                 <>
