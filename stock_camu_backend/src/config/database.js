@@ -10,7 +10,7 @@ async function initializeDatabase() {
   try {
     // Primero conectamos sin especificar una base de datos
     const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || '192.168.1.202',
+      host: process.env.DB_HOST || '10.88.109.27',
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASSWORD || '',
       multipleStatements: true // Importante para ejecutar múltiples consultas
@@ -51,7 +51,7 @@ const sequelize = new Sequelize(
   process.env.DB_USER || 'root',
   process.env.DB_PASSWORD || '',
   {
-    host: process.env.DB_HOST || '192.168.1.202',
+    host: process.env.DB_HOST || '10.88.109.27',
     dialect: 'mysql',
     port: process.env.DB_PORT || 3306,
     logging: process.env.NODE_ENV === 'development' ? console.log : false,

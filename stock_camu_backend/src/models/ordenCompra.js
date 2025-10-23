@@ -36,7 +36,7 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT
       },
       estado: {
-        type: DataTypes.ENUM('pendiente', 'en_proceso', 'completado', 'cancelado'),
+        type: DataTypes.ENUM('pendiente', 'en_proceso', 'completado', 'cancelado','terminado'),
         defaultValue: 'pendiente'
       },
       observacion: {

@@ -107,26 +107,41 @@ const generarCodigoParcela = async (socio_id, periodo) => {
         socio_id,
         periodo
       },
-      order: [['codigo', 'DESC']]
+      order: [['codigo', 'ASC']]
     });
 
-    // Generar el siguiente número secuencial
-    let numeroSecuencial = 1;
-    if (parcelasExistentes.length > 0) {
-      // Extraer el número secuencial del último código
-      const ultimoCodigo = parcelasExistentes[0].codigo;
-      const partes = ultimoCodigo.split('-');
-      if (partes.length >= 2) {
-        const ultimoNumero = parseInt(partes[partes.length - 1]);
-        numeroSecuencial = ultimoNumero + 1;
-      }
+    // Si es la primera parcela, devolver solo el código del socio
+    if (parcelasExistentes.length === 0) {
+      return socio.codigo;
     }
 
-    // Formatear el número secuencial con ceros a la izquierda
-    const numeroFormateado = numeroSecuencial.toString().padStart(2, '0');
+    // Si ya existen parcelas, verificar si hay una sin número secuencial
+    const primeraParcela = parcelasExistentes[0];
+    const primeraPartesCodigo = primeraParcela.codigo.split('-');
     
-    // Generar el código final: CODIGO_SOCIO-NUMERO_SECUENCIAL
-    return `${socio.codigo}-${numeroFormateado}`;
+    // Si la primera parcela tiene solo el código del socio (sin número)
+    if (primeraPartesCodigo.length === 1 && primeraParcela.codigo === socio.codigo) {
+      // Migrar la primera parcela a SOC-01
+      primeraParcela.codigo = `${socio.codigo}-01`;
+      await primeraParcela.save();
+      
+      // La nueva parcela será SOC-02
+      return `${socio.codigo}-02`;
+    }
+
+    // Si todas las parcelas ya tienen números secuenciales, generar el siguiente
+    const ultimaParcela = parcelasExistentes[parcelasExistentes.length - 1];
+    const ultimasPartes = ultimaParcela.codigo.split('-');
+    
+    if (ultimasPartes.length >= 2) {
+      const ultimoNumero = parseInt(ultimasPartes[ultimasPartes.length - 1]);
+      const numeroSecuencial = ultimoNumero + 1;
+      const numeroFormateado = numeroSecuencial.toString().padStart(2, '0');
+      return `${socio.codigo}-${numeroFormateado}`;
+    }
+    
+    // Fallback: generar con número 01
+    return `${socio.codigo}-01`;
   } catch (error) {
     throw error;
   }
@@ -319,9 +334,34 @@ exports.deleteParcela = async (req, res) => {
     if (!parcela) {
       return res.status(404).json({ error: 'Parcela no encontrada' });
     }
+
+    const socio_id = parcela.socio_id;
+    const periodo = parcela.periodo;
     
+    // Eliminar la parcela
     await parcela.destroy();
 
+    // Validar la secuencia de códigos para el socio en este período
+    const parcelasRestantes = await Parcela.findAll({
+      where: {
+        socio_id,
+        periodo
+      },
+      order: [['codigo', 'ASC']]
+    });
+
+    // Si queda solo una parcela y tiene número secuencial, convertirla a sin número
+    if (parcelasRestantes.length === 1) {
+      const ultimaParcela = parcelasRestantes[0];
+      const socio = await Socio.findByPk(socio_id);
+      
+      // Verificar si el código tiene guión (número secuencial)
+      if (ultimaParcela.codigo.includes('-')) {
+        // Convertir a formato sin número: SOC-001-01 -> SOC-001
+        ultimaParcela.codigo = socio.codigo;
+        await ultimaParcela.save();
+      }
+    }
     
     res.json({ message: 'Parcela eliminada correctamente' });
   } catch (error) {

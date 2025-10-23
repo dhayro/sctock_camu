@@ -407,7 +407,7 @@ exports.getOrdenesPendientes = async (req, res) => {
     // Filtro base: solo órdenes pendientes
     let where = {
       estado: {
-        [Op.in]: ["pendiente", "en_proceso"],
+        [Op.in]: ["pendiente", "en_proceso","completado"],
       },
     };
 

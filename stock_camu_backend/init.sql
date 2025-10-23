@@ -134,7 +134,7 @@ CREATE TABLE ordenes_compra (
     fecha_emision DATE NOT NULL,
     fecha_entrega DATE,
     lugar_entrega TEXT,
-    estado ENUM('pendiente', 'en_proceso', 'completado', 'cancelado') DEFAULT 'pendiente',
+    estado ENUM('pendiente', 'en_proceso', 'completado', 'cancelado','terminado') DEFAULT 'pendiente',
     observacion TEXT,
     forma_pago VARCHAR(50),
     usuario_creacion_id INT NOT NULL,

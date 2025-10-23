@@ -26,6 +26,11 @@ const ordenCompraService = {
     return api.patch(`/ordenes-compra/${id}/estado`, { estado });
   },
   
+  cambiarEstado: async (id, estado) => {
+    // Cambiar estado de la orden de compra
+    return api.patch(`/ordenes-compra/${id}/estado`, { estado });
+  },
+  
   // Nuevos servicios para órdenes pendientes
   getPendientes: async (params) => {
     // Fetch all pending ordenes de compra with optional query parameters

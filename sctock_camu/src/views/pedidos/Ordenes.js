@@ -44,7 +44,10 @@ import {
     cilFilter,
     cilFilterX,
     cilInfo,
-    cilX, cilSave
+    cilX,
+    cilSave,
+    cilCheckCircle,
+    cilXCircle
 } from '@coreui/icons';
 import Swal from 'sweetalert2';
 import { debounce } from 'lodash';
@@ -532,12 +535,13 @@ const fetchDetalles = async () => {
 };
 
 // Componente OrdenRow mejorado para responsividad
-const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete }) => {
+const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete, onChangeEstado }) => {
     const getEstadoBadge = (estado) => {
         const badges = {
             'pendiente': 'warning',
             'en_proceso': 'info',
             'completado': 'success',
+            'terminado': 'primary',
             'cancelado': 'danger'
         };
         return badges[estado] || 'secondary';
@@ -547,6 +551,11 @@ const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete })
         if (!dateString) return '-';
         return new Date(dateString).toLocaleDateString('es-PE');
     };
+
+    // Verificar si tiene ingresos (cantidad_ingresada > 0)
+    const tieneIngresos = orden.detalles?.some(detalle => 
+        parseFloat(detalle.cantidad_ingresada || 0) > 0
+    ) || false;
 
     return (
         <CTableRow>
@@ -569,26 +578,52 @@ const OrdenRow = ({ orden, index, currentPage, itemsPerPage, onEdit, onDelete })
                 </CBadge>
             </CTableDataCell>
             <CTableDataCell>
-                <CButtonGroup size="sm">
-                    <CButton
-                        color="info"
-                        variant="outline"
-                        onClick={() => onEdit(orden)}
-                        title="Ver/Editar"
-                        disabled={orden.estado !== 'pendiente'} // Disable edit button if not 'pendiente'
-                    >
-                        <CIcon icon={cilInfo} />
-                    </CButton>
-                    <CButton
-                        color="danger"
-                        variant="outline"
-                        onClick={() => onDelete(orden)}
-                        title="Eliminar"
-                        disabled={orden.estado !== 'pendiente'} // Disable delete button if not 'pendiente'
-                    >
-                        <CIcon icon={cilTrash} />
-                    </CButton>
-                </CButtonGroup>
+                {orden.estado === 'cancelado' ? (
+                    <span className="text-muted text-center">Sin acciones</span>
+                ) : (
+                    <CButtonGroup size="sm">
+                        <CButton
+                            color="info"
+                            variant="outline"
+                            onClick={() => onEdit(orden)}
+                            title="Ver/Editar"
+                            disabled={orden.estado !== 'pendiente'}
+                        >
+                            <CIcon icon={cilInfo} />
+                        </CButton>
+                        <CButton
+                            color="danger"
+                            variant="outline"
+                            onClick={() => onDelete(orden)}
+                            title="Eliminar"
+                            disabled={orden.estado !== 'pendiente'}
+                        >
+                            <CIcon icon={cilTrash} />
+                        </CButton>
+                        {/* Botón Cancelar - Solo activo si NO hay ingresos y estado ≠ cancelado */}
+                        {!tieneIngresos && orden.estado !== 'cancelado' && (
+                            <CButton
+                                color="warning"
+                                variant="outline"
+                                onClick={() => onChangeEstado(orden.id, 'cancelado')}
+                                title="Cancelar orden"
+                            >
+                                <CIcon icon={cilXCircle} />
+                            </CButton>
+                        )}
+                        {/* Botón Terminar - Siempre activo a menos que ya esté terminado */}
+                        {orden.estado !== 'terminado' && (
+                            <CButton
+                                color="success"
+                                variant="outline"
+                                onClick={() => onChangeEstado(orden.id, 'terminado')}
+                                title="Terminar/Cerrar orden"
+                            >
+                                <CIcon icon={cilCheckCircle} />
+                            </CButton>
+                        )}
+                    </CButtonGroup>
+                )}
             </CTableDataCell>
         </CTableRow>
     );
@@ -1149,7 +1184,8 @@ const OrdenModal = ({ visible, onClose, title, orden, errors, submitting, onChan
                                             >
                                                 <option value="pendiente">Pendiente</option>
                                                 <option value="en_proceso">En Proceso</option>
-                                                <option value="completado">Completado</option>
+                                                <option value="completado">Completado (Lleno)</option>
+                                                <option value="terminado">Terminado (Cerrado)</option>
                                                 <option value="cancelado">Cancelado</option>
                                             </CFormSelect>
                                         </div>
@@ -1662,6 +1698,53 @@ const Ordenes = () => {
         });
     };
 
+    const handleChangeEstadoOrden = async (ordenId, nuevoEstado) => {
+        try {
+            // Mostrar confirmación según el estado
+            const mensajes = {
+                'cancelado': '¿Está seguro que desea CANCELAR esta orden?',
+                'terminado': '¿Está seguro que desea TERMINAR/CERRAR esta orden?'
+            };
+
+            const resultado = await Swal.fire({
+                title: 'Confirmar cambio de estado',
+                text: mensajes[nuevoEstado] || 'Confirmar cambio de estado',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: nuevoEstado === 'cancelado' ? '#d33' : '#28a745',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: nuevoEstado === 'cancelado' ? 'Sí, cancelar' : 'Sí, terminar',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (!resultado.isConfirmed) return;
+
+            // Cambiar estado mediante API
+            await ordenCompraService.cambiarEstado(ordenId, nuevoEstado);
+
+            // Mostrar mensaje de éxito
+            Swal.fire({
+                icon: 'success',
+                title: '¡Éxito!',
+                text: `La orden ha sido ${nuevoEstado === 'cancelado' ? 'cancelada' : 'terminada'} correctamente.`,
+                confirmButtonColor: '#321fdb',
+                timer: 2000,
+                timerProgressBar: true
+            });
+
+            // Recargar las órdenes
+            await fetchOrdenes(currentPage, itemsPerPage, searchTerm, numeroFilter, clienteFilter);
+        } catch (error) {
+            console.error('Error al cambiar estado:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: error.response?.data?.error || 'Error al cambiar el estado de la orden',
+                confirmButtonColor: '#321fdb'
+            });
+        }
+    };
+
     const deleteOrden = async (orden) => {
         try {
             Swal.fire({
@@ -1817,6 +1900,7 @@ const Ordenes = () => {
                                             itemsPerPage={itemsPerPage}
                                             onEdit={handleOpenEditModal}
                                             onDelete={handleOpenDeleteModal}
+                                            onChangeEstado={handleChangeEstadoOrden}
                                         />
                                     ))}
                                 </CTableBody>
