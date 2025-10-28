@@ -2,7 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
-const API_BASE = 'http://10.88.109.27:3000/api'; // O la IP de tu backend si es remota
+const API_BASE = 'http://172.10.9.144:3000/api'; // O la IP de tu backend si es remota
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

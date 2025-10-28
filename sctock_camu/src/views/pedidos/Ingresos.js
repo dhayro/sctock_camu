@@ -4626,7 +4626,7 @@ const Ingresos = () => {
                                 </CTableDataCell>
                                 <CTableDataCell>{ingreso.num_jabas}</CTableDataCell>
                                 <CTableDataCell>
-                                  S/ {(parseFloat(ingreso.pago_transporte) || 0).toFixed(2)}
+                                  S/ {(parseFloat(ingreso.monto_transporte) || 0).toFixed(2)}
                                 </CTableDataCell>
                                 <CTableDataCell>
                                   S/ {(parseFloat(ingreso.ingreso_cooperativa) || 0).toFixed(2)}

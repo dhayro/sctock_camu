@@ -398,32 +398,26 @@ exports.createIngreso = async (req, res) => {
     const codigoLote = detalleOrden.orden_compra.codigo_lote;
     console.log('Código de lote obtenido:', codigoLote);
     
-    // Buscar el último ingreso con el mismo código de lote para generar el siguiente número
-    const ultimoIngreso = await Ingreso.findOne({
-      where: {
-        numero_ingreso: {
-          [Op.like]: `${codigoLote}-%`
-        }
-      },
-      order: [['numero_ingreso', 'DESC']],
+    // Obtener todos los ingresos del mismo lote y calcular el mayor sufijo numérico
+    const ingresosLote = await Ingreso.findAll({
+      where: { numero_ingreso: { [Op.like]: `${codigoLote}-%` } },
+      attributes: ['numero_ingreso'],
       transaction
     });
-    
+
     let numeroIngreso;
-    if (ultimoIngreso) {
-      console.log('Último ingreso encontrado:', ultimoIngreso.numero_ingreso);
-      // Extraer el número secuencial del último ingreso
-      const match = ultimoIngreso.numero_ingreso.match(/-(\d+)$/);
-      if (match) {
-        const ultimoNumero = parseInt(match[1], 10);
-        const siguienteNumero = ultimoNumero + 1;
-        numeroIngreso = `${codigoLote}-${siguienteNumero.toString().padStart(2, '0')}`;
-      } else {
-        // Si no coincide el patrón, empezar con 01
-        numeroIngreso = `${codigoLote}-01`;
-      }
+    if (ingresosLote && ingresosLote.length > 0) {
+      let maxNumero = 0;
+      ingresosLote.forEach(i => {
+        const m = i.numero_ingreso.match(/-(\d+)$/);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (!Number.isNaN(n) && n > maxNumero) maxNumero = n;
+        }
+      });
+      const siguienteNumero = maxNumero + 1;
+      numeroIngreso = `${codigoLote}-${siguienteNumero.toString().padStart(2, '0')}`;
     } else {
-      // Si no hay ingresos previos con este código de lote, empezar con 01
       numeroIngreso = `${codigoLote}-01`;
     }
     
